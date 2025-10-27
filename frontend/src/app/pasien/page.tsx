@@ -3,7 +3,7 @@ import PasienPage from '../../features/pasien'
 
 export default function Page() {
   return (
-    <ProtectedLayout>
+    <ProtectedLayout allowedRoles={['admin', 'kasir']}>
       <PasienPage />
     </ProtectedLayout>
   )
