@@ -3,7 +3,7 @@ import AntrianPage from '../../features/antrian'
 
 export default function Page() {
   return (
-    <ProtectedLayout>
+    <ProtectedLayout allowedRoles={['admin', 'kasir']}>
       <AntrianPage />
     </ProtectedLayout>
   )
