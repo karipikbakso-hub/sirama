@@ -1,16 +1,20 @@
-import { useState } from 'react'
 import { Pasien } from './types'
-import { dummyPasien } from './data'
 
-export function usePasienData() {
-  const [data, setData] = useState<Pasien[]>(dummyPasien)
-  const addPasien = (newData: Omit<Pasien, 'id' | 'created_at'>) => {
-    const newPasien: Pasien = {
-      id: Date.now(),
-      created_at: new Date().toISOString(),
-      ...newData,
-    }
-    setData(prev => [newPasien, ...prev])
-  }
-  return { data, addPasien }
-}
+export const dummyPasien: Pasien[] = [
+  {
+    id: 1,
+    nama: 'Budi Santoso',
+    nik: '327101230001',
+    umur: 32,
+    keluhan: 'Demam dan batuk',
+    created_at: '2025-10-27T08:00:00Z',
+  },
+  {
+    id: 2,
+    nama: 'Siti Aminah',
+    nik: '327101230002',
+    umur: 45,
+    keluhan: 'Nyeri kepala',
+    created_at: '2025-10-27T09:30:00Z',
+  },
+]
