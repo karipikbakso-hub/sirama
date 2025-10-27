@@ -1,7 +1,3 @@
 {
-  "projects": {
-    "default": {
-      "rootDirectory": "frontend"
-    }
-  }
+  "rootDirectory": "frontend"
 }
