@@ -1,1 +1,17 @@
+[
+  {
+    "id": 1,
+    "nomor": "A001",
+    "nama_pasien": "Siti Rahmawati",
+    "poli": "Umum",
+    "status": "Menunggu"
+  },
+  {
+    "id": 2,
+    "nomor": "A002",
+    "nama_pasien": "Budi Santoso",
+    "poli": "Gigi",
+    "status": "Dalam Pemeriksaan"
+  }
+]
 
