@@ -4,11 +4,12 @@ SIRAMA (Sistem Informasi Rumah Sakit Modular Adaptif) dikembangkan secara bertah
 
 ---
 
-## 🟢 Fase 1 – Klinik & Puskesmas (Core MVP + BPJS Dasar)
+# 🏥 Roadmap Modular SIMRS – SIRAMA
 
-**Fokus:** Alur dasar pasien, pemeriksaan, pembayaran, dan integrasi BPJS minimal  
-**Target:** Klinik kecil, Puskesmas, praktik mandiri  
-**Fitur Futuristik:** Audit trail granular, dashboard real-time, integrasi antrean Mobile JKN
+## 🟢 Fase 1 – Klinik & Puskesmas (Core MVP + BPJS Dasar)
+**Fokus**: Alur dasar pasien, pemeriksaan, pembayaran, dan integrasi BPJS minimal  
+**Target**: Klinik kecil, Puskesmas, praktik mandiri  
+**Fitur Futuristik**: Audit trail granular, dashboard real-time, integrasi antrean Mobile JKN
 
 ### Modul:
 - **Pasien** – Pendaftaran, identitas, riwayat kunjungan
@@ -19,14 +20,16 @@ SIRAMA (Sistem Informasi Rumah Sakit Modular Adaptif) dikembangkan secara bertah
 - **Auth & Role** – Login, hak akses
 - **Audit Trail** – Log aktivitas pengguna & perubahan data
 - **Bridging BPJS (Dasar)** – Pembuatan SEP, cek peserta, antrean Mobile JKN
+- **Fasilitas & Kamar** – Status ruang, pemakaian, pemeliharaan (untuk persiapan rawat inap)
+- **Surveilans & Pelaporan** – Laporan penyakit menular, imunisasi, pelaporan ke Kemenkes via FHIR
+- **FHIR SATUSEHAT (Dasar)** – Struktur data pasien, encounter, observation, dan kunjungan sesuai HL7 FHIR
 
 ---
 
 ## 🟡 Fase 2 – RS Tipe C (Rawat Inap & Pemeriksaan Penunjang)
-
-**Fokus:** Layanan rawat inap dan pemeriksaan penunjang  
-**Target:** RS tipe C, RS swasta kecil  
-**Fitur Futuristik:** Upload hasil lab/radiologi digital, cetak otomatis, integrasi LIS/PACS
+**Fokus**: Layanan rawat inap dan pemeriksaan penunjang  
+**Target**: RS tipe C, RS swasta kecil  
+**Fitur Futuristik**: Upload hasil lab/radiologi digital, cetak otomatis, integrasi LIS/PACS
 
 ### Modul:
 - **Rawat Inap** – Booking kamar, monitoring, tagihan
@@ -35,6 +38,10 @@ SIRAMA (Sistem Informasi Rumah Sakit Modular Adaptif) dikembangkan secara bertah
 - **Radiologi** – Permintaan & hasil scan, upload gambar
 - **MCU** – Pemeriksaan fisik, hasil MCU, cetak sertifikat
 - **Laporan** – Kunjungan, tindakan, pendapatan, export PDF/Excel
+- **Bridging BPJS (Lanjutan)** – e-Claim, VClaim, validasi INA-CBG
+- **SDM & Jadwal** – Manajemen pegawai, shift, absensi
+- **Integrasi LIS/PACS** – Koneksi sistem lab & radiologi eksternal
+- **FHIR SATUSEHAT (Lanjutan)** – Resource lanjutan: DiagnosticReport, Medication, ImagingStudy
 
 ---
 
