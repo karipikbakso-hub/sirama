@@ -1,11 +1,10 @@
-import { Pasien } from './types'
+import { Transaksi } from './types'
 
-export async function fetchPasien(): Promise<Pasien[]> {
-  // Ganti dengan fetch Laravel nanti
+export async function fetchTransaksi(): Promise<Transaksi[]> {
   return new Promise(resolve => setTimeout(() => resolve([]), 500))
 }
 
-export async function createPasien(data: Omit<Pasien, 'id' | 'created_at'>): Promise<Pasien> {
+export async function createTransaksi(data: Omit<Transaksi, 'id' | 'created_at'>): Promise<Transaksi> {
   return {
     id: Math.floor(Math.random() * 1000),
     created_at: new Date().toISOString(),
