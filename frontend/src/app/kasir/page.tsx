@@ -3,7 +3,7 @@ import KasirPage from '../../features/kasir'
 
 export default function Page() {
   return (
-    <ProtectedLayout>
+    <ProtectedLayout allowedRoles={['kasir']}>
       <KasirPage />
     </ProtectedLayout>
   )
