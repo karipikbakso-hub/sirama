@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { fetchMock } from './src/lib/api'
+import { fetchMock } from '../lib/api'
 
 export default function Page(){
 const [stats, setStats] = useState<any>(null)
