@@ -1,16 +1,16 @@
 import { useState } from 'react'
-import { Pasien } from './types'
-import { dummyPasien } from './data'
+import { Transaksi } from './types'
+import { dummyTransaksi } from './data'
 
-export function usePasienData() {
-  const [data, setData] = useState<Pasien[]>(dummyPasien)
-  const addPasien = (newData: Omit<Pasien, 'id' | 'created_at'>) => {
-    const newPasien: Pasien = {
+export function useKasirData() {
+  const [data, setData] = useState<Transaksi[]>(dummyTransaksi)
+  const addTransaksi = (newData: Omit<Transaksi, 'id' | 'created_at'>) => {
+    const newTransaksi: Transaksi = {
       id: Date.now(),
       created_at: new Date().toISOString(),
       ...newData,
     }
-    setData(prev => [newPasien, ...prev])
+    setData(prev => [newTransaksi, ...prev])
   }
-  return { data, addPasien }
+  return { data, addTransaksi }
 }
