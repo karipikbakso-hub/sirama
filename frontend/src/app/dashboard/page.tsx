@@ -3,7 +3,7 @@ import DashboardPage from '../../features/dashboard'
 
 export default function Page() {
   return (
-    <ProtectedLayout>
+    <ProtectedLayout allowedRoles={['admin', 'kasir']}>
       <DashboardPage />
     </ProtectedLayout>
   )
