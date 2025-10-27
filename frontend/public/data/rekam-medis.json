@@ -1,1 +1,11 @@
+[
+  {
+    "id": 1,
+    "pasien_id": 1,
+    "dokter": "dr. Aulia Fitria",
+    "diagnosa": "Demam Berdarah",
+    "tindakan": "Pemberian cairan infus",
+    "tanggal": "2025-10-27"
+  }
+]
 
