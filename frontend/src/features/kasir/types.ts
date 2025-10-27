@@ -1,8 +1,7 @@
-export interface Pasien {
+export interface Transaksi {
   id: number
   nama: string
-  nik: string
-  umur: number
-  keluhan: string
+  layanan: string
+  total: number
   created_at: string
 }
