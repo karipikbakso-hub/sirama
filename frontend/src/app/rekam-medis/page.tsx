@@ -3,7 +3,7 @@ import RekamMedisPage from '../../features/rekam-medis'
 
 export default function Page() {
   return (
-    <ProtectedLayout>
+    <ProtectedLayout allowedRoles={['admin']}>
       <RekamMedisPage />
     </ProtectedLayout>
   )
