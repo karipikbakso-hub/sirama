@@ -1,1 +1,18 @@
-
+[
+  {
+    "id": 1,
+    "nama": "Siti Rahmawati",
+    "nik": "3201020001123456",
+    "alamat": "Jl. Merpati No. 5, Bandung",
+    "no_bpjs": "0001234567890",
+    "riwayat": ["Demam", "Batuk", "Kontrol 2x"]
+  },
+  {
+    "id": 2,
+    "nama": "Budi Santoso",
+    "nik": "3201040002456789",
+    "alamat": "Jl. Mawar No. 10, Cimahi",
+    "no_bpjs": "0009876543210",
+    "riwayat": ["Hipertensi", "Kontrol 1x"]
+  }
+]
