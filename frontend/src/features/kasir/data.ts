@@ -1,20 +1,18 @@
-import { Pasien } from './types'
+import { Transaksi } from './types'
 
-export const dummyPasien: Pasien[] = [
+export const dummyTransaksi: Transaksi[] = [
   {
     id: 1,
     nama: 'Budi Santoso',
-    nik: '327101230001',
-    umur: 32,
-    keluhan: 'Demam dan batuk',
+    layanan: 'Pemeriksaan Umum',
+    total: 50000,
     created_at: '2025-10-27T08:00:00Z',
   },
   {
     id: 2,
     nama: 'Siti Aminah',
-    nik: '327101230002',
-    umur: 45,
-    keluhan: 'Nyeri kepala',
-    created_at: '2025-10-27T09:30:00Z',
+    layanan: 'Pemeriksaan Gigi',
+    total: 75000,
+    created_at: '2025-10-27T09:00:00Z',
   },
 ]
