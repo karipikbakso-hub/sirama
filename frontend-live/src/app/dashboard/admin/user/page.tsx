@@ -2,23 +2,35 @@
 
 import { useState } from 'react'
 
-const dummyUsers = Array.from({ length: 42 }, (_, i) => ({
+type User = {
+  id: number
+  name: string
+  role: 'Admin' | 'Dokter' | 'Perawat' | 'Kasir'
+  status: 'Aktif' | 'Nonaktif'
+}
+
+const dummyUsers: User[] = Array.from({ length: 42 }, (_, i) => ({
   id: i + 1,
   name: `User ${i + 1}`,
-  role: ['Admin', 'Dokter', 'Perawat', 'Kasir'][i % 4],
+  role: ['Admin', 'Dokter', 'Perawat', 'Kasir'][i % 4] as User['role'],
   status: i % 3 === 0 ? 'Nonaktif' : 'Aktif',
 }))
 
+const statusColor: Record<User['status'], string> = {
+  Aktif: 'bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-200',
+  Nonaktif: 'bg-red-100 text-red-700 dark:bg-red-800 dark:text-red-200',
+}
+
 export default function UserPage() {
   const [page, setPage] = useState(1)
-  const [modalUser, setModalUser] = useState(null)
+  const [modalUser, setModalUser] = useState<User | null>(null)
   const [modalType, setModalType] = useState<'edit' | 'delete' | null>(null)
 
   const perPage = 10
   const totalPages = Math.ceil(dummyUsers.length / perPage)
   const users = dummyUsers.slice((page - 1) * perPage, page * perPage)
 
-  const openModal = (user, type) => {
+  const openModal = (user: User, type: 'edit' | 'delete') => {
     setModalUser(user)
     setModalType(type)
   }
@@ -52,9 +64,8 @@ export default function UserPage() {
                 <td className="p-3">
                   <span
                     className={`px-2 py-1 rounded text-xs font-medium ${
-                      user.status === 'Aktif'
-                        ? 'bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-200'
-                        : 'bg-red-100 text-red-700 dark:bg-red-800 dark:text-red-200'
+                      statusColor[user.status as keyof typeof statusColor] ??
+                      'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200'
                     }`}
                   >
                     {user.status}

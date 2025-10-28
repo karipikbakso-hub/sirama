@@ -105,49 +105,54 @@ export default function KlinikPage() {
           </thead>
           <tbody>
             {pasienFiltered.map((p, i) => (
-              <tr
+                <tr
                 key={p.id}
                 className="border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
-              >
+                >
                 <td className="p-3 text-gray-700 dark:text-gray-300">{i + 1}</td>
                 <td className="p-3 text-gray-700 dark:text-gray-300">{p.nama}</td>
                 <td className="p-3 text-gray-700 dark:text-gray-300">{p.dokter}</td>
                 <td className="p-3 text-gray-700 dark:text-gray-300">{p.keluhan}</td>
                 <td className="p-3 text-gray-700 dark:text-gray-300">{p.waktu}</td>
                 <td>
-                  <span className={`px-2 py-1 rounded text-xs font-semibold ${statusColor[p.status]}`}>
+                    <span
+                    className={`px-2 py-1 rounded text-xs font-semibold ${
+                        statusColor[p.status as keyof typeof statusColor] ??
+                        'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200'
+                    }`}
+                    >
                     {p.status}
-                  </span>
+                    </span>
                 </td>
                 <td className="p-3 space-x-2">
                     <button
-                        onClick={() => openModal(p, 'periksa')}
-                        className="px-3 py-1 text-xs rounded bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 hover:scale-105 transition"
+                    onClick={() => openModal(p, 'periksa')}
+                    className="px-3 py-1 text-xs rounded bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 hover:scale-105 transition"
                     >
-                        🔍 Periksa
+                    🔍 Periksa
                     </button>
                     <button
-                        onClick={() => handleCetak(p)}
-                        className="px-3 py-1 text-xs rounded bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 hover:scale-105 transition"
+                    onClick={() => handleCetak(p)}
+                    className="px-3 py-1 text-xs rounded bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 hover:scale-105 transition"
                     >
-                        🖨️ Cetak
+                    🖨️ Cetak
                     </button>
                     <button
-                        onClick={() => openModal(p, 'ubah')}
-                        className="px-3 py-1 text-xs rounded bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-300 hover:scale-105 transition"
+                    onClick={() => openModal(p, 'ubah')}
+                    className="px-3 py-1 text-xs rounded bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-300 hover:scale-105 transition"
                     >
-                        ✏️ Ubah
+                    ✏️ Ubah
                     </button>
                     <button
-                        onClick={() => handleHapus(p)}
-                        className="px-3 py-1 text-xs rounded bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 hover:scale-105 transition"
+                    onClick={() => handleHapus(p)}
+                    className="px-3 py-1 text-xs rounded bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300 hover:scale-105 transition"
                     >
-                        🗑️ Hapus
+                    🗑️ Hapus
                     </button>
                 </td>
-              </tr>
+                </tr>
             ))}
-          </tbody>
+            </tbody>
         </table>
       </div>
 

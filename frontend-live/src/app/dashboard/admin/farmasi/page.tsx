@@ -2,16 +2,18 @@
 
 import { useState } from 'react'
 
+type Status = 'Menunggu' | 'Sudah Diberikan' | 'Ditolak'
+
 const dummyResep = Array.from({ length: 42 }, (_, i) => ({
   id: i + 1,
   pasien: ['Andi', 'Budi', 'Citra', 'Dewi', 'Eka'][i % 5],
   dokter: ['dr. Sari', 'dr. Rudi'][i % 2],
   obat: ['Paracetamol', 'Amoxicillin', 'Vitamin C', 'Ibuprofen'][i % 4],
-  status: ['Menunggu', 'Sudah Diberikan', 'Ditolak'][i % 3],
+  status: ['Menunggu', 'Sudah Diberikan', 'Ditolak'][i % 3] as Status,
   tanggal: `2025-10-${(i % 30) + 1}`,
 }))
 
-const statusColor = {
+const statusColor: Record<Status, string> = {
   Menunggu: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-800 dark:text-yellow-200',
   'Sudah Diberikan': 'bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-200',
   Ditolak: 'bg-red-100 text-red-700 dark:bg-red-800 dark:text-red-200',
@@ -79,7 +81,10 @@ export default function FarmasiPage() {
         </select>
         <select
           value={perPage}
-          onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1) }}
+          onChange={(e) => {
+            setPerPage(Number(e.target.value))
+            setPage(1)
+          }}
           className="appearance-none px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200"
         >
           <option value={10}>10 / halaman</option>
@@ -95,6 +100,7 @@ export default function FarmasiPage() {
         totalItems={resepFiltered.length}
         perPage={perPage}
         onPageChange={setPage}
+        label="resep"
       />
 
       {/* Tabel */}
@@ -113,14 +119,24 @@ export default function FarmasiPage() {
           </thead>
           <tbody>
             {paginated.map((r, i) => (
-              <tr key={r.id} className="border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
-                <td className="p-3 text-gray-700 dark:text-gray-300">{(page - 1) * perPage + i + 1}</td>
+              <tr
+                key={r.id}
+                className="border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                <td className="p-3 text-gray-700 dark:text-gray-300">
+                  {(page - 1) * perPage + i + 1}
+                </td>
                 <td className="p-3 text-gray-700 dark:text-gray-300">{r.pasien}</td>
                 <td className="p-3 text-gray-700 dark:text-gray-300">{r.dokter}</td>
                 <td className="p-3 text-gray-700 dark:text-gray-300">{r.obat}</td>
                 <td className="p-3 text-gray-700 dark:text-gray-300">{r.tanggal}</td>
                 <td>
-                  <span className={`px-2 py-1 rounded text-xs font-semibold ${statusColor[r.status]}`}>
+                  <span
+                    className={`px-2 py-1 rounded text-xs font-semibold ${
+                      statusColor[r.status] ??
+                      'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200'
+                    }`}
+                  >
                     {r.status}
                   </span>
                 </td>
@@ -142,6 +158,7 @@ export default function FarmasiPage() {
         totalItems={resepFiltered.length}
         perPage={perPage}
         onPageChange={setPage}
+        label="resep"
       />
     </div>
   )

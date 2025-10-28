@@ -124,9 +124,14 @@ export default function RawatInapPage() {
                 <td className="p-3 text-gray-700 dark:text-gray-300">{p.masuk}</td>
                 <td className="p-3 text-gray-700 dark:text-gray-300">{p.durasi}</td>
                 <td>
-                  <span className={`px-2 py-1 rounded text-xs font-semibold ${statusColor[p.status]}`}>
+                <span
+                    className={`px-2 py-1 rounded text-xs font-semibold ${
+                    statusColor[p.status as keyof typeof statusColor] ??
+                    'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200'
+                    }`}
+                >
                     {p.status}
-                  </span>
+                </span>
                 </td>
                 <td className="p-3 space-x-2">
                 <button className="px-3 py-1 text-xs rounded bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 hover:scale-105 transition">
