@@ -1,30 +1,21 @@
+import type { Metadata } from 'next'
 import '../styles/globals.css'
-import { ThemeProvider } from 'next-themes'
-import Navbar from '../components/Navbar'
-import Sidebar from '../components/Sidebar'
-import Breadcrumb from '../components/Breadcrumb'
 
-export const metadata = {
-  title: 'SIRAMA Demo',
-  description: 'SIRAMA - Demo Fase 1',
+export const metadata: Metadata = {
+  title: 'SIRAMA Admin',
+  description: 'Dashboard modern untuk SIMRS SIRAMA',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="id">
-      <body>
-        <ThemeProvider attribute="data-theme" defaultTheme="system">
-          <div className="app-shell">
-            <Navbar />
-            <div className="flex">
-              <Sidebar />
-              <main className="flex-1 p-6">
-                <Breadcrumb items={['Dashboard']} />
-                {children}
-              </main>
-            </div>
-          </div>
-        </ThemeProvider>
+      <head>
+        <link href="https://fonts.cdnfonts.com/css/satoshi" rel="stylesheet" />
+      </head>
+      <body className="antialiased bg-gray-100 dark:bg-gray-900">
+        {children}
       </body>
     </html>
   )
