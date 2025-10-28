@@ -13,9 +13,9 @@ export default function SidebarPerawat() {
   const pathname = usePathname()
 
   const items = [
-    ['Monitoring Pasien', <MdMonitorHeart />, '/dashboard/perawat/monitoring'],
-    ['Tanda Vital', <MdFavorite />, '/dashboard/perawat/vital'],
-    ['Status Kamar', <MdMeetingRoom />, '/dashboard/perawat/kamar'],
+    { label: 'Monitoring Pasien', icon: MdMonitorHeart, href: '/dashboard/perawat/monitoring' },
+    { label: 'Tanda Vital', icon: MdFavorite, href: '/dashboard/perawat/vital' },
+    { label: 'Status Kamar', icon: MdMeetingRoom, href: '/dashboard/perawat/kamar' },
   ]
 
   return (
@@ -38,7 +38,7 @@ const SidebarGroup = memo(function SidebarGroup({
   pathname,
 }: {
   title: string
-  items: Array<[string, JSX.Element, string]>
+  items: Array<{ label: string; icon: React.ElementType; href: string }>
   pathname: string
 }) {
   return (
@@ -48,7 +48,7 @@ const SidebarGroup = memo(function SidebarGroup({
       </div>
 
       <nav className="mt-1 space-y-1">
-        {items.map(([label, icon, href]) => (
+        {items.map(({ label, icon: Icon, href }) => (
           <Link
             key={href}
             href={href}
@@ -58,7 +58,7 @@ const SidebarGroup = memo(function SidebarGroup({
                 : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
             }`}
           >
-            <span className="text-lg">{icon}</span>
+            <Icon className="text-lg" />
             <span className="text-sm">{label}</span>
           </Link>
         ))}

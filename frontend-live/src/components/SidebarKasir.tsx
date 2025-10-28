@@ -14,10 +14,10 @@ export default function SidebarKasir() {
   const pathname = usePathname()
 
   const items = [
-    ['Billing & Pembayaran', <MdPayment />, '/dashboard/kasir/billing'],
-    ['Kwitansi', <MdReceiptLong />, '/dashboard/kasir/kwitansi'],
-    ['Pembayaran', <MdAttachMoney />, '/dashboard/kasir/pembayaran'],
-    ['Cetak Tagihan', <MdPrint />, '/dashboard/kasir/tagihan'],
+    { label: 'Billing & Pembayaran', icon: MdPayment, href: '/dashboard/kasir/billing' },
+    { label: 'Kwitansi', icon: MdReceiptLong, href: '/dashboard/kasir/kwitansi' },
+    { label: 'Pembayaran', icon: MdAttachMoney, href: '/dashboard/kasir/pembayaran' },
+    { label: 'Cetak Tagihan', icon: MdPrint, href: '/dashboard/kasir/tagihan' },
   ]
 
   return (
@@ -40,7 +40,7 @@ const SidebarGroup = memo(function SidebarGroup({
   pathname,
 }: {
   title: string
-  items: Array<[string, JSX.Element, string]>
+  items: Array<{ label: string; icon: React.ElementType; href: string }>
   pathname: string
 }) {
   return (
@@ -50,7 +50,7 @@ const SidebarGroup = memo(function SidebarGroup({
       </div>
 
       <nav className="mt-1 space-y-1">
-        {items.map(([label, icon, href]) => (
+        {items.map(({ label, icon: Icon, href }) => (
           <Link
             key={href}
             href={href}
@@ -60,7 +60,7 @@ const SidebarGroup = memo(function SidebarGroup({
                 : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
             }`}
           >
-            <span className="text-lg">{icon}</span>
+            <Icon className="text-lg" />
             <span className="text-sm">{label}</span>
           </Link>
         ))}

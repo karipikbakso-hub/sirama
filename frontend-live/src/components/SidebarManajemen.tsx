@@ -14,10 +14,10 @@ export default function SidebarManajemen() {
   const pathname = usePathname()
 
   const items = [
-    ['Laporan Operasional', <MdAssessment />, '/dashboard/manajemen/laporan'],
-    ['Dashboard Kinerja', <MdDashboard />, '/dashboard/manajemen/kinerja'],
-    ['Rekap Pendapatan', <MdAttachMoney />, '/dashboard/manajemen/pendapatan'],
-    ['Statistik SDM', <MdGroups />, '/dashboard/manajemen/sdm'],
+    { label: 'Laporan Operasional', icon: MdAssessment, href: '/dashboard/manajemen/laporan' },
+    { label: 'Dashboard Kinerja', icon: MdDashboard, href: '/dashboard/manajemen/kinerja' },
+    { label: 'Rekap Pendapatan', icon: MdAttachMoney, href: '/dashboard/manajemen/pendapatan' },
+    { label: 'Statistik SDM', icon: MdGroups, href: '/dashboard/manajemen/sdm' },
   ]
 
   return (
@@ -40,7 +40,7 @@ const SidebarGroup = memo(function SidebarGroup({
   pathname,
 }: {
   title: string
-  items: Array<[string, JSX.Element, string]>
+  items: Array<{ label: string; icon: React.ElementType; href: string }>
   pathname: string
 }) {
   return (
@@ -50,7 +50,7 @@ const SidebarGroup = memo(function SidebarGroup({
       </div>
 
       <nav className="mt-1 space-y-1">
-        {items.map(([label, icon, href]) => (
+        {items.map(({ label, icon: Icon, href }) => (
           <Link
             key={href}
             href={href}
@@ -60,7 +60,7 @@ const SidebarGroup = memo(function SidebarGroup({
                 : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
             }`}
           >
-            <span className="text-lg">{icon}</span>
+            <Icon className="text-lg" />
             <span className="text-sm">{label}</span>
           </Link>
         ))}

@@ -14,10 +14,10 @@ export default function SidebarPendaftaran() {
   const pathname = usePathname()
 
   const items = [
-    ['Data Pasien', <MdPerson />, '/dashboard/pasien'],
-    ['Antrian', <MdListAlt />, '/dashboard/antrian'],
-    ['Bridging BPJS', <MdShield />, '/dashboard/bpjs'],
-    ['Riwayat Kunjungan', <MdCalendarToday />, '/dashboard/kunjungan'],
+    { label: 'Data Pasien', icon: MdPerson, href: '/dashboard/pasien' },
+    { label: 'Antrian', icon: MdListAlt, href: '/dashboard/antrian' },
+    { label: 'Bridging BPJS', icon: MdShield, href: '/dashboard/bpjs' },
+    { label: 'Riwayat Kunjungan', icon: MdCalendarToday, href: '/dashboard/kunjungan' },
   ]
 
   return (
@@ -40,7 +40,7 @@ const SidebarGroup = memo(function SidebarGroup({
   pathname,
 }: {
   title: string
-  items: Array<[string, JSX.Element, string]>
+  items: Array<{ label: string; icon: React.ElementType; href: string }>
   pathname: string
 }) {
   return (
@@ -50,7 +50,7 @@ const SidebarGroup = memo(function SidebarGroup({
       </div>
 
       <nav className="mt-1 space-y-1">
-        {items.map(([label, icon, href]) => (
+        {items.map(({ label, icon: Icon, href }) => (
           <Link
             key={href}
             href={href}
@@ -60,7 +60,7 @@ const SidebarGroup = memo(function SidebarGroup({
                 : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
             }`}
           >
-            <span className="text-lg">{icon}</span>
+            <Icon className="text-lg" />
             <span className="text-sm">{label}</span>
           </Link>
         ))}

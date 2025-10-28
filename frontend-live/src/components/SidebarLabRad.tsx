@@ -14,10 +14,10 @@ export default function SidebarLabRad() {
   const pathname = usePathname()
 
   const items = [
-    ['Laboratorium', <MdScience />, '/dashboard/labrad/lab'],
-    ['Radiologi', <MdCameraAlt />, '/dashboard/labrad/rad'],
-    ['Upload Hasil', <MdUploadFile />, '/dashboard/labrad/upload'],
-    ['Cetak Hasil', <MdPrint />, '/dashboard/labrad/cetak'],
+    { label: 'Laboratorium', icon: MdScience, href: '/dashboard/labrad/lab' },
+    { label: 'Radiologi', icon: MdCameraAlt, href: '/dashboard/labrad/rad' },
+    { label: 'Upload Hasil', icon: MdUploadFile, href: '/dashboard/labrad/upload' },
+    { label: 'Cetak Hasil', icon: MdPrint, href: '/dashboard/labrad/cetak' },
   ]
 
   return (
@@ -40,7 +40,7 @@ const SidebarGroup = memo(function SidebarGroup({
   pathname,
 }: {
   title: string
-  items: Array<[string, JSX.Element, string]>
+  items: Array<{ label: string; icon: React.ElementType; href: string }>
   pathname: string
 }) {
   return (
@@ -50,7 +50,7 @@ const SidebarGroup = memo(function SidebarGroup({
       </div>
 
       <nav className="mt-1 space-y-1">
-        {items.map(([label, icon, href]) => (
+        {items.map(({ label, icon: Icon, href }) => (
           <Link
             key={href}
             href={href}
@@ -60,7 +60,7 @@ const SidebarGroup = memo(function SidebarGroup({
                 : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
             }`}
           >
-            <span className="text-lg">{icon}</span>
+            <Icon className="text-lg" />
             <span className="text-sm">{label}</span>
           </Link>
         ))}

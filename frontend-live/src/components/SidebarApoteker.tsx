@@ -16,12 +16,12 @@ export default function SidebarApoteker() {
   const pathname = usePathname()
 
   const items = [
-    ['Entry Resep', <MdEditDocument />, '/dashboard/apoteker/resep'],
-    ['Penyerahan Obat', <MdLocalPharmacy />, '/dashboard/apoteker/penyerahan'],
-    ['Stok Gudang', <MdInventory />, '/dashboard/apoteker/stok'],
-    ['Permintaan Obat', <MdOutbound />, '/dashboard/apoteker/permintaan'],
-    ['Riwayat Resep', <MdHistory />, '/dashboard/apoteker/riwayat-resep'],
-    ['Obat Terpopuler', <MdBarChart />, '/dashboard/apoteker/obat-terpopuler'],
+    { label: 'Entry Resep', icon: MdEditDocument, href: '/dashboard/apoteker/resep' },
+    { label: 'Penyerahan Obat', icon: MdLocalPharmacy, href: '/dashboard/apoteker/penyerahan' },
+    { label: 'Stok Gudang', icon: MdInventory, href: '/dashboard/apoteker/stok' },
+    { label: 'Permintaan Obat', icon: MdOutbound, href: '/dashboard/apoteker/permintaan' },
+    { label: 'Riwayat Resep', icon: MdHistory, href: '/dashboard/apoteker/riwayat-resep' },
+    { label: 'Obat Terpopuler', icon: MdBarChart, href: '/dashboard/apoteker/obat-terpopuler' },
   ]
 
   return (
@@ -44,7 +44,7 @@ const SidebarGroup = memo(function SidebarGroup({
   pathname,
 }: {
   title: string
-  items: Array<[string, JSX.Element, string]>
+  items: Array<{ label: string; icon: React.ElementType; href: string }>
   pathname: string
 }) {
   return (
@@ -54,7 +54,7 @@ const SidebarGroup = memo(function SidebarGroup({
       </div>
 
       <nav className="mt-1 space-y-1">
-        {items.map(([label, icon, href]) => (
+        {items.map(({ label, icon: Icon, href }) => (
           <Link
             key={href}
             href={href}
@@ -64,7 +64,7 @@ const SidebarGroup = memo(function SidebarGroup({
                 : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
             }`}
           >
-            <span className="text-lg">{icon}</span>
+            <Icon className="text-lg" />
             <span className="text-sm">{label}</span>
           </Link>
         ))}

@@ -31,21 +31,19 @@ export default function SidebarAdmin() {
   return (
     <aside className="hidden md:flex flex-col w-64 h-screen bg-white dark:bg-gray-900 border-r dark:border-gray-700 px-6 py-8 space-y-6 text-sm">
       <Link
-            href="/dashboard/admin"
-            className="text-center text-4xl font-bold tracking-wide text-gray-800 dark:text-white select-none"
-        >
-            SIRAMA
-        </Link>
-
-
+        href="/dashboard/admin"
+        className="text-center text-4xl font-bold tracking-wide text-gray-800 dark:text-white select-none"
+      >
+        SIRAMA
+      </Link>
 
       <SidebarGroup
         title="Manajemen Sistem"
         items={[
-          ['Pengguna & Role', <FaUsers />, '/dashboard/admin/user'],
-          ['Laporan & Statistik', <FaChartBar />, '/dashboard/admin/laporan'],
-          ['Pengaturan Sistem', <FaCog />, '/dashboard/admin/pengaturan'],
-          ['Audit Trail', <FaFileAlt />, '/dashboard/admin/audit'],
+          { label: 'Pengguna & Role', icon: FaUsers, href: '/dashboard/admin/user' },
+          { label: 'Laporan & Statistik', icon: FaChartBar, href: '/dashboard/admin/laporan' },
+          { label: 'Pengaturan Sistem', icon: FaCog, href: '/dashboard/admin/pengaturan' },
+          { label: 'Audit Trail', icon: FaFileAlt, href: '/dashboard/admin/audit' },
         ]}
         pathname={pathname}
         defaultOpen={true}
@@ -54,11 +52,11 @@ export default function SidebarAdmin() {
       <SidebarGroup
         title="Modul Inti"
         items={[
-          ['Klinik', <FaClinicMedical />, '/dashboard/admin/klinik'],
-          ['Rawat Inap', <FaProcedures />, '/dashboard/admin/rawat'],
-          ['Farmasi', <FaPills />, '/dashboard/admin/farmasi'],
-          ['Laboratorium', <FaVial />, '/dashboard/admin/lab'],
-          ['Kasir', <FaCashRegister />, '/dashboard/admin/kasir'],
+          { label: 'Klinik', icon: FaClinicMedical, href: '/dashboard/admin/klinik' },
+          { label: 'Rawat Inap', icon: FaProcedures, href: '/dashboard/admin/rawat' },
+          { label: 'Farmasi', icon: FaPills, href: '/dashboard/admin/farmasi' },
+          { label: 'Laboratorium', icon: FaVial, href: '/dashboard/admin/lab' },
+          { label: 'Kasir', icon: FaCashRegister, href: '/dashboard/admin/kasir' },
         ]}
         pathname={pathname}
         defaultOpen={true}
@@ -67,10 +65,10 @@ export default function SidebarAdmin() {
       <SidebarGroup
         title="Modul Tambahan"
         items={[
-          ['Laundry', <FaTshirt />, '/dashboard/admin/laundry'],
-          ['POS', <FaUtensils />, '/dashboard/admin/pos'],
-          ['Property', <FaHome />, '/dashboard/admin/property'],
-          ['eLearning', <FaGraduationCap />, '/dashboard/admin/elearning'],
+          { label: 'Laundry', icon: FaTshirt, href: '/dashboard/admin/laundry' },
+          { label: 'POS', icon: FaUtensils, href: '/dashboard/admin/pos' },
+          { label: 'Property', icon: FaHome, href: '/dashboard/admin/property' },
+          { label: 'eLearning', icon: FaGraduationCap, href: '/dashboard/admin/elearning' },
         ]}
         pathname={pathname}
         defaultOpen={modulTambahanOpen}
@@ -90,7 +88,7 @@ const SidebarGroup = memo(function SidebarGroup({
   onToggle,
 }: {
   title: string
-  items: Array<[string, JSX.Element, string]>
+  items: Array<{ label: string; icon: React.ElementType; href: string }>
   pathname: string
   defaultOpen?: boolean
   toggleable?: boolean
@@ -110,7 +108,7 @@ const SidebarGroup = memo(function SidebarGroup({
 
       {defaultOpen && (
         <nav className={`mt-2 space-y-1 ${toggleable ? 'pl-3 border-l border-gray-200 dark:border-gray-700' : ''}`}>
-          {items.map(([label, icon, href]) => (
+          {items.map(({ label, icon: Icon, href }) => (
             <Link
               key={href}
               href={href}
@@ -120,7 +118,7 @@ const SidebarGroup = memo(function SidebarGroup({
                   : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
               }`}
             >
-              <span className="text-lg">{icon}</span>
+              <Icon className="text-lg" />
               <span className="text-sm">{label}</span>
             </Link>
           ))}

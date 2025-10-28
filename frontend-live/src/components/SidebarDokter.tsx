@@ -15,11 +15,11 @@ export default function SidebarDokter() {
   const pathname = usePathname()
 
   const items = [
-    ['Rekam Medis', <MdDescription />, '/dashboard/dokter/medis'],
-    ['Resume Medis', <MdNoteAlt />, '/dashboard/dokter/resume'],
-    ['MCU & Pemeriksaan', <MdPsychology />, '/dashboard/dokter/mcu'],
-    ['Riwayat Pasien', <MdHistory />, '/dashboard/dokter/riwayat'],
-    ['Order Lab/Rad', <MdScience />, '/dashboard/dokter/order'],
+    { label: 'Rekam Medis', icon: MdDescription, href: '/dashboard/dokter/medis' },
+    { label: 'Resume Medis', icon: MdNoteAlt, href: '/dashboard/dokter/resume' },
+    { label: 'MCU & Pemeriksaan', icon: MdPsychology, href: '/dashboard/dokter/mcu' },
+    { label: 'Riwayat Pasien', icon: MdHistory, href: '/dashboard/dokter/riwayat' },
+    { label: 'Order Lab/Rad', icon: MdScience, href: '/dashboard/dokter/order' },
   ]
 
   return (
@@ -42,7 +42,7 @@ const SidebarGroup = memo(function SidebarGroup({
   pathname,
 }: {
   title: string
-  items: Array<[string, JSX.Element, string]>
+  items: Array<{ label: string; icon: React.ElementType; href: string }>
   pathname: string
 }) {
   return (
@@ -52,7 +52,7 @@ const SidebarGroup = memo(function SidebarGroup({
       </div>
 
       <nav className="mt-1 space-y-1">
-        {items.map(([label, icon, href]) => (
+        {items.map(({ label, icon: Icon, href }) => (
           <Link
             key={href}
             href={href}
@@ -62,7 +62,7 @@ const SidebarGroup = memo(function SidebarGroup({
                 : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
             }`}
           >
-            <span className="text-lg">{icon}</span>
+            <Icon className="text-lg" />
             <span className="text-sm">{label}</span>
           </Link>
         ))}
