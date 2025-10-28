@@ -2,13 +2,13 @@
 
 import { useState } from 'react'
 
-const dummyLogs = Array.from({ length: 42 }, (_, i) => ({
-  id: i + 1,
-  user: ['admin', 'dokter1', 'kasir2'][i % 3],
-  action: ['Login', 'Update Data', 'Hapus', 'Cetak'][i % 4],
-  module: ['Pasien', 'Rekam Medis', 'Pembayaran', 'Obat'][i % 4],
-  time: `2025-10-${(i % 30) + 1} 14:${(i % 60).toString().padStart(2, '0')}`,
-}))
+type LogEntry = {
+  id: number
+  user: 'admin' | 'dokter1' | 'kasir2'
+  action: keyof typeof actionColor
+  module: string
+  time: string
+}
 
 const actionColor = {
   Login: 'text-blue-600 dark:text-blue-400',
@@ -16,6 +16,14 @@ const actionColor = {
   Hapus: 'text-red-600 dark:text-red-400',
   Cetak: 'text-green-600 dark:text-green-400',
 }
+
+const dummyLogs: LogEntry[] = Array.from({ length: 42 }, (_, i) => ({
+  id: i + 1,
+  user: ['admin', 'dokter1', 'kasir2'][i % 3] as LogEntry['user'],
+  action: ['Login', 'Update Data', 'Hapus', 'Cetak'][i % 4] as LogEntry['action'],
+  module: ['Pasien', 'Rekam Medis', 'Pembayaran', 'Obat'][i % 4],
+  time: `2025-10-${(i % 30) + 1} 14:${(i % 60).toString().padStart(2, '0')}`,
+}))
 
 export default function AuditTrailPage() {
   const [page, setPage] = useState(1)
@@ -65,10 +73,21 @@ export default function AuditTrailPage() {
           </thead>
           <tbody>
             {logs.map((log, i) => (
-              <tr key={log.id} className="border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
-                <td className="p-3 text-gray-700 dark:text-gray-300">{(page - 1) * perPage + i + 1}</td>
+              <tr
+                key={log.id}
+                className="border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                <td className="p-3 text-gray-700 dark:text-gray-300">
+                  {(page - 1) * perPage + i + 1}
+                </td>
                 <td className="p-3 text-gray-700 dark:text-gray-300">{log.user}</td>
-                <td className={`p-3 font-medium ${actionColor[log.action]}`}>{log.action}</td>
+                <td
+                  className={`p-3 font-medium ${
+                    actionColor[log.action] ?? 'text-gray-500'
+                  }`}
+                >
+                  {log.action}
+                </td>
                 <td className="p-3 text-gray-700 dark:text-gray-300">{log.module}</td>
                 <td className="p-3 text-gray-700 dark:text-gray-300">{log.time}</td>
               </tr>
