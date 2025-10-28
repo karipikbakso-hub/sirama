@@ -2,21 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Font & base styling */
-body {
-  font-family: 'Satoshi', ui-sans-serif, system-ui, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  color: rgb(31, 41, 55); /* gray-800 untuk light mode */
-  background-color: rgb(243, 244, 246); /* gray-100 untuk light mode */
-}
-
-/* Dark mode override */
-.dark body {
-  color: rgb(255, 255, 255); /* white text */
-  background-color: rgb(17, 24, 39); /* gray-900 */
-}
-
 /* Fade-in animation */
 @keyframes fade-in {
   from { opacity: 0; transform: scale(0.95); }
@@ -27,9 +12,19 @@ body {
   animation: fade-in 0.3s ease-out;
 }
 
-
-
 @layer base {
+  /* Font & base styling */
+  body {
+    font-family: 'Satoshi', ui-sans-serif, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 24px;
+    @apply bg-background text-foreground;
+  }
+
+  * {
+    @apply border-border;
+  }
+
   :root {
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
@@ -57,6 +52,7 @@ body {
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
   }
+
   .dark {
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
@@ -82,16 +78,5 @@ body {
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-  }
-}
-
-
-
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
   }
 }
