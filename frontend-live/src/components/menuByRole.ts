@@ -59,13 +59,15 @@ export const menuByRole: Record<Role, MenuItem[]> = {
     { label: 'Pembayaran', icon: MdAttachMoney, path: 'pembayaran' },
     { label: 'Cetak Tagihan', icon: MdPrint, path: 'tagihan' },
   ],
-  apoteker: [
+    apoteker: [
     { label: 'Home', icon: MdDashboard, path: '' },
-    { label: 'Farmasi', icon: MdLocalPharmacy, path: 'farmasi' },
-    { label: 'Entry Resep', icon: MdAssignment, path: 'resep' },
+    { label: 'Obat Terpopuler', icon: MdLocalPharmacy, path: 'obat-terpopuler' },
     { label: 'Penyerahan Obat', icon: MdLocalShipping, path: 'penyerahan' },
+    { label: 'Permintaan Obat', icon: MdAssignment, path: 'permintaan' },
+    { label: 'Entry Resep', icon: MdAssignment, path: 'resep' },
+    { label: 'Riwayat Resep', icon: MdHistory, path: 'riwayat-resep' },
     { label: 'Stok Gudang', icon: MdInventory, path: 'stok' },
-  ],
+    ],
   labrad: [
     { label: 'Home', icon: MdDashboard, path: '' },
     { label: 'Laboratorium', icon: MdScience, path: 'lab' },
