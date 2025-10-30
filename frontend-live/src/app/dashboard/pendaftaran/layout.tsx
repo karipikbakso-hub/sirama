@@ -1,79 +1,121 @@
 'use client'
 
-import SidebarPendaftaran from '@/components/SidebarPendaftaran'
-import MobileNav from '@/components/MobileNav'
-import { useState, useEffect } from 'react'
-import { MdPerson, MdSettings, MdLogout } from 'react-icons/md'
-import { FiMoon, FiSun } from 'react-icons/fi'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useTheme } from 'next-themes'
+import { useState } from 'react'
+import {
+  MdPerson,
+  MdListAlt,
+  MdShield,
+  MdCalendarToday,
+  MdSettings,
+  MdLogout,
+  MdDarkMode,
+  MdLightMode,
+} from 'react-icons/md'
+import MobileNav from '@/components/MobileNav'
 
 export default function PendaftaranLayout({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(false)
-  const [mounted, setMounted] = useState(false)
+  const pathname = usePathname()
   const { theme, setTheme } = useTheme()
+  const [open, setOpen] = useState(false)
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const items = [
+    { label: 'Data Pasien', icon: MdPerson, href: '/dashboard/pendaftaran/pasien' },
+    { label: 'Antrian', icon: MdListAlt, href: '/dashboard/pendaftaran/antrian' },
+    { label: 'Bridging BPJS', icon: MdShield, href: '/dashboard/pendaftaran/bpjs' },
+    { label: 'Riwayat Kunjungan', icon: MdCalendarToday, href: '/dashboard/pendaftaran/kunjungan' },
+  ]
 
   return (
     <>
-      <div className="flex min-h-screen bg-background text-foreground transition-colors duration-300">
-        <SidebarPendaftaran />
+      <div className="flex min-h-screen bg-background text-foreground">
+        {/* Sidebar */}
+        <aside className="hidden md:flex flex-col w-64 h-screen bg-card border-r border-border px-6 py-8 space-y-6 text-sm">
+          <Link href="/dashboard/pendaftaran" className="text-center text-4xl font-bold tracking-wide select-none">
+            SIRAMA
+          </Link>
+
+          <div>
+            <div className="px-3 py-2 text-xs uppercase tracking-wider text-muted-foreground">Modul Pendaftaran</div>
+            <nav className="mt-1 space-y-1">
+              {items.map(({ label, icon: Icon, href }) => {
+                const isActive = pathname === href
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={`flex items-center gap-3 px-3 py-2 rounded transition-all duration-300 ease-in-out ${
+                      isActive
+                        ? 'bg-accent text-primary border border-primary shadow-sm'
+                        : 'text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <Icon className="text-lg text-inherit" />
+                    <span className="text-sm">{label}</span>
+                  </Link>
+                )
+              })}
+            </nav>
+          </div>
+        </aside>
+
+        {/* Main Content */}
         <div className="flex-1 flex flex-col">
           {/* Header */}
-          <header className="sticky top-0 z-30 bg-card text-card-foreground border-b border-border px-6 py-4 flex justify-between items-center shadow-sm">
+          <header className="sticky top-0 z-30 bg-card border-b px-6 py-4 flex justify-between items-center shadow-sm">
             <h1 className="text-xl font-semibold tracking-wide">Dashboard Pendaftaran</h1>
 
-            <div className="flex items-center gap-4 relative">
-              {/* Toggle Mode */}
-              {mounted && (
-                <button
-                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                  className="p-2 rounded bg-muted text-muted-foreground hover:ring-2 ring-blue-400 transition"
-                  title="Toggle Mode"
-                >
-                  {theme === 'dark' ? <FiSun /> : <FiMoon />}
-                </button>
-              )}
-
-              {/* Avatar */}
+            <div className="flex items-center gap-4">
+              {/* Toggle Dark Mode */}
               <button
-                onClick={() => setOpen(!open)}
-                className="flex items-center gap-2 px-3 py-2 rounded hover:bg-muted text-muted-foreground transition"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="p-2 rounded hover:bg-muted text-muted-foreground"
               >
-                <div className="bg-primary text-primary-foreground rounded-full p-2">
-                  <MdPerson className="text-lg" />
-                </div>
-                <span className="text-sm font-medium">Pendaftaran SIRAMA</span>
+                {theme === 'dark' ? <MdLightMode className="text-xl" /> : <MdDarkMode className="text-xl" />}
               </button>
 
-              {open && (
-                <div className="absolute right-0 top-12 w-48 bg-popover text-popover-foreground border border-border rounded shadow-lg text-sm z-50 animate-fade-in">
-                  <button className="flex items-center gap-2 px-4 py-2 hover:bg-muted w-full text-left">
-                    <MdPerson className="text-lg text-muted-foreground" />
-                    View Profile
-                  </button>
-                  <button className="flex items-center gap-2 px-4 py-2 hover:bg-muted w-full text-left">
-                    <MdSettings className="text-lg text-muted-foreground" />
-                    Account Settings
-                  </button>
-                  <button
-                    onClick={() => (location.href = '/login')}
-                    className="flex items-center gap-2 px-4 py-2 hover:bg-muted w-full text-left text-red-600"
-                  >
-                    <MdLogout className="text-lg" />
-                    Log out
-                  </button>
-                </div>
-              )}
+              {/* Profile Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setOpen(!open)}
+                  className="flex items-center gap-2 px-3 py-2 rounded hover:bg-muted text-muted-foreground"
+                >
+                  <div className="bg-primary text-primary-foreground rounded-full p-2">
+                    <MdPerson className="text-lg" />
+                  </div>
+                  <span className="text-sm font-medium">Pendaftaran SIRAMA</span>
+                </button>
+
+                {open && (
+                  <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded shadow-lg text-sm z-50">
+                    <button className="flex items-center gap-2 px-4 py-2 hover:bg-muted w-full text-left">
+                      <MdPerson className="text-lg text-muted-foreground" />
+                      View Profile
+                    </button>
+                    <button className="flex items-center gap-2 px-4 py-2 hover:bg-muted w-full text-left">
+                      <MdSettings className="text-lg text-muted-foreground" />
+                      Account Settings
+                    </button>
+                    <button
+                      onClick={() => (location.href = '/login')}
+                      className="flex items-center gap-2 px-4 py-2 hover:bg-muted w-full text-left text-destructive"
+                    >
+                      <MdLogout className="text-lg" />
+                      Log out
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </header>
 
           {/* Content */}
-          <main className="p-6 space-y-6">{children}</main>
+          <main className="layout-container py-6 space-y-6">{children}</main>
         </div>
       </div>
+
       <MobileNav />
     </>
   )

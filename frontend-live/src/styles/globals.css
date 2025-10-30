@@ -36,105 +36,127 @@
 
 /* Komponen global reusable untuk layout dan tabel */
 @layer components {
-  .table-wrapper {
-    @apply w-full overflow-x-auto;
-    /* Scroll horizontal hanya terjadi di dalam tabel, bukan seluruh halaman */
-  }
+    /* Header tetap di atas */
+    .layout-header {
+      @apply fixed top-0 left-0 right-0 z-50 h-14 bg-card border-b border-border;
+    }
 
-  .table-base {
-    @apply w-max min-w-full max-w-full text-sm bg-card text-card-foreground border border-border;
-    /* 
-      - w-max: lebar tabel mengikuti konten, tidak paksa 100%
-      - min-w-full: tetap minimal 100% agar tidak terlalu kecil
-      - max-w-full: tidak melebihi lebar layar
-    */
-  }
+    /* Footer tetap di bawah */
+    .layout-footer {
+      @apply fixed bottom-0 left-0 right-0 z-50 h-16 bg-card border-t border-border;
+    }
 
-  .table-head {
-    @apply bg-muted text-muted-foreground;
-    /* Header tabel dengan warna lembut dan kontras */
-  }
+    /* Konten utama scrollable */
+    .layout-main {
+      @apply pt-4 pb-16 overflow-y-auto max-h-screen;
+    }
 
-  .table-row {
-    @apply hover:bg-accent text-accent-foreground;
-    /* Row dengan efek hover dan warna aksen */
-  }
+    /* Container responsif */
+    .layout-container {
+      @apply w-full px-6;
+    }
 
-  .table-cell {
-    @apply px-4 py-2 whitespace-nowrap;
-    /* Padding sel + mencegah teks patah di kolom sempit */
-  }
+    /* Tabel scroll horizontal */
+    .table-wrapper {
+      @apply w-full overflow-x-auto;
+    }
+
+    /* Tabel fleksibel, tidak paksa zoom */
+    .table-base {
+      @apply w-max text-sm bg-card text-card-foreground border border-border;
+      /* w-max → tabel selebar konten, tidak paksa lebar penuh */
+    }
+
+    .table-head {
+      @apply bg-muted text-muted-foreground;
+    }
+
+    .table-row {
+      @apply hover:bg-accent text-accent-foreground;
+    }
+
+    .table-cell {
+      @apply px-4 py-2 whitespace-nowrap text-left;
+      /* text-left → tabel rata kiri */
+    }
+    .btn-active {
+    @apply border border-primary bg-accent text-primary shadow-sm transition-all duration-300 ease-out;
+    }
+
+    .btn-default {
+      @apply text-muted-foreground hover:bg-muted transition-all duration-300 ease-out;
+    }
 }
 
-
+  
 /* Sistem warna global: Light mode */
 :root {
-  /* ☀️ Light mode: putih lembut dan abu terang */
-  --background: 0 0% 98%;                     /* Latar belakang utama */
-  --foreground: 0 0% 10%;                     /* Teks utama */
-  --card: 0 0% 100%;                          /* Latar kartu */
-  --card-foreground: 0 0% 10%;                /* Teks di dalam kartu */
-  --popover: 0 0% 100%;                       /* Latar popover */
-  --popover-foreground: 0 0% 10%;             /* Teks popover */
+  --background: 220 20% 97%;              /* Latar terang bersih */
+  --foreground: 220 15% 20%;              /* Teks abu gelap */
+  --card: 0 0% 100%;                      /* Putih bersih */
+  --card-foreground: 220 15% 20%;         /* Teks kartu */
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 15% 20%;
 
-  --primary: 210 100% 50%;                    /* Biru utama (Apple-style) */
-  --primary-foreground: 0 0% 100%;            /* Teks di atas warna utama */
+  --primary: 220 100% 60%;                /* Biru terang modern */
+  --primary-foreground: 0 0% 100%;        /* Teks putih di atas biru */
 
-  --secondary: 0 0% 95%;                      /* Abu terang untuk elemen sekunder */
-  --secondary-foreground: 0 0% 20%;           /* Teks sekunder */
+  --secondary: 220 20% 95%;               /* Abu terang */
+  --secondary-foreground: 220 15% 30%;    /* Teks sekunder */
 
-  --muted: 0 0% 92%;                          /* Background lembut */
-  --muted-foreground: 0 0% 50%;               /* Teks lembut */
+  --muted: 220 20% 92%;                   /* Background lembut */
+  --muted-foreground: 220 15% 50%;        /* Teks lembut */
 
-  --accent: 210 100% 96%;                     /* Warna aksen hover */
-  --accent-foreground: 210 100% 30%;          /* Teks aksen */
+  --accent: 220 100% 96%;                 /* Hover card */
+  --accent-foreground: 220 100% 40%;      /* Teks hover */
 
-  --destructive: 0 80% 60%;                   /* Merah untuk aksi berbahaya */
-  --destructive-foreground: 0 0% 100%;        /* Teks di atas merah */
+  --destructive: 0 80% 60%;
+  --destructive-foreground: 0 0% 100%;
 
-  --border: 0 0% 85%;                         /* Warna border default */
-  --input: 0 0% 90%;                          /* Background input */
-  --ring: 210 100% 50%;                       /* Warna ring fokus */
+  --border: 220 15% 85%;                  /* Border terang */
+  --input: 220 20% 90%;
+  --ring: 220 100% 60%;
 
-  --chart-1: 210 100% 50%;                    /* Warna chart biru */
-  --chart-2: 120 60% 45%;                     /* Warna chart hijau */
-  --chart-3: 30 80% 55%;                      /* Warna chart oranye */
-  --chart-4: 280 65% 60%;                     /* Warna chart ungu */
-  --chart-5: 0 80% 60%;                       /* Warna chart merah */
+  --chart-1: 220 100% 60%;
+  --chart-2: 120 60% 45%;
+  --chart-3: 30 80% 55%;
+  --chart-4: 280 65% 60%;
+  --chart-5: 0 80% 60%;
 
-  --radius: 0.5rem;                           /* Border radius default */
+  --radius: 0.5rem;
 }
+
+
 
 /* Sistem warna global: Dark mode */
 .dark {
-  /* 🌙 Dark mode: abu gelap dan biru terang */
-  --background: 0 0% 7%;                      /* Latar belakang gelap */
-  --foreground: 0 0% 90%;                     /* Teks terang */
-  --card: 0 0% 10%;                           /* Latar kartu gelap */
-  --card-foreground: 0 0% 90%;                /* Teks kartu terang */
-  --popover: 0 0% 10%;                        /* Latar popover gelap */
-  --popover-foreground: 0 0% 90%;             /* Teks popover terang */
+  --background: 240 10% 10%;              /* Latar gelap elegan */
+  --foreground: 0 0% 90%;                 /* Teks terang */
+  --card: 240 10% 12%;                    /* Kartu gelap */
+  --card-foreground: 0 0% 90%;
+  --popover: 240 10% 12%;
+  --popover-foreground: 0 0% 90%;
 
-  --primary: 210 100% 60%;                    /* Biru terang */
-  --primary-foreground: 0 0% 100%;            /* Teks di atas biru */
+  --primary: 220 100% 60%;                /* Biru terang */
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 0 0% 15%;                      /* Abu gelap untuk elemen sekunder */
-  --secondary-foreground: 0 0% 90%;           /* Teks sekunder terang */
+  --secondary: 240 10% 18%;               /* Abu gelap */
+  --secondary-foreground: 0 0% 90%;
 
-  --muted: 0 0% 18%;                          /* Background lembut gelap */
-  --muted-foreground: 0 0% 60%;               /* Teks lembut terang */
+  --muted: 240 10% 20%;                   /* Background lembut gelap */
+  --muted-foreground: 0 0% 60%;
 
-  --accent: 210 100% 25%;                     /* Warna aksen gelap */
-  --accent-foreground: 0 0% 100%;             /* Teks aksen terang */
+  --accent: 220 100% 25%;
+  --accent-foreground: 0 0% 100%;
 
-  --destructive: 0 70% 40%;                   /* Merah gelap */
-  --destructive-foreground: 0 0% 100%;        /* Teks di atas merah gelap */
+  --destructive: 0 70% 40%;
+  --destructive-foreground: 0 0% 100%;
 
-  --border: 0 0% 20%;                         /* Border gelap */
-  --input: 0 0% 20%;                          /* Background input gelap */
-  --ring: 210 100% 60%;                       /* Ring fokus terang */
+  --border: 240 10% 25%;
+  --input: 240 10% 25%;
+  --ring: 220 100% 60%;
 
-  --chart-1: 210 100% 60%;
+  --chart-1: 220 100% 60%;
   --chart-2: 120 60% 50%;
   --chart-3: 30 80% 60%;
   --chart-4: 280 65% 65%;
