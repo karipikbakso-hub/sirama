@@ -14,10 +14,10 @@ export default function SidebarPendaftaran() {
   const pathname = usePathname()
 
   const items = [
-    { label: 'Data Pasien', icon: MdPerson, href: '/dashboard/pasien' },
-    { label: 'Antrian', icon: MdListAlt, href: '/dashboard/antrian' },
-    { label: 'Bridging BPJS', icon: MdShield, href: '/dashboard/bpjs' },
-    { label: 'Riwayat Kunjungan', icon: MdCalendarToday, href: '/dashboard/kunjungan' },
+    { label: 'Data Pasien', icon: MdPerson, href: '/dashboard/pendaftaran/pasien' },
+    { label: 'Antrian', icon: MdListAlt, href: '/dashboard/pendaftaran/antrian' },
+    { label: 'Bridging BPJS', icon: MdShield, href: '/dashboard/pendaftaran/bpjs' },
+    { label: 'Riwayat Kunjungan', icon: MdCalendarToday, href: '/dashboard/pendaftaran/kunjungan' },
   ]
 
   return (
