@@ -9,6 +9,8 @@ import {
   Legend,
 } from 'chart.js'
 import { Bar } from 'react-chartjs-2'
+import { FiPrinter } from 'react-icons/fi'
+import { useState } from 'react'
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend)
 
@@ -32,9 +34,28 @@ const chartData = {
 }
 
 export default function ObatTerpopulerPage() {
+  const [periode] = useState('Oktober 2025')
+
+  const handleCetak = () => {
+    console.log('🖨️ Cetak laporan obat terpopuler:', populer)
+  }
+
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Obat Terpopuler</h1>
+    <div className="space-y-6 px-4 sm:px-6 lg:px-8">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-white">📊 Obat Terpopuler</h1>
+        <button
+          onClick={handleCetak}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          <FiPrinter />
+          Cetak Laporan
+        </button>
+      </div>
+
+      <p className="text-sm text-gray-500 dark:text-gray-400">
+        Statistik pemakaian obat berdasarkan resep yang masuk — periode {periode}.
+      </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* List */}

@@ -1,6 +1,15 @@
 'use client'
 
-const orders = [
+import { useState } from 'react'
+
+type OrderLab = {
+  pasien: string
+  jenis: string
+  status: string
+  tanggal: string
+}
+
+const initialOrders: OrderLab[] = [
   { pasien: 'Dewi', jenis: 'Hematologi Lengkap', status: 'Selesai', tanggal: '2025-10-25' },
   { pasien: 'Budi', jenis: 'Urinalisa', status: 'Pending', tanggal: '2025-10-24' },
   { pasien: 'Siti', jenis: 'Kimia Darah', status: 'Selesai', tanggal: '2025-10-23' },
@@ -19,29 +28,114 @@ const orders = [
 ]
 
 export default function OrderLabPage() {
+  const [orders, setOrders] = useState(initialOrders)
+  const [showForm, setShowForm] = useState(false)
+  const [newOrder, setNewOrder] = useState<OrderLab>({
+    pasien: '',
+    jenis: '',
+    status: 'Pending',
+    tanggal: '',
+  })
+
+  const handleAdd = () => {
+    if (Object.values(newOrder).some((v) => v.trim() === '')) return
+    setOrders([...orders, newOrder])
+    setNewOrder({ pasien: '', jenis: '', status: 'Pending', tanggal: '' })
+    setShowForm(false)
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-4 sm:px-6 lg:px-8 relative">
       <h1 className="text-2xl font-bold text-gray-800 dark:text-white">🧫 Order Laboratorium</h1>
       <p className="text-sm text-gray-500 dark:text-gray-400">
         Daftar permintaan pemeriksaan laboratorium dan status hasilnya.
       </p>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-sm border rounded">
-          <thead className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200">
+      <button
+        onClick={() => setShowForm(true)}
+        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+      >
+        ➕ Input Order Lab
+      </button>
+
+      {/* Modal Form */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center px-4">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded shadow-lg w-full max-w-md space-y-4">
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Form Order Lab Baru</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-gray-300">Pasien</label>
+                <input
+                  value={newOrder.pasien}
+                  onChange={(e) => setNewOrder({ ...newOrder, pasien: e.target.value })}
+                  className="w-full px-3 py-2 border rounded dark:bg-gray-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-gray-300">Jenis Pemeriksaan</label>
+                <input
+                  value={newOrder.jenis}
+                  onChange={(e) => setNewOrder({ ...newOrder, jenis: e.target.value })}
+                  className="w-full px-3 py-2 border rounded dark:bg-gray-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-gray-300">Status</label>
+                <select
+                  value={newOrder.status}
+                  onChange={(e) => setNewOrder({ ...newOrder, status: e.target.value })}
+                  className="w-full px-3 py-2 border rounded dark:bg-gray-900 dark:text-white"
+                >
+                  <option value="Pending">Pending</option>
+                  <option value="Selesai">Selesai</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-gray-300">Tanggal</label>
+                <input
+                  type="date"
+                  value={newOrder.tanggal}
+                  onChange={(e) => setNewOrder({ ...newOrder, tanggal: e.target.value })}
+                  className="w-full px-3 py-2 border rounded dark:bg-gray-900 dark:text-white"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <button
+                onClick={() => setShowForm(false)}
+                className="px-3 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleAdd}
+                className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tabel */}
+      <div className="overflow-x-auto border rounded shadow mt-4">
+        <table className="min-w-full text-sm bg-white dark:bg-gray-800">
+          <thead className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
             <tr>
-              <th className="px-4 py-2">Pasien</th>
-              <th>Jenis Pemeriksaan</th>
-              <th>Status</th>
-              <th>Tanggal</th>
+              <th className="px-4 py-2 text-left">Pasien</th>
+              <th className="px-4 py-2 text-left">Jenis Pemeriksaan</th>
+              <th className="px-4 py-2 text-left">Status</th>
+              <th className="px-4 py-2 text-left">Tanggal</th>
             </tr>
           </thead>
           <tbody>
             {orders.map((o, i) => (
               <tr key={i} className="border-t dark:border-gray-700">
                 <td className="px-4 py-2">{o.pasien}</td>
-                <td>{o.jenis}</td>
-                <td>
+                <td className="px-4 py-2">{o.jenis}</td>
+                <td className="px-4 py-2">
                   <span
                     className={`px-2 py-1 rounded text-xs font-medium ${
                       o.status === 'Selesai'
@@ -52,7 +146,7 @@ export default function OrderLabPage() {
                     {o.status}
                   </span>
                 </td>
-                <td>{o.tanggal}</td>
+                <td className="px-4 py-2">{o.tanggal}</td>
               </tr>
             ))}
           </tbody>
