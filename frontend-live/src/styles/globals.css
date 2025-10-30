@@ -1,82 +1,142 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@tailwind base;               /* Import layer base Tailwind (reset, typography) */
+@tailwind components;         /* Import layer komponen custom */
+@tailwind utilities;          /* Import semua utility class Tailwind */
 
-/* Fade-in animation */
+/* Fade-in animation untuk transisi masuk (misalnya modal, dropdown) */
 @keyframes fade-in {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.95);   /* Mulai dari sedikit mengecil */
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);      /* Akhiri dengan ukuran normal */
+  }
 }
 
+/* Class animasi yang bisa dipakai di JSX: className="animate-fade-in" */
 .animate-fade-in {
   animation: fade-in 0.3s ease-out;
 }
 
+/* Base styles untuk elemen HTML utama */
 @layer base {
-  /* Font & base styling */
   body {
-    font-family: 'Satoshi', ui-sans-serif, system-ui, sans-serif;
-    font-size: 16px;
-    line-height: 24px;
-    @apply bg-background text-foreground;
+    font-family: 'Satoshi', ui-sans-serif, system-ui, sans-serif; /* Font utama */
+    font-size: 16px;           /* Ukuran font default */
+    line-height: 24px;         /* Jarak antar baris */
+    background-color: hsl(var(--background)); /* Warna latar dari sistem warna global */
+    color: hsl(var(--foreground));            /* Warna teks utama */
   }
 
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));         /* Semua border pakai warna global */
+  }
+}
+
+/* Komponen global reusable untuk layout dan tabel */
+@layer components {
+  .table-wrapper {
+    @apply w-full overflow-x-auto;
+    /* Scroll horizontal hanya terjadi di dalam tabel, bukan seluruh halaman */
   }
 
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
+  .table-base {
+    @apply w-max min-w-full max-w-full text-sm bg-card text-card-foreground border border-border;
+    /* 
+      - w-max: lebar tabel mengikuti konten, tidak paksa 100%
+      - min-w-full: tetap minimal 100% agar tidak terlalu kecil
+      - max-w-full: tidak melebihi lebar layar
+    */
   }
 
-  .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+  .table-head {
+    @apply bg-muted text-muted-foreground;
+    /* Header tabel dengan warna lembut dan kontras */
   }
+
+  .table-row {
+    @apply hover:bg-accent text-accent-foreground;
+    /* Row dengan efek hover dan warna aksen */
+  }
+
+  .table-cell {
+    @apply px-4 py-2 whitespace-nowrap;
+    /* Padding sel + mencegah teks patah di kolom sempit */
+  }
+}
+
+
+/* Sistem warna global: Light mode */
+:root {
+  /* ☀️ Light mode: putih lembut dan abu terang */
+  --background: 0 0% 98%;                     /* Latar belakang utama */
+  --foreground: 0 0% 10%;                     /* Teks utama */
+  --card: 0 0% 100%;                          /* Latar kartu */
+  --card-foreground: 0 0% 10%;                /* Teks di dalam kartu */
+  --popover: 0 0% 100%;                       /* Latar popover */
+  --popover-foreground: 0 0% 10%;             /* Teks popover */
+
+  --primary: 210 100% 50%;                    /* Biru utama (Apple-style) */
+  --primary-foreground: 0 0% 100%;            /* Teks di atas warna utama */
+
+  --secondary: 0 0% 95%;                      /* Abu terang untuk elemen sekunder */
+  --secondary-foreground: 0 0% 20%;           /* Teks sekunder */
+
+  --muted: 0 0% 92%;                          /* Background lembut */
+  --muted-foreground: 0 0% 50%;               /* Teks lembut */
+
+  --accent: 210 100% 96%;                     /* Warna aksen hover */
+  --accent-foreground: 210 100% 30%;          /* Teks aksen */
+
+  --destructive: 0 80% 60%;                   /* Merah untuk aksi berbahaya */
+  --destructive-foreground: 0 0% 100%;        /* Teks di atas merah */
+
+  --border: 0 0% 85%;                         /* Warna border default */
+  --input: 0 0% 90%;                          /* Background input */
+  --ring: 210 100% 50%;                       /* Warna ring fokus */
+
+  --chart-1: 210 100% 50%;                    /* Warna chart biru */
+  --chart-2: 120 60% 45%;                     /* Warna chart hijau */
+  --chart-3: 30 80% 55%;                      /* Warna chart oranye */
+  --chart-4: 280 65% 60%;                     /* Warna chart ungu */
+  --chart-5: 0 80% 60%;                       /* Warna chart merah */
+
+  --radius: 0.5rem;                           /* Border radius default */
+}
+
+/* Sistem warna global: Dark mode */
+.dark {
+  /* 🌙 Dark mode: abu gelap dan biru terang */
+  --background: 0 0% 7%;                      /* Latar belakang gelap */
+  --foreground: 0 0% 90%;                     /* Teks terang */
+  --card: 0 0% 10%;                           /* Latar kartu gelap */
+  --card-foreground: 0 0% 90%;                /* Teks kartu terang */
+  --popover: 0 0% 10%;                        /* Latar popover gelap */
+  --popover-foreground: 0 0% 90%;             /* Teks popover terang */
+
+  --primary: 210 100% 60%;                    /* Biru terang */
+  --primary-foreground: 0 0% 100%;            /* Teks di atas biru */
+
+  --secondary: 0 0% 15%;                      /* Abu gelap untuk elemen sekunder */
+  --secondary-foreground: 0 0% 90%;           /* Teks sekunder terang */
+
+  --muted: 0 0% 18%;                          /* Background lembut gelap */
+  --muted-foreground: 0 0% 60%;               /* Teks lembut terang */
+
+  --accent: 210 100% 25%;                     /* Warna aksen gelap */
+  --accent-foreground: 0 0% 100%;             /* Teks aksen terang */
+
+  --destructive: 0 70% 40%;                   /* Merah gelap */
+  --destructive-foreground: 0 0% 100%;        /* Teks di atas merah gelap */
+
+  --border: 0 0% 20%;                         /* Border gelap */
+  --input: 0 0% 20%;                          /* Background input gelap */
+  --ring: 210 100% 60%;                       /* Ring fokus terang */
+
+  --chart-1: 210 100% 60%;
+  --chart-2: 120 60% 50%;
+  --chart-3: 30 80% 60%;
+  --chart-4: 280 65% 65%;
+  --chart-5: 0 80% 65%;
 }

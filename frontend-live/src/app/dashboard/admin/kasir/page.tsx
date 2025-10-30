@@ -134,7 +134,7 @@ export default function KasirPage() {
                 <td className="p-3 text-gray-700 dark:text-gray-300">{t.metode}</td>
                 <td className="p-3 text-gray-700 dark:text-gray-300">{t.tanggal}</td>
                 <td className="p-3 text-gray-700 dark:text-gray-300">
-                  Rp {t.total.toLocaleString()}
+                Rp {t.total.toLocaleString('id-ID')}
                 </td>
                 <td>
                   <span

@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect, memo } from 'react'
 
-// Import ikon dari react-icons
 import {
   FaUsers, FaChartBar, FaCog, FaFileAlt,
   FaClinicMedical, FaProcedures, FaPills, FaVial, FaCashRegister,
@@ -29,10 +28,10 @@ export default function SidebarAdmin() {
   }, [pathname])
 
   return (
-    <aside className="hidden md:flex flex-col w-64 h-screen bg-white dark:bg-gray-900 border-r dark:border-gray-700 px-6 py-8 space-y-6 text-sm">
+    <aside className="hidden md:flex flex-col w-64 h-screen bg-background text-foreground border-r border-border px-6 py-8 space-y-6 text-sm transition-colors duration-300">
       <Link
         href="/dashboard/admin"
-        className="text-center text-4xl font-bold tracking-wide text-gray-800 dark:text-white select-none"
+        className="text-center text-4xl font-bold tracking-wide text-foreground select-none"
       >
         SIRAMA
       </Link>
@@ -98,7 +97,7 @@ const SidebarGroup = memo(function SidebarGroup({
     <div>
       <button
         onClick={toggleable ? onToggle : undefined}
-        className="flex items-center justify-between w-full px-3 py-2 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+        className="flex items-center justify-between w-full px-3 py-2 rounded text-muted-foreground hover:bg-muted transition"
       >
         <span className="text-xs uppercase tracking-wider">{title}</span>
         {toggleable && (
@@ -107,21 +106,24 @@ const SidebarGroup = memo(function SidebarGroup({
       </button>
 
       {defaultOpen && (
-        <nav className={`mt-2 space-y-1 ${toggleable ? 'pl-3 border-l border-gray-200 dark:border-gray-700' : ''}`}>
-          {items.map(({ label, icon: Icon, href }) => (
-            <Link
-              key={href}
-              href={href}
-              className={`flex items-center gap-3 px-3 py-2 rounded transition-all duration-300 ease-in-out ${
-                pathname === href
-                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-semibold'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
-              }`}
-            >
-              <Icon className="text-lg" />
-              <span className="text-sm">{label}</span>
-            </Link>
-          ))}
+        <nav className={`mt-2 space-y-1 ${toggleable ? 'pl-3 border-l border-border' : ''}`}>
+          {items.map(({ label, icon: Icon, href }) => {
+            const isActive = pathname === href
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`flex items-center gap-3 px-3 py-2 rounded transition-all duration-300 ease-in-out ${
+                  isActive
+                    ? 'bg-primary text-primary-foreground font-semibold'
+                    : 'text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                <Icon className="text-lg text-inherit" />
+                <span className="text-sm">{label}</span>
+              </Link>
+            )
+          })}
         </nav>
       )}
     </div>

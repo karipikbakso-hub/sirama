@@ -9,12 +9,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="id" suppressHydrationWarning>
-      <body className="font-satoshi antialiased">
+    <html lang="id" className="scroll-smooth" suppressHydrationWarning>
+      <body className="font-satoshi antialiased bg-background text-foreground transition-colors duration-300">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-          <main className="min-h-screen bg-gray-100 dark:bg-gray-900 transition-colors duration-300">
-            {children}
-          </main>
+          <main className="min-h-screen">{children}</main>
         </ThemeProvider>
       </body>
     </html>
