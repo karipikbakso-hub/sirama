@@ -27,10 +27,14 @@ const sdm = [
 
 export default function SDMPage() {
   const statusCount = useMemo(() => {
-    const count = { Hadir: 0, Izin: 0, Sakit: 0 }
-    sdm.forEach(s => count[s.status]++)
+    const count: Record<string, number> = { Hadir: 0, Izin: 0, Sakit: 0 }
+    sdm.forEach(s => {
+      if (count[s.status] !== undefined) {
+        count[s.status]++
+      }
+    })
     return count
-  }, [])
+  }, [sdm])
 
   const unitCount = useMemo(() => {
     const map = new Map<string, number>()
@@ -41,15 +45,20 @@ export default function SDMPage() {
       labels: Array.from(map.keys()),
       values: Array.from(map.values()),
     }
-  }, [])
+  }, [sdm])
 
   const shiftCount = useMemo(() => {
-    const count = { Pagi: 0, Sore: 0, '-': 0 }
-    sdm.forEach(s => count[s.shift]++)
+    const count: Record<string, number> = { Pagi: 0, Sore: 0, Tanpa: 0 }
+    sdm.forEach(s => {
+      if (s.shift === 'Pagi') count.Pagi++
+      else if (s.shift === 'Sore') count.Sore++
+      else count.Tanpa++
+    })
     return count
-  }, [])
+  }, [sdm])
 
   return (
+
     <div className="space-y-6 px-4 sm:px-6 lg:px-8">
       <h1 className="text-2xl font-bold text-gray-800 dark:text-white">👥 SDM & Kehadiran</h1>
       <p className="text-sm text-gray-500 dark:text-gray-400">
