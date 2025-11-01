@@ -1,79 +1,97 @@
-'use client'
+'use client';
 
-import { useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
-import clsx from 'clsx'
+import { useState } from 'react';
+import { MdEmail, MdLock } from 'react-icons/md';
+import api from '@/lib/api';
+import { useRouter } from 'next/navigation';
 
-const roles = [
-  { label: 'Admin', value: 'admin' },
-  { label: 'Dokter', value: 'dokter' },
-  { label: 'Kasir', value: 'kasir' },
-  { label: 'Laboratorium', value: 'labrad' },
-  { label: 'Rawat Inap', value: 'rawatinap' },
-  { label: 'Apoteker', value: 'apoteker' },
-  { label: 'Pendaftaran', value: 'pendaftaran' },
-  { label: 'Manajemen', value: 'manajemen' },
-]
+export default function LoginForm() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const router = useRouter();
 
-export default function LoginPage() {
-  const router = useRouter()
-  const [selectedRole, setSelectedRole] = useState<string | null>(null)
-  const [visible, setVisible] = useState(false)
+  const handleLogin = async () => {
+    try {
+      const res = await api.post('/login', { email, password });
+      const token = res.data.access_token;
 
-  useEffect(() => {
-    const timer = setTimeout(() => setVisible(true), 300)
-    return () => clearTimeout(timer)
-  }, [])
+      localStorage.setItem('token', token);
+      setError('');
 
-  const handleLogin = () => {
-    if (!selectedRole) return
-    router.push(`/dashboard?role=${selectedRole}`)
-  }
+      // Optional: simpan user info kalau mau
+      localStorage.setItem('user', JSON.stringify(res.data.user));
+
+      // Redirect ke dashboard
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError('Email atau password salah');
+    }
+  };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-white px-4 transition-colors duration-500">
-      <div className={clsx(
-        'w-full max-w-xl p-8 rounded-2xl shadow-xl border transition-all duration-700',
-        'bg-gray-50 border-gray-200',
-        visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-      )}>
-        <h1 className="text-2xl font-semibold text-center text-gray-800 mb-4">
-          Masuk ke SIRAMA
-        </h1>
-        <p className="text-sm text-center text-gray-500 mb-6">
-          Pilih peran untuk melihat alur sistem sesuai role pengguna
-        </p>
+    <div className="w-full max-w-md bg-white rounded-xl shadow-md shadow-blue-100 p-8 space-y-6">
+      <h2 className="text-2xl font-bold text-center text-[#1a4c6e]">Login SIRAMA</h2>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          {roles.map(({ label, value }) => (
-            <button
-              key={value}
-              onClick={() => setSelectedRole(value)}
-              className={clsx(
-                'px-4 py-2 rounded-lg border text-sm font-medium transition shadow-sm',
-                selectedRole === value
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-blue-50'
-              )}
-            >
-              {label}
-            </button>
-          ))}
+      <div className="space-y-6">
+        {/* Email */}
+        <div className="relative">
+          <MdEmail className="absolute left-3 top-4 text-muted-foreground text-xl" />
+          <input
+            type="email"
+            id="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="peer w-full pl-10 pt-6 pb-2 rounded-md border border-[#e0e0e0] bg-[#f5f5f5] text-[#212121] placeholder-transparent focus:outline-none focus:ring-2 focus:ring-[#1976d2]"
+          />
+          <label
+            htmlFor="email"
+            className="absolute left-10 top-2 text-sm text-muted-foreground transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-muted-foreground peer-focus:top-2 peer-focus:text-sm peer-focus:text-[#1976d2]"
+          >
+            Email
+          </label>
         </div>
 
+        {/* Password */}
+        <div className="relative">
+          <MdLock className="absolute left-3 top-4 text-muted-foreground text-xl" />
+          <input
+            type="password"
+            id="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="peer w-full pl-10 pt-6 pb-2 rounded-md border border-[#e0e0e0] bg-[#f5f5f5] text-[#212121] placeholder-transparent focus:outline-none focus:ring-2 focus:ring-[#1976d2]"
+          />
+          <label
+            htmlFor="password"
+            className="absolute left-10 top-2 text-sm text-muted-foreground transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-muted-foreground peer-focus:top-2 peer-focus:text-sm peer-focus:text-[#1976d2]"
+          >
+            Password
+          </label>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <p className="text-sm text-red-600 text-center">{error}</p>
+        )}
+
+        {/* Button */}
         <button
           onClick={handleLogin}
-          disabled={!selectedRole}
-          className={clsx(
-            'w-full py-2 px-4 font-semibold rounded-lg shadow-sm transition',
-            selectedRole
-              ? 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-2 focus:ring-blue-500'
-              : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-          )}
+          className="w-full py-2 rounded-md bg-[#1976d2] text-white font-semibold hover:bg-[#1565c0] transition"
         >
-          Masuk sebagai {selectedRole ?? '...'}
+          Masuk
         </button>
       </div>
-    </main>
-  )
+
+      <p className="text-center text-sm text-muted-foreground">
+        Belum punya akun?{' '}
+        <a href="/register" className="text-[#1976d2] hover:underline">
+          Daftar di sini
+        </a>
+      </p>
+    </div>
+  );
 }
