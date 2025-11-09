@@ -16,7 +16,7 @@ import {
   MdNotifications,
   MdBarChart
 } from 'react-icons/md'
-import { menuByRole } from '@/lib/menuByRole'
+import { menuByRole, MenuItem } from '@/lib/menuByRole'
 
 // Import all admin modules
 import AdminUserPage from './user/page'
@@ -192,7 +192,7 @@ function AdminDashboardHome() {
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Quick Actions</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {menuByRole.admin?.slice(0, 4).map((item, index) => (
+          {menuByRole.admin?.slice(0, 4).filter((item): item is MenuItem => 'icon' in item).map((item, index) => (
             <button
               key={index}
               className="flex flex-col items-center gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors group"
