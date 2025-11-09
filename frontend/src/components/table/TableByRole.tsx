@@ -1,7 +1,7 @@
 'use client'
 
-import Table from '@/components/table/core/Table'
-import { userColumns } from '@/components/table/columns/userColumns'
+import { Table } from '@/components/table/core/Table'
+import { getUserColumns } from '@/components/table/columns/userColumns'
 import { pasienColumns } from '@/components/table/columns/pasienColumns'
 import { resepColumns } from '@/components/table/columns/resepColumns'
 
@@ -9,7 +9,7 @@ import type { Role } from '@/types/role'
 import type { ColumnDef } from '@tanstack/react-table'
 
 const columnsByRole: Record<Role, ColumnDef<any>[]> = {
-  admin: userColumns,
+  admin: getUserColumns({ onEdit: () => {}, onDelete: () => {}, onAudit: () => {} }),
   dokter: resepColumns,
   perawatpoli: pasienColumns,
   perawatigd: pasienColumns,
@@ -21,16 +21,16 @@ const columnsByRole: Record<Role, ColumnDef<any>[]> = {
   kepalaunit: pasienColumns,
   tpp: pasienColumns,
   kasir: pasienColumns,
-  sdm: userColumns,
+  sdm: getUserColumns({ onEdit: () => {}, onDelete: () => {}, onAudit: () => {} }),
   keuangan: pasienColumns,
   logmedis: resepColumns,
   logumum: resepColumns,
   manajemenrs: pasienColumns,
-  supplier: userColumns,
-  penjamin: userColumns,
+  supplier: getUserColumns({ onEdit: () => {}, onDelete: () => {}, onAudit: () => {} }),
+  penjamin: getUserColumns({ onEdit: () => {}, onDelete: () => {}, onAudit: () => {} }),
   bpjs: pasienColumns,
   satusehat: resepColumns,
-  audit: userColumns,
+  audit: getUserColumns({ onEdit: () => {}, onDelete: () => {}, onAudit: () => {} }),
 }
 
 export default function TableByRole({
