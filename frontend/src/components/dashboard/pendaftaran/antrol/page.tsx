@@ -169,10 +169,11 @@ export default function AntrolPage() {
           <h2 className="text-lg md:text-xl font-bold mb-4">Pilih Layanan</h2>
           <div className="space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="poli-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Pilih Poli/Klinik
               </label>
               <select
+                id="poli-select"
                 value={selectedService}
                 onChange={(e) => setSelectedService(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-200"
@@ -187,21 +188,23 @@ export default function AntrolPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="tanggal-kunjungan" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Tanggal Kunjungan
               </label>
               <input
+                id="tanggal-kunjungan"
                 type="date"
+                title="Tanggal Kunjungan"
                 defaultValue={new Date().toISOString().split('T')[0]}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-200"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="waktu-kedatangan" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Waktu Kedatangan
               </label>
-              <select className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-200">
+              <select id="waktu-kedatangan" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-200">
                 <option>Pagi (08:00 - 12:00)</option>
                 <option>Siang (13:00 - 17:00)</option>
               </select>

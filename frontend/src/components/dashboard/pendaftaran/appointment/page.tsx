@@ -507,7 +507,7 @@ export default function AppointmentPage() {
                   {showPatientDropdown && patientsList?.data && (
                     <div className="absolute z-10 w-full mt-1 bg-white dark:bg-zinc-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                       {patientsList.data
-                        .filter(patient =>
+                        .filter((patient: any) =>
                           patient.name.toLowerCase().includes(createForm.patient_id.toLowerCase()) ||
                           patient.mrn.toString().includes(createForm.patient_id)
                         )
@@ -548,7 +548,7 @@ export default function AppointmentPage() {
                   {showDoctorDropdown && doctorsList?.data && (
                     <div className="absolute z-10 w-full mt-1 bg-white dark:bg-zinc-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                       {doctorsList.data
-                        .filter(doctor =>
+                        .filter((doctor: any) =>
                           doctor.name.toLowerCase().includes(createForm.doctor_id.toLowerCase()) ||
                           doctor.specialty.toLowerCase().includes(createForm.doctor_id.toLowerCase()) ||
                           doctor.license_number.toLowerCase().includes(createForm.doctor_id.toLowerCase())
