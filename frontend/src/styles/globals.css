@@ -1,164 +1,156 @@
-@tailwind base;               /* Import layer base Tailwind (reset, typography) */
-@tailwind components;         /* Import layer komponen custom */
-@tailwind utilities;          /* Import semua utility class Tailwind */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-/* Fade-in animation untuk transisi masuk (misalnya modal, dropdown) */
+/* Fade-in animation */
 @keyframes fade-in {
   from {
     opacity: 0;
-    transform: scale(0.95);   /* Mulai dari sedikit mengecil */
+    transform: scale(0.95);
   }
   to {
     opacity: 1;
-    transform: scale(1);      /* Akhiri dengan ukuran normal */
+    transform: scale(1);
   }
 }
 
-/* Class animasi yang bisa dipakai di JSX: className="animate-fade-in" */
 .animate-fade-in {
   animation: fade-in 0.3s ease-out;
 }
 
-/* Base styles untuk elemen HTML utama */
+/* Blob animation */
+@keyframes blob {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+.animate-blob {
+  animation: blob 10s infinite;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+/* Base reset & layout fix */
 @layer base {
+  html,
+  body,
+  #__next {
+    @apply h-full w-full m-0 p-0;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
   body {
-    font-family: 'Satoshi', ui-sans-serif, system-ui, sans-serif; /* Font utama */
-    font-size: 16px;           /* Ukuran font default */
-    line-height: 24px;         /* Jarak antar baris */
-    background-color: hsl(var(--background)); /* Warna latar dari sistem warna global */
-    color: hsl(var(--foreground));            /* Warna teks utama */
+    font-family: 'Satoshi', ui-sans-serif, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 24px;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
   }
 
   * {
-    border-color: hsl(var(--border));         /* Semua border pakai warna global */
+    border-color: hsl(var(--border));
   }
 }
 
-/* Komponen global reusable untuk layout dan tabel */
+/* Layout & table components */
 @layer components {
-    /* Header tetap di atas */
-    .layout-header {
-      @apply fixed top-0 left-0 right-0 z-50 h-14 bg-card border-b border-border;
-    }
+  .layout-header {
+    @apply fixed top-0 left-0 right-0 z-50 h-14 bg-card border-b border-border;
+  }
 
-    /* Footer tetap di bawah */
-    .layout-footer {
-      @apply fixed bottom-0 left-0 right-0 z-50 h-16 bg-card border-t border-border;
-    }
+  .layout-footer {
+    @apply fixed bottom-0 left-0 right-0 z-50 h-16 bg-card border-t border-border;
+  }
 
-    /* Konten utama scrollable */
-    .layout-main {
-      @apply pt-4 pb-16 overflow-y-auto max-h-screen;
-    }
+  .layout-main {
+    @apply pt-14 pb-16 overflow-y-auto max-h-screen;
+  }
 
-    /* Container responsif */
-    .layout-container {
-      @apply w-full px-6;
-    }
+  .layout-container {
+    @apply w-full px-6;
+  }
 
-    /* Tabel scroll horizontal */
-    .table-wrapper {
-      @apply w-full overflow-x-auto;
-    }
+  .table-wrapper {
+    @apply w-full overflow-x-auto;
+  }
 
-    /* Tabel fleksibel, tidak paksa zoom */
-    .table-base {
-      @apply w-max text-sm bg-card text-card-foreground border border-border;
-      /* w-max → tabel selebar konten, tidak paksa lebar penuh */
-    }
+  .table-base {
+    @apply w-max text-sm bg-card text-card-foreground border border-border;
+  }
 
-    .table-head {
-      @apply bg-muted text-muted-foreground;
-    }
+  .table-head {
+    @apply bg-muted text-muted-foreground;
+  }
 
-    .table-row {
-      @apply hover:bg-accent text-accent-foreground;
-    }
+  .table-row {
+    @apply hover:bg-accent text-accent-foreground;
+  }
 
-    .table-cell {
-      @apply px-4 py-2 whitespace-nowrap text-left;
-      /* text-left → tabel rata kiri */
-    }
-    .btn-active {
+  .table-cell {
+    @apply px-4 py-2 whitespace-nowrap text-left;
+  }
+
+  .btn-active {
     @apply border border-primary bg-accent text-primary shadow-sm transition-all duration-300 ease-out;
-    }
+  }
 
-    .btn-default {
-      @apply text-muted-foreground hover:bg-muted transition-all duration-300 ease-out;
-    }
+  .btn-default {
+    @apply text-muted-foreground hover:bg-muted transition-all duration-300 ease-out;
+  }
 }
 
-  
-/* Sistem warna global: Light mode */
+/* Light theme only - similar to login form background */
 :root {
-  --background: 220 20% 97%;              /* Latar terang bersih */
-  --foreground: 220 15% 20%;              /* Teks abu gelap */
-  --card: 0 0% 100%;                      /* Putih bersih */
-  --card-foreground: 220 15% 20%;         /* Teks kartu */
+  --background: 120 25% 98%;
+  --foreground: 120 15% 15%;
+  --card: 0 0% 100%;
+  --card-foreground: 120 15% 15%;
   --popover: 0 0% 100%;
-  --popover-foreground: 220 15% 20%;
+  --popover-foreground: 120 15% 15%;
 
-  --primary: 220 100% 60%;                /* Biru terang modern */
-  --primary-foreground: 0 0% 100%;        /* Teks putih di atas biru */
+  --primary: 120 60% 45%;
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 220 20% 95%;               /* Abu terang */
-  --secondary-foreground: 220 15% 30%;    /* Teks sekunder */
+  --secondary: 120 20% 95%;
+  --secondary-foreground: 120 15% 25%;
 
-  --muted: 220 20% 92%;                   /* Background lembut */
-  --muted-foreground: 220 15% 50%;        /* Teks lembut */
+  --muted: 120 20% 92%;
+  --muted-foreground: 120 15% 45%;
 
-  --accent: 220 100% 96%;                 /* Hover card */
-  --accent-foreground: 220 100% 40%;      /* Teks hover */
+  --accent: 120 60% 96%;
+  --accent-foreground: 120 60% 30%;
 
   --destructive: 0 80% 60%;
   --destructive-foreground: 0 0% 100%;
 
-  --border: 220 15% 85%;                  /* Border terang */
-  --input: 220 20% 90%;
-  --ring: 220 100% 60%;
+  --border: 120 15% 85%;
+  --input: 120 20% 90%;
+  --ring: 120 60% 45%;
 
-  --chart-1: 220 100% 60%;
-  --chart-2: 120 60% 45%;
+  --chart-1: 120 60% 45%;
+  --chart-2: 220 60% 55%;
   --chart-3: 30 80% 55%;
   --chart-4: 280 65% 60%;
   --chart-5: 0 80% 60%;
 
   --radius: 0.5rem;
-}
-
-
-
-/* Sistem warna global: Dark mode */
-.dark {
-  --background: 240 10% 10%;              /* Latar gelap elegan */
-  --foreground: 0 0% 90%;                 /* Teks terang */
-  --card: 240 10% 12%;                    /* Kartu gelap */
-  --card-foreground: 0 0% 90%;
-  --popover: 240 10% 12%;
-  --popover-foreground: 0 0% 90%;
-
-  --primary: 220 100% 60%;                /* Biru terang */
-  --primary-foreground: 0 0% 100%;
-
-  --secondary: 240 10% 18%;               /* Abu gelap */
-  --secondary-foreground: 0 0% 90%;
-
-  --muted: 240 10% 20%;                   /* Background lembut gelap */
-  --muted-foreground: 0 0% 60%;
-
-  --accent: 220 100% 25%;
-  --accent-foreground: 0 0% 100%;
-
-  --destructive: 0 70% 40%;
-  --destructive-foreground: 0 0% 100%;
-
-  --border: 240 10% 25%;
-  --input: 240 10% 25%;
-  --ring: 220 100% 60%;
-
-  --chart-1: 220 100% 60%;
-  --chart-2: 120 60% 50%;
-  --chart-3: 30 80% 60%;
-  --chart-4: 280 65% 65%;
-  --chart-5: 0 80% 65%;
 }

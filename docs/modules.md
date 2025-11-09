@@ -205,3 +205,77 @@ Dokumen ini merinci fungsi utama tiap modul dalam sistem SIRAMA, dibagi berdasar
 - Fungsi: Pelatihan staf, onboarding digital
 - Tabel: materi, progress_pelatihan
 - Endpoint: GET /elearning/:id
+
+---
+
+## 🧪 Alur Pengujian Sistem
+
+### 1. Pengujian Unit (Unit Testing)
+- Setiap komponen atau fungsi diuji secara terpisah
+- Memastikan setiap fungsi bekerja sesuai ekspektasi
+- Dilakukan pada level kode dengan mock data
+- Target coverage minimal 80% untuk modul kritikal
+
+### 2. Pengujian Integrasi (Integration Testing)
+- Mengujikan interaksi antar modul
+- Memastikan data mengalir dengan benar antar komponen
+- Contoh: Pengujian alur dari pendaftaran pasien hingga pembayaran
+
+### 3. Pengujian Sistem (System Testing)
+- Pengujian menyeluruh terhadap seluruh sistem
+- Memastikan sistem berfungsi sesuai spesifikasi fungsional
+- Termasuk pengujian keamanan, performa, dan interoperabilitas
+
+### 4. Pengujian Penerimaan Pengguna (User Acceptance Testing/UAT)
+- Pengujian yang dilakukan oleh pengguna akhir
+- Memastikan sistem memenuhi kebutuhan bisnis
+- Melibatkan berbagai role pengguna dalam sistem
+
+### 5. Pengujian Beban (Load Testing)
+- Mengujikan performa sistem di bawah beban tinggi
+- Memastikan sistem tetap responsif saat digunakan banyak pengguna
+- Dilakukan terutama pada modul dengan trafik tinggi seperti dashboard dan antrean
+
+---
+
+## 📊 Manfaat Dashboard dan Relasi Tabel
+
+### Dashboard Dokter
+- Menampilkan informasi pasien yang akan diperiksa
+- Menyediakan akses cepat ke EMR, CPPT, dan order laboratorium/radiologi
+- Meningkatkan efisiensi kerja dokter dengan menyajikan informasi penting dalam satu tampilan
+
+### Dashboard Perawat Poli
+- Menampilkan data tanda-tanda vital pasien
+- Memungkinkan pencatatan CPPT dan EMR dengan mudah
+- Memberikan informasi antrian pasien untuk perencanaan pelayanan
+
+### Dashboard Keuangan
+- Menyajikan informasi piutang, hutang, dan laporan keuangan
+- Membantu manajemen rumah sakit dalam pengambilan keputusan finansial
+- Memberikan statistik dan grafik untuk analisis tren keuangan
+
+### Dashboard Rekam Medis
+- Memudahkan verifikasi dan pengkodean rekam medis
+- Menyediakan akses ke berkas klaim untuk keperluan billing
+- Membantu dalam grouping INA-CBG untuk klaim BPJS
+
+### Dashboard Kepala Unit
+- Menampilkan KPI (Key Performance Indicator) seperti BOR, LOS, dan TOI
+- Membantu evaluasi kinerja unit pelayanan
+- Memberikan insight untuk perbaikan kualitas pelayanan
+
+### Dashboard SDM
+- Menyediakan informasi data pegawai, absensi, dan rekapitulasi
+- Membantu manajemen sumber daya manusia dalam perencanaan dan pengawasan
+- Memberikan statistik kehadiran dan kinerja pegawai
+
+### Relasi Tabel yang Berkaitan
+- Tabel pasien berelasi dengan tabel registrasi, rekam medis, dan billing
+- Tabel dokter berelasi dengan tabel pemeriksaan, diagnosa, dan resep
+- Tabel obat berelasi dengan tabel resep, stok, dan mutasi stok
+- Tabel laboratorium berelasi dengan tabel order laboratorium dan hasil laboratorium
+- Tabel radiologi berelasi dengan tabel order radiologi dan hasil radiologi
+- Semua tabel dilengkapi dengan audit trail untuk pelacakan perubahan data
+
+Dengan struktur dashboard dan relasi tabel yang terintegrasi, sistem SIRAMA memungkinkan aliran informasi yang efisien dan akurat antar berbagai unit dalam rumah sakit, sehingga meningkatkan kualitas pelayanan dan efisiensi operasional.

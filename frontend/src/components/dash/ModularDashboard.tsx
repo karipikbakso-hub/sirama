@@ -1,0 +1,153 @@
+'use client'
+
+import { Suspense, lazy } from 'react'
+import { menuByRole, MenuItem } from '@/lib/menuByRole'
+import { capitalize } from '@/lib/utils'
+
+// Lazy load 7 main role dashboards (Kemenkes Standards)
+const AdminDashboard = lazy(() => import('@/components/dashboard/admin/page'))
+const PendaftaranDashboard = lazy(() => import('@/components/dashboard/pendaftaran/page'))
+const DokterDashboard = lazy(() => import('@/components/dashboard/dokter/page'))
+const PerawatDashboard = lazy(() => import('@/components/dashboard/perawat/page'))
+const ApotekerDashboard = lazy(() => import('@/components/dashboard/apoteker/page'))
+const KasirDashboard = lazy(() => import('@/components/dashboard/kasir/page'))
+const ManajemenRsDashboard = lazy(() => import('@/components/dashboard/manajemenrs/page'))
+
+// Lazy load pendaftaran modules
+const RegistrasiPage = lazy(() => import('@/components/dashboard/pendaftaran/registrasi/page'))
+const PasienPage = lazy(() => import('@/components/dashboard/pendaftaran/pasien/page'))
+const AntrianPage = lazy(() => import('@/components/dashboard/pendaftaran/antrian/page'))
+const SEPPage = lazy(() => import('@/components/dashboard/pendaftaran/sep/page'))
+const KPIPage = lazy(() => import('@/roles/pendaftaran/pages/kpi'))
+const RiwayatPage = lazy(() => import('@/roles/pendaftaran/pages/riwayat'))
+const RegistrasiIGDPage = lazy(() => import('@/roles/pendaftaran/pages/registrasi-igd'))
+const AntrianManagementPage = lazy(() => import('@/roles/pendaftaran/pages/antrian-management'))
+const RujukanPage = lazy(() => import('@/roles/pendaftaran/pages/rujukan'))
+const MasterDataPage = lazy(() => import('@/roles/pendaftaran/pages/master-data'))
+const NotificationsPage = lazy(() => import('@/roles/pendaftaran/pages/notifications'))
+const MobileJKNPage = lazy(() => import('@/roles/pendaftaran/pages/mobile-jkn'))
+const AppointmentPage = lazy(() => import('@/components/dashboard/pendaftaran/appointment/page'))
+const BPJSIntegrationPage = lazy(() => import('@/components/dashboard/pendaftaran/bpjs-integration/page'))
+
+interface ModularDashboardProps {
+  role: string
+  module?: string
+}
+
+export default function ModularDashboard({ role, module }: ModularDashboardProps) {
+  const renderDashboard = () => {
+    // Handle module routing for pendaftaran
+    if (role === 'pendaftaran' && module) {
+      switch (module) {
+        case 'registrasi':
+          return <RegistrasiPage />
+        case 'pasien':
+          return <PasienPage />
+        case 'antrian':
+          return <AntrianPage />
+        case 'sep':
+          return <SEPPage />
+        case 'kpi':
+          return <KPIPage />
+        case 'riwayat':
+          return <RiwayatPage />
+        case 'registrasi-igd':
+          return <RegistrasiIGDPage />
+        case 'antrian-management':
+          return <AntrianManagementPage />
+        case 'rujukan':
+          return <RujukanPage />
+        case 'master-data':
+          return <MasterDataPage />
+        case 'notifications':
+          return <NotificationsPage />
+        case 'mobile-jkn':
+          return <MobileJKNPage />
+        case 'appointment':
+          return <AppointmentPage />
+        case 'bpjs-integration':
+          return <BPJSIntegrationPage />
+        default:
+          return <PendaftaranDashboard />
+      }
+    }
+
+    switch (role) {
+      case 'admin':
+        return <AdminDashboard />
+      case 'pendaftaran':
+        return <PendaftaranDashboard />
+      case 'dokter':
+        return <DokterDashboard />
+      case 'perawat':
+        return <PerawatDashboard />
+      case 'apoteker':
+        return <ApotekerDashboard />
+      case 'kasir':
+        return <KasirDashboard />
+      case 'manajemenrs':
+        return <ManajemenRsDashboard />
+      default:
+        return <GenericDashboard role={role} />
+    }
+  }
+
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+          <p>Loading dashboard...</p>
+        </div>
+      </div>
+    }>
+      {renderDashboard()}
+    </Suspense>
+  )
+}
+
+// Fallback component for roles without specific dashboards
+function GenericDashboard({ role }: { role: string }) {
+  const menuItems = menuByRole[role] || []
+  const flatMenuItems = menuItems.filter((item): item is MenuItem => 'icon' in item)
+
+  return (
+    <div>
+      <div className="mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white">
+          Dashboard {capitalize(role)}
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">
+          Selamat datang — berikut ringkasan aktivitas Anda.
+        </p>
+      </div>
+
+      {/* Card Ringkasan */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {flatMenuItems.slice(0, 4).map((item, i) => (
+          <div
+            key={i}
+            className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700"
+          >
+            <div className="flex items-center">
+              <item.icon className="text-xl text-blue-600 dark:text-blue-400 mr-3" />
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{item.label}</p>
+                <p className="font-medium text-gray-800 dark:text-white">–</p>
+              </div>
+            </div>
+          </div>
+        ))}
+        {flatMenuItems.length === 0 && (
+          <div className="col-span-full text-center py-8 text-gray-500 dark:text-gray-400">
+            Tidak ada menu tersedia untuk role ini.
+          </div>
+        )}
+      </div>
+
+      <div className="mt-6 text-gray-500 dark:text-gray-400">
+        <p>🛠️ Catatan: Dashboard ini masih dalam pengembangan. Konten akan disesuaikan berdasarkan role Anda.</p>
+      </div>
+    </div>
+  )
+}
