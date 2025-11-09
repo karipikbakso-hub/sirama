@@ -31,7 +31,7 @@ Database (Render) → MySQL Database
    - **Output Directory**: `.next`
 
 ### 2. Environment Variables
-Di Vercel dashboard, tambahkan environment variable:
+Setelah project di-import, di Vercel dashboard → Settings → Environment Variables, tambahkan:
 
 ```
 NEXT_PUBLIC_API_URL=https://sirama-backend.onrender.com
@@ -48,9 +48,9 @@ Klik "Deploy" dan tunggu proses selesai.
 3. Pilih repository GitHub SIRAMA
 4. Configure service:
    - **Name**: `sirama-backend`
-   - **Environment**: `Docker` atau `Native`
+   - **Environment**: `Docker`
    - **Branch**: `main`
-   - **Root Directory**: `backend`
+   - **Root Directory**: (leave empty, Dockerfile is in backend/)
 
 ### 2. Environment Variables
 Tambahkan environment variables berikut:

@@ -1,9 +1,8 @@
 services:
   - type: web
     name: sirama-backend
-    runtime: php
-    buildCommand: "composer install --no-dev --optimize-autoloader"
-    startCommand: "php artisan serve --host 0.0.0.0 --port $PORT"
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
     envVars:
       - key: APP_NAME
         value: SIRAMA
@@ -48,6 +47,10 @@ services:
         value: database
       - key: FRONTEND_URL
         value: https://your-frontend-domain.vercel.app
+      - key: RUN_MIGRATIONS
+        value: true
+      - key: RUN_SEEDERS
+        value: false
 
 databases:
   - name: sirama-db
