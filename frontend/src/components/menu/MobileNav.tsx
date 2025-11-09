@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { menuByRole, Role } from '@/lib/menuByRole';
+import { menuByRole, Role, MenuItem } from '@/lib/menuByRole';
 import { MdHome } from 'react-icons/md';
 
 export default function MobileNav() {
@@ -11,7 +11,7 @@ export default function MobileNav() {
   const searchParams = useSearchParams();
   const segments = pathname?.split('/') || [];
   const role = segments[2] as Role;
-  const navItems = menuByRole[role] ?? [];
+  const navItems = (menuByRole[role] ?? []).filter((item): item is MenuItem => 'icon' in item);
 
   const normalize = (url: string) => url.replace(/\/$/, '');
   const buttonRef = useRef<HTMLButtonElement>(null);
