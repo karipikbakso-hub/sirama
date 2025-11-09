@@ -16,10 +16,12 @@ type UserPayload = {
 
 export default function UserFormModal({
   user,
+  isOpen,
   onClose,
   onSuccess,
 }: {
   user?: UserPayload
+  isOpen: boolean
   onClose: () => void
   onSuccess: () => void
 }) {
@@ -32,7 +34,7 @@ export default function UserFormModal({
   const { addOrEdit } = useUserMutation({ onSuccess })
 
   return (
-    <Modal title={user ? 'Edit User' : 'Tambah User'} onClose={onClose}>
+    <Modal isOpen={isOpen} title={user ? 'Edit User' : 'Tambah User'} onClose={onClose}>
       <form
         onSubmit={handleSubmit(data => addOrEdit.mutate(data))}
         className="space-y-4"
