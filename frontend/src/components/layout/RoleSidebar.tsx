@@ -28,13 +28,8 @@ export default function RoleSidebar({ role }: { role: string }) {
 
   // Modular navigation for all roles
   const handleMenuClick = (href: string) => {
-    // Extract module name from href (e.g., '/dashboard/admin/user' -> 'user')
-    const moduleName = href.split('/').pop() || 'dashboard'
-
-    // Update URL without causing a page reload
-    const currentParams = searchParams ? new URLSearchParams(searchParams) : new URLSearchParams()
-    currentParams.set('module', moduleName)
-    router.replace(`/dashboard/${role}?${currentParams.toString()}`, { scroll: false })
+    // Use proper Next.js navigation to the actual route
+    router.push(href)
   }
 
   // Check if menu has mixed structure (standalone items + categories)
@@ -85,9 +80,7 @@ export default function RoleSidebar({ role }: { role: string }) {
               // Check if this is a standalone menu item
               if ('href' in navItem) {
                 const item = navItem as MenuItem
-                const moduleName = item.href.split('/').pop() || 'dashboard'
-                const currentModule = searchParams?.get('module') || 'dashboard'
-                const isActive = currentModule === moduleName
+                const isActive = pathname === item.href
 
                 return (
                   <button
@@ -189,9 +182,7 @@ export default function RoleSidebar({ role }: { role: string }) {
                     }`}>
                       <div className="ml-6 mt-2 space-y-1">
                         {category.items.map((item, itemIndex) => {
-                          const moduleName = item.href.split('/').pop() || 'dashboard'
-                          const currentModule = searchParams?.get('module') || 'dashboard'
-                          const isActive = currentModule === moduleName
+                          const isActive = pathname === item.href
 
                           return (
                             <button
