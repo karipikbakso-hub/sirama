@@ -1,6 +1,5 @@
 'use client'
 
-import RoleGuard from '@/components/RoleGuard';
 import { FaMicroscope, FaXRay, FaPrint, FaUpload } from 'react-icons/fa'
 
 const stats = [

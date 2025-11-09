@@ -1,6 +1,5 @@
 'use client'
 
-import RoleGuard from '@/components/RoleGuard';
 import { FaBed, FaHeartbeat, FaClipboardCheck } from 'react-icons/fa'
 
 const stats = [
