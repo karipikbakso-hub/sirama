@@ -66,7 +66,7 @@ export default function UserPage() {
       username: user.username,
       email: user.email,
       password: '',
-      role: user.role,
+      role: user.role || '',
     })
     setIsModalOpen(true)
   }
@@ -186,11 +186,12 @@ export default function UserPage() {
         </form>
       </Modal>
 
-      <AuditLogModal
-        isOpen={isAuditModalOpen}
-        onClose={() => setIsAuditModalOpen(false)}
-        userId={auditUserId || 0}
-      />
+      {isAuditModalOpen && (
+        <AuditLogModal
+          onClose={() => setIsAuditModalOpen(false)}
+          userId={auditUserId || 0}
+        />
+      )}
     </div>
   )
 }

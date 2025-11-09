@@ -1,6 +1,6 @@
 'use client'
 
-import { menuByRole } from '@/lib/menuByRole'
+import { menuByRole, MenuItem } from '@/lib/menuByRole'
 
 export default function DokterDashboard() {
   return <DokterDashboardHome />
@@ -25,7 +25,7 @@ function DokterDashboardHome() {
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {menuByRole.dokter?.map((item, index) => (
+          {menuByRole.dokter?.filter((item): item is MenuItem => 'icon' in item).map((item, index) => (
             <div
               key={index}
               className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600"
