@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Patient;
 use App\Models\Registration;
+use App\Models\Doctor;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -79,7 +80,7 @@ class RegistrationController extends Controller
         $validator = Validator::make($request->all(), [
             'patient_id' => 'required|integer|exists:patients,id',
             'service_unit' => 'required|string|max:100',
-            'doctor_id' => 'nullable|integer|exists:users,id',
+            'doctor_id' => 'nullable|integer|exists:m_dokter,id',
             'arrival_type' => ['required', Rule::in(['mandiri', 'rujukan', 'igd'])],
             'referral_source' => 'nullable|string|max:255',
             'payment_method' => ['required', Rule::in(['tunai', 'bpjs', 'asuransi'])],
@@ -155,7 +156,7 @@ class RegistrationController extends Controller
     {
         $registration->load([
             'patient:id,mrn,name,nik,birth_date,gender,phone,address',
-            'doctor:id,name',
+            'doctor:id,nama_dokter as name',
             'creator:id,name'
         ]);
 
@@ -180,7 +181,7 @@ class RegistrationController extends Controller
 
         $validator = Validator::make($request->all(), [
             'service_unit' => 'sometimes|required|string|max:100',
-            'doctor_id' => 'nullable|integer|exists:users,id',
+            'doctor_id' => 'nullable|integer|exists:m_dokter,id',
             'arrival_type' => ['sometimes', 'required', Rule::in(['mandiri', 'rujukan', 'igd'])],
             'referral_source' => 'nullable|string|max:255',
             'payment_method' => ['sometimes', 'required', Rule::in(['tunai', 'bpjs', 'asuransi'])],
@@ -211,7 +212,7 @@ class RegistrationController extends Controller
             $registration->update($updateData);
 
             // Load relationships for response
-            $registration->load(['patient:id,mrn,name', 'doctor:id,name', 'creator:id,name']);
+            $registration->load(['patient:id,mrn,name', 'doctor:id,nama_dokter as name', 'creator:id,name']);
 
             return response()->json([
                 'success' => true,
@@ -344,7 +345,7 @@ class RegistrationController extends Controller
      */
     public function statistics(Request $request): JsonResponse
     {
-        $date = $request->get('date', today());
+        $date = $request->get('date', date('Y-m-d'));
 
         $stats = [
             'total_registrations' => Registration::whereDate('created_at', $date)->count(),
