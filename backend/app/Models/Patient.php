@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-class Patient extends Model
+class Patient extends Model implements HasMedia
 {
-    use HasFactory;
+    use InteractsWithMedia;
 
     protected $fillable = [
         'mrn',
@@ -74,14 +76,6 @@ class Patient extends Model
     }
 
     /**
-     * Relationship with medical records
-     */
-    public function medicalRecords(): HasMany
-    {
-        return $this->hasMany(MedicalRecord::class);
-    }
-
-    /**
      * Scope for active patients
      */
     public function scopeActive($query)
@@ -100,5 +94,25 @@ class Patient extends Model
               ->orWhere('nik', 'like', "%{$search}%")
               ->orWhere('phone', 'like', "%{$search}%");
         });
+    }
+
+    /**
+     * Define media collections for patient files
+     */
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('medical-records')
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/gif', 'application/pdf'])
+            ->singleFile(); // One profile picture
+
+        $this->addMediaCollection('x-rays')
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/dicom'])
+            ->acceptsFileExtensions(['jpg', 'jpeg', 'png', 'dcm']);
+
+        $this->addMediaCollection('lab-results')
+            ->acceptsMimeTypes(['application/pdf', 'image/jpeg', 'image/png']);
+
+        $this->addMediaCollection('prescriptions')
+            ->acceptsMimeTypes(['application/pdf', 'image/jpeg', 'image/png']);
     }
 }

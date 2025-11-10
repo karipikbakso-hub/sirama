@@ -13,9 +13,7 @@ export default function MobileNav() {
   const role = segments[2] as Role;
   const navItems = (menuByRole[role] ?? []).filter((item): item is MenuItem => 'icon' in item);
 
-  const normalize = (url: string) => url.replace(/\/$/, '');
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const linkRef = useRef<HTMLAnchorElement>(null);
 
   const [hasMounted, setHasMounted] = useState(false);
   useEffect(() => {
@@ -23,19 +21,16 @@ export default function MobileNav() {
   }, []);
 
   useEffect(() => {
-    if (hasMounted && (buttonRef.current || linkRef.current)) {
-      const activeElement = buttonRef.current || linkRef.current;
-      if (activeElement) {
-        activeElement.scrollIntoView({
-          behavior: 'smooth',
-          block: 'nearest',
-          inline: 'center',
-        });
-      }
+    if (hasMounted && buttonRef.current) {
+      buttonRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      });
     }
   }, [hasMounted, pathname, searchParams]);
 
-  // Modular navigation for all roles
+  // Modular navigation for all roles - use query parameters for content switching
   const handleMenuClick = (href: string) => {
     const moduleName = href?.split('/').pop() || 'dashboard';
     const currentParams = searchParams ? new URLSearchParams(searchParams) : new URLSearchParams();
@@ -55,7 +50,7 @@ export default function MobileNav() {
     >
       <div className="overflow-x-auto">
         <div className="flex gap-2 px-2 py-3 min-w-max">
-          {/* Menu Items - All roles use modular navigation */}
+          {/* Menu Items - Use modular navigation with query parameters */}
           {navItems.map(({ label, icon: Icon, href }) => {
             const moduleName = href?.split('/').pop() || 'dashboard';
             const currentModule = searchParams?.get('module') || 'dashboard';

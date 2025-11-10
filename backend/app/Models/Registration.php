@@ -2,13 +2,11 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Registration extends Model
 {
-    use HasFactory;
 
     protected $fillable = [
         'patient_id',
@@ -94,7 +92,7 @@ class Registration extends Model
      */
     public function doctor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'doctor_id');
+        return $this->belongsTo(Doctor::class, 'doctor_id');
     }
 
     /**
@@ -103,14 +101,6 @@ class Registration extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
-    }
-
-    /**
-     * Relationship with medical records
-     */
-    public function medicalRecords()
-    {
-        return $this->hasMany(MedicalRecord::class);
     }
 
     /**

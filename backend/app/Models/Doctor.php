@@ -43,6 +43,14 @@ class Doctor extends Model
     }
 
     /**
+     * Get name attribute for Laravel relationships
+     */
+    public function getNameAttribute()
+    {
+        return $this->nama_dokter;
+    }
+
+    /**
      * Scope for searching doctors
      */
     public function scopeSearch($query, string $search)

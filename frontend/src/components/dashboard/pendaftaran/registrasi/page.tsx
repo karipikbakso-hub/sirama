@@ -115,6 +115,7 @@ export default function RegistrasiPage() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingRegistration, setEditingRegistration] = useState<Registration | null>(null)
+  const [editingSubmitting, setEditingSubmitting] = useState(false)
 
   // State untuk form input
   const [formData, setFormData] = useState({
@@ -292,6 +293,92 @@ export default function RegistrasiPage() {
       emergency_contact: ''
     })
     setIsEditModalOpen(true)
+  }
+
+  // Handle edit submission
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingRegistration) return
+
+    setEditingSubmitting(true)
+
+    try {
+      const updateData = {
+        service_unit: formData.service_unit,
+        doctor_id: formData.doctor_id ? parseInt(formData.doctor_id) : null,
+        arrival_type: formData.arrival_type,
+        referral_source: formData.referral_source || null,
+        payment_method: formData.payment_method,
+        insurance_number: formData.insurance_number || null,
+        status: editingRegistration.status, // Keep current status
+        notes: formData.notes || null
+      }
+
+      const response = await api.put(`/api/registrations/${editingRegistration.id}`, updateData)
+
+      if (response.data.success) {
+        // Refresh data
+        await fetchRegistrations()
+        await fetchStatistics()
+
+        // Close modal and reset form
+        setIsEditModalOpen(false)
+        setEditingRegistration(null)
+        setFormData({
+          name: '',
+          nik: '',
+          birth_date: '',
+          gender: 'L',
+          phone: '',
+          address: '',
+          emergency_contact: '',
+          patient_id: '',
+          service_unit: '',
+          doctor_id: '',
+          arrival_type: 'mandiri',
+          referral_source: '',
+          payment_method: 'tunai',
+          insurance_number: '',
+          notes: ''
+        })
+
+        alert('Registrasi berhasil diperbarui')
+      } else {
+        throw new Error(response.data.message || 'Failed to update registration')
+      }
+    } catch (err: any) {
+      console.error('Error updating registration:', err)
+      const errorMessage = err.response?.data?.message || err.message || 'Terjadi kesalahan saat memperbarui registrasi'
+      alert(errorMessage)
+    } finally {
+      setEditingSubmitting(false)
+    }
+  }
+
+  // Handle delete
+  const handleDelete = async (registration: Registration) => {
+    if (registration.status !== 'cancelled') {
+      alert('Hanya registrasi yang dibatalkan yang dapat dihapus')
+      return
+    }
+
+    if (!confirm(`Apakah Anda yakin ingin menghapus registrasi ${registration.registration_no}?`)) {
+      return
+    }
+
+    try {
+      const response = await api.delete(`/api/registrations/${registration.id}`)
+      if (response.data.success) {
+        await fetchRegistrations() // Refresh data
+        await fetchStatistics() // Refresh statistics
+        alert('Registrasi berhasil dihapus')
+      } else {
+        throw new Error(response.data.message || 'Failed to delete registration')
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || 'An error occurred')
+      console.error('Error deleting registration:', err)
+    }
   }
 
   // Close detail modal
@@ -502,6 +589,14 @@ export default function RegistrasiPage() {
             title="Edit Registrasi"
           >
             <FaEdit />
+          </button>
+          <button
+            onClick={() => handleDelete(row.original)}
+            className="p-2 text-red-500 dark:text-red-400 border border-red-300 dark:border-red-600 rounded-lg hover:bg-red-100 dark:hover:bg-red-600 transition"
+            title="Hapus Registrasi"
+            disabled={row.original.status !== 'cancelled'}
+          >
+            <FaTrash />
           </button>
         </div>
       ),
@@ -1316,12 +1411,7 @@ export default function RegistrasiPage() {
                 </button>
               </div>
 
-              <form onSubmit={(e) => {
-                e.preventDefault()
-                // Handle edit submission here
-                console.log('Edit registration:', formData)
-                closeEditModal()
-              }}>
+              <form onSubmit={handleEditSubmit}>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

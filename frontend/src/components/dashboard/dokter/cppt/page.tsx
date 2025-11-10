@@ -1,47 +1,164 @@
 'use client'
 
-import { useState } from 'react'
-import { MdSearch, MdPerson, MdNoteAlt, MdSave, MdAdd, MdEdit, MdDelete } from 'react-icons/md'
+import { useState, useEffect } from 'react'
+import { MdSearch, MdPerson, MdNoteAlt, MdSave, MdAdd, MdEdit, MdDelete, MdRefresh } from 'react-icons/md'
 
 export default function CPPTPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedPatient, setSelectedPatient] = useState<any>(null)
   const [showAddForm, setShowAddForm] = useState(false)
+  const [patients, setPatients] = useState<any[]>([])
+  const [cpptData, setCpptData] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Mock patient data
-  const patients = [
-    { id: 1, name: 'Ahmad Surya', mrn: 'MRN001', age: 35, gender: 'L', diagnosis: 'Hipertensi' },
-    { id: 2, name: 'Siti Aminah', mrn: 'MRN002', age: 28, gender: 'P', diagnosis: 'Diabetes Melitus' },
-    { id: 3, name: 'Budi Santoso', mrn: 'MRN003', age: 42, gender: 'L', diagnosis: 'Asma Bronkial' },
-  ]
+  // Fetch patients data
+  useEffect(() => {
+    fetchPatients()
+  }, [])
 
-  // Mock CPPT data
-  const cpptData = [
-    {
-      id: 1,
-      date: '2025-11-09',
-      time: '08:30',
-      subjective: 'Pasien mengeluh sakit kepala dan pusing sejak 2 hari yang lalu',
-      objective: 'TD: 160/95 mmHg, HR: 85 bpm, RR: 18/min, Temp: 36.8°C',
-      assessment: 'Hipertensi grade 1',
-      plan: 'Lanjutkan obat antihipertensi, kontrol tekanan darah mingguan',
-      doctor: 'Dr. Ahmad Surya'
-    },
-    {
-      id: 2,
-      date: '2025-11-08',
-      time: '14:15',
-      subjective: 'Pasien merasa lebih baik setelah minum obat',
-      objective: 'TD: 145/90 mmHg, HR: 78 bpm, RR: 16/min, Temp: 36.5°C',
-      assessment: 'Hipertensi terkendali',
-      plan: 'Lanjutkan terapi, kontrol bulan depan',
-      doctor: 'Dr. Ahmad Surya'
+  // Fetch CPPT data when patient is selected
+  useEffect(() => {
+    if (selectedPatient) {
+      fetchCpptData(selectedPatient.id)
     }
-  ]
+  }, [selectedPatient])
+
+  const fetchPatients = async () => {
+    try {
+      setLoading(true)
+      const token = localStorage.getItem('token')
+      const response = await fetch('http://localhost:8000/api/patients?per_page=50', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'include'
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      if (data.success) {
+        setPatients(data.data.data || [])
+        setError(null)
+      } else {
+        throw new Error(data.message || 'Failed to fetch patients')
+      }
+    } catch (err) {
+      setError('Failed to load patients')
+      console.error('Error fetching patients:', err)
+      // For demo purposes, set some mock data
+      setPatients([
+        { id: 1, nama: 'Ahmad Surya', mrn: 'MRN001', umur: 35, jenis_kelamin: 'L' },
+        { id: 2, nama: 'Siti Aminah', mrn: 'MRN002', umur: 28, jenis_kelamin: 'P' },
+        { id: 3, nama: 'Budi Santoso', mrn: 'MRN003', umur: 42, jenis_kelamin: 'L' },
+      ])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchCpptData = async (patientId: number) => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`http://localhost:8000/api/doctor/cppt/${patientId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'include'
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      if (data.success) {
+        setCpptData(data.data.data || [])
+      } else {
+        throw new Error(data.message || 'Failed to fetch CPPT data')
+      }
+    } catch (err) {
+      console.error('Error fetching CPPT data:', err)
+      // For demo purposes, set some mock data
+      setCpptData([
+        {
+          id: 1,
+          tanggal_waktu: '2025-11-09 08:30:00',
+          subjective: 'Pasien mengeluh sakit kepala dan pusing sejak 2 hari yang lalu',
+          objective: 'TD: 160/95 mmHg, HR: 85 bpm, RR: 18/min, Temp: 36.8°C',
+          assessment: 'Hipertensi grade 1',
+          plan: 'Lanjutkan obat antihipertensi, kontrol tekanan darah mingguan',
+          dokter: { nama: 'Dr. Ahmad Surya' }
+        },
+        {
+          id: 2,
+          tanggal_waktu: '2025-11-08 14:15:00',
+          subjective: 'Pasien merasa lebih baik setelah minum obat',
+          objective: 'TD: 145/90 mmHg, HR: 78 bpm, RR: 16/min, Temp: 36.5°C',
+          assessment: 'Hipertensi terkendali',
+          plan: 'Lanjutkan terapi, kontrol bulan depan',
+          dokter: { nama: 'Dr. Ahmad Surya' }
+        }
+      ])
+    }
+  }
+
+  const handleCreateCppt = async (formData: any) => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('http://localhost:8000/api/doctor/cppt', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          id_pasien: selectedPatient.id,
+          id_dokter: 1, // This should come from authenticated user
+          subjective: formData.subjective,
+          objective: formData.objective,
+          assessment: formData.assessment,
+          plan: formData.plan,
+          jenis_profesi: 'dokter'
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      if (data.success) {
+        // Refresh CPPT data
+        fetchCpptData(selectedPatient.id)
+        setShowAddForm(false)
+      } else {
+        throw new Error(data.message || 'Failed to create CPPT entry')
+      }
+    } catch (err) {
+      console.error('Error creating CPPT entry:', err)
+      // For demo purposes, just close the modal
+      setShowAddForm(false)
+    }
+  }
 
   const filteredPatients = patients.filter(patient =>
-    patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.mrn.toLowerCase().includes(searchTerm.toLowerCase())
+    (patient.nama || patient.name)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    patient.mrn?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   return (
@@ -94,9 +211,9 @@ export default function CPPTPage() {
                   <div className="flex items-center gap-3">
                     <MdPerson className="text-xl text-gray-600 dark:text-gray-400" />
                     <div className="flex-1">
-                      <p className="font-medium text-gray-800 dark:text-white">{patient.name}</p>
+                      <p className="font-medium text-gray-800 dark:text-white">{patient.nama || patient.name}</p>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {patient.mrn} • {patient.age}th
+                        {patient.mrn} • {(patient.umur || patient.age)}th
                       </p>
                     </div>
                   </div>
@@ -134,6 +251,7 @@ export default function CPPTPage() {
         <CPPTFormModal
           patient={selectedPatient}
           onClose={() => setShowAddForm(false)}
+          onSubmit={handleCreateCppt}
         />
       )}
     </div>
@@ -148,10 +266,10 @@ function CPPTContent({ patient, cpptData }: { patient: any, cpptData: any[] }) {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
-              CPPT - {patient.name}
+              CPPT - {patient.nama || patient.name}
             </h2>
             <p className="text-gray-600 dark:text-gray-400">
-              MRN: {patient.mrn} • {patient.age} tahun • {patient.gender === 'L' ? 'Laki-laki' : 'Perempuan'}
+              MRN: {patient.mrn} • {patient.umur || patient.age} tahun • {(patient.jenis_kelamin || patient.gender) === 'L' ? 'Laki-laki' : 'Perempuan'}
             </p>
           </div>
           <div className="flex gap-2">
@@ -185,16 +303,26 @@ function CPPTContent({ patient, cpptData }: { patient: any, cpptData: any[] }) {
 }
 
 function CPPTEntry({ entry }: { entry: any }) {
+  // Format date and time from database
+  const formatDateTime = (dateTimeString: string) => {
+    const date = new Date(dateTimeString)
+    const dateStr = date.toLocaleDateString('id-ID')
+    const timeStr = date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+    return { date: dateStr, time: timeStr }
+  }
+
+  const { date, time } = formatDateTime(entry.tanggal_waktu || entry.created_at)
+
   return (
     <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
           <div className="text-sm text-gray-600 dark:text-gray-400">
-            {entry.date} • {entry.time}
+            {date} • {time}
           </div>
           <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
-            {entry.doctor}
+            {entry.dokter?.nama || 'Dokter'}
           </div>
         </div>
         <div className="flex gap-2">
@@ -246,7 +374,7 @@ function CPPTEntry({ entry }: { entry: any }) {
   )
 }
 
-function CPPTFormModal({ patient, onClose }: { patient: any, onClose: () => void }) {
+function CPPTFormModal({ patient, onClose, onSubmit }: { patient: any, onClose: () => void, onSubmit: (formData: any) => Promise<void> }) {
   const [formData, setFormData] = useState({
     subjective: '',
     objective: '',
@@ -254,11 +382,9 @@ function CPPTFormModal({ patient, onClose }: { patient: any, onClose: () => void
     plan: ''
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle form submission
-    console.log('CPPT Data:', formData)
-    onClose()
+    await onSubmit(formData)
   }
 
   return (

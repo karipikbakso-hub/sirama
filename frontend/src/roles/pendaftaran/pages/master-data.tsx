@@ -18,34 +18,37 @@ import {
 import { useAuthContext } from '@/hooks/AuthContext'
 import api from '@/lib/apiAuth'
 
-// Types
+// Types - Updated to match Indonesian field names from backend
 type Doctor = {
   id: number
-  name: string
-  specialty: string
-  license_number: string
-  phone?: string
+  nama_dokter: string
+  spesialisasi: string
+  no_sip: string
+  telepon?: string
   email?: string
-  status: 'active' | 'inactive' | 'retired'
+  status: string
+  aktif?: boolean
   created_at: string
 }
 
 type Medicine = {
   id: number
-  name: string
-  generic_name?: string
-  category?: string
-  unit?: string
-  stock_quantity?: number
-  status: 'active' | 'inactive'
+  nama_obat: string
+  nama_generik?: string
+  golongan_obat?: string
+  satuan?: string
+  stok?: number
+  status: string
+  aktif?: boolean
 }
 
 type ICD10Diagnosis = {
   id: number
-  code: string
-  description: string
-  chapter?: string
-  status: 'active' | 'inactive'
+  kode_icd: string
+  nama_diagnosa: string
+  kategori?: string
+  status: string
+  aktif?: boolean
 }
 
 type Statistics = {
@@ -248,19 +251,19 @@ export default function MasterDataPage() {
 
   // Filter data based on search
   const filteredDoctors = doctors.filter(doctor =>
-    doctor.name.toLowerCase().includes(doctorSearch.toLowerCase()) ||
-    doctor.specialty.toLowerCase().includes(doctorSearch.toLowerCase()) ||
-    doctor.license_number.toLowerCase().includes(doctorSearch.toLowerCase())
+    (doctor.nama_dokter?.toLowerCase() || '').includes(doctorSearch.toLowerCase()) ||
+    (doctor.spesialisasi?.toLowerCase() || '').includes(doctorSearch.toLowerCase()) ||
+    (doctor.no_sip?.toLowerCase() || '').includes(doctorSearch.toLowerCase())
   )
 
   const filteredMedicines = medicines.filter(medicine =>
-    medicine.name.toLowerCase().includes(medicineSearch.toLowerCase()) ||
-    (medicine.generic_name && medicine.generic_name.toLowerCase().includes(medicineSearch.toLowerCase()))
+    (medicine.nama_obat?.toLowerCase() || '').includes(medicineSearch.toLowerCase()) ||
+    (medicine.nama_generik?.toLowerCase() || '').includes(medicineSearch.toLowerCase())
   )
 
   const filteredIcd10 = icd10Diagnoses.filter(diagnosis =>
-    diagnosis.code.toLowerCase().includes(icd10Search.toLowerCase()) ||
-    diagnosis.description.toLowerCase().includes(icd10Search.toLowerCase())
+    (diagnosis.kode_icd?.toLowerCase() || '').includes(icd10Search.toLowerCase()) ||
+    (diagnosis.nama_diagnosa?.toLowerCase() || '').includes(icd10Search.toLowerCase())
   )
 
   return (
@@ -394,17 +397,14 @@ export default function MasterDataPage() {
                   <tbody>
                     {filteredDoctors.map((doctor) => (
                       <tr key={doctor.id} className="border-b border-gray-200 dark:border-gray-700">
-                        <td className="px-4 py-3">{doctor.name}</td>
-                        <td className="px-4 py-3">{doctor.specialty}</td>
-                        <td className="px-4 py-3 font-mono">{doctor.license_number}</td>
+                        <td className="px-4 py-3">{doctor.nama_dokter}</td>
+                        <td className="px-4 py-3">{doctor.spesialisasi}</td>
+                        <td className="px-4 py-3 font-mono">{doctor.no_sip}</td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-1 rounded-full text-xs ${
-                            doctor.status === 'active' ? 'bg-green-100 text-green-800' :
-                            doctor.status === 'inactive' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
+                            doctor.aktif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                           }`}>
-                            {doctor.status === 'active' ? 'Aktif' :
-                             doctor.status === 'inactive' ? 'Tidak Aktif' : 'Pensiun'}
+                            {doctor.aktif ? 'Aktif' : 'Tidak Aktif'}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -416,12 +416,14 @@ export default function MasterDataPage() {
                                 setShowDoctorForm(true)
                               }}
                               className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                              aria-label="Edit dokter"
                             >
                               <FaEdit />
                             </button>
                             <button
                               onClick={() => handleDelete(doctor.id, 'doctors')}
                               className="p-1 text-red-600 hover:bg-red-100 rounded"
+                              aria-label="Hapus dokter"
                             >
                               <FaTrash />
                             </button>
@@ -480,15 +482,15 @@ export default function MasterDataPage() {
                   <tbody>
                     {filteredMedicines.map((medicine) => (
                       <tr key={medicine.id} className="border-b border-gray-200 dark:border-gray-700">
-                        <td className="px-4 py-3">{medicine.name}</td>
-                        <td className="px-4 py-3">{medicine.generic_name || '-'}</td>
-                        <td className="px-4 py-3">{medicine.category || '-'}</td>
-                        <td className="px-4 py-3">{medicine.stock_quantity || 0}</td>
+                        <td className="px-4 py-3">{medicine.nama_obat}</td>
+                        <td className="px-4 py-3">{medicine.nama_generik || '-'}</td>
+                        <td className="px-4 py-3">{medicine.golongan_obat || '-'}</td>
+                        <td className="px-4 py-3">{medicine.stok || 0}</td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-1 rounded-full text-xs ${
-                            medicine.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            medicine.aktif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                           }`}>
-                            {medicine.status === 'active' ? 'Aktif' : 'Tidak Aktif'}
+                            {medicine.aktif ? 'Aktif' : 'Tidak Aktif'}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -500,12 +502,14 @@ export default function MasterDataPage() {
                                 setShowMedicineForm(true)
                               }}
                               className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                              aria-label="Edit obat"
                             >
                               <FaEdit />
                             </button>
                             <button
                               onClick={() => handleDelete(medicine.id, 'medicines')}
                               className="p-1 text-red-600 hover:bg-red-100 rounded"
+                              aria-label="Hapus obat"
                             >
                               <FaTrash />
                             </button>
@@ -563,14 +567,14 @@ export default function MasterDataPage() {
                   <tbody>
                     {filteredIcd10.map((diagnosis) => (
                       <tr key={diagnosis.id} className="border-b border-gray-200 dark:border-gray-700">
-                        <td className="px-4 py-3 font-mono">{diagnosis.code}</td>
-                        <td className="px-4 py-3">{diagnosis.description}</td>
-                        <td className="px-4 py-3">{diagnosis.chapter || '-'}</td>
+                        <td className="px-4 py-3 font-mono">{diagnosis.kode_icd}</td>
+                        <td className="px-4 py-3">{diagnosis.nama_diagnosa}</td>
+                        <td className="px-4 py-3">{diagnosis.kategori || '-'}</td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-1 rounded-full text-xs ${
-                            diagnosis.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            diagnosis.aktif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                           }`}>
-                            {diagnosis.status === 'active' ? 'Aktif' : 'Tidak Aktif'}
+                            {diagnosis.aktif ? 'Aktif' : 'Tidak Aktif'}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -582,12 +586,14 @@ export default function MasterDataPage() {
                                 setShowIcd10Form(true)
                               }}
                               className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                              aria-label="Edit diagnosis ICD-10"
                             >
                               <FaEdit />
                             </button>
                             <button
                               onClick={() => handleDelete(diagnosis.id, 'icd10-diagnoses')}
                               className="p-1 text-red-600 hover:bg-red-100 rounded"
+                              aria-label="Hapus diagnosis ICD-10"
                             >
                               <FaTrash />
                             </button>
@@ -617,9 +623,10 @@ export default function MasterDataPage() {
                     <label className="block text-sm font-medium mb-1">Nama Lengkap *</label>
                     <input
                       type="text"
-                      value={formData.name || ''}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      value={formData.nama_dokter || ''}
+                      onChange={(e) => setFormData({...formData, nama_dokter: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700"
+                      placeholder="Masukkan nama lengkap dokter"
                       required
                     />
                   </div>
@@ -627,9 +634,10 @@ export default function MasterDataPage() {
                     <label className="block text-sm font-medium mb-1">Spesialisasi *</label>
                     <input
                       type="text"
-                      value={formData.specialty || ''}
-                      onChange={(e) => setFormData({...formData, specialty: e.target.value})}
+                      value={formData.spesialisasi || ''}
+                      onChange={(e) => setFormData({...formData, spesialisasi: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700"
+                      placeholder="Masukkan spesialisasi dokter"
                       required
                     />
                   </div>
@@ -637,9 +645,10 @@ export default function MasterDataPage() {
                     <label className="block text-sm font-medium mb-1">Nomor SIP *</label>
                     <input
                       type="text"
-                      value={formData.license_number || ''}
-                      onChange={(e) => setFormData({...formData, license_number: e.target.value})}
+                      value={formData.no_sip || ''}
+                      onChange={(e) => setFormData({...formData, no_sip: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700"
+                      placeholder="Masukkan nomor SIP"
                       required
                     />
                   </div>
@@ -647,9 +656,10 @@ export default function MasterDataPage() {
                     <label className="block text-sm font-medium mb-1">Telepon</label>
                     <input
                       type="text"
-                      value={formData.phone || ''}
-                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                      value={formData.telepon || ''}
+                      onChange={(e) => setFormData({...formData, telepon: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700"
+                      placeholder="Masukkan nomor telepon"
                     />
                   </div>
                   <div>
@@ -659,6 +669,7 @@ export default function MasterDataPage() {
                       value={formData.email || ''}
                       onChange={(e) => setFormData({...formData, email: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700"
+                      placeholder="Masukkan alamat email"
                     />
                   </div>
                   <div>
@@ -667,6 +678,7 @@ export default function MasterDataPage() {
                       value={formData.status || 'active'}
                       onChange={(e) => setFormData({...formData, status: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700"
+                      aria-label="Status dokter"
                       required
                     >
                       <option value="active">Aktif</option>
@@ -715,9 +727,10 @@ export default function MasterDataPage() {
                     <label className="block text-sm font-medium mb-1">Nama Obat *</label>
                     <input
                       type="text"
-                      value={formData.name || ''}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      value={formData.nama_obat || ''}
+                      onChange={(e) => setFormData({...formData, nama_obat: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700"
+                      placeholder="Masukkan nama obat"
                       required
                     />
                   </div>
@@ -725,27 +738,30 @@ export default function MasterDataPage() {
                     <label className="block text-sm font-medium mb-1">Nama Generik</label>
                     <input
                       type="text"
-                      value={formData.generic_name || ''}
-                      onChange={(e) => setFormData({...formData, generic_name: e.target.value})}
+                      value={formData.nama_generik || ''}
+                      onChange={(e) => setFormData({...formData, nama_generik: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700"
+                      placeholder="Masukkan nama generik"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Kategori</label>
+                    <label className="block text-sm font-medium mb-1">Golongan Obat</label>
                     <input
                       type="text"
-                      value={formData.category || ''}
-                      onChange={(e) => setFormData({...formData, category: e.target.value})}
+                      value={formData.golongan_obat || ''}
+                      onChange={(e) => setFormData({...formData, golongan_obat: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700"
+                      placeholder="Masukkan golongan obat"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Satuan</label>
                     <input
                       type="text"
-                      value={formData.unit || ''}
-                      onChange={(e) => setFormData({...formData, unit: e.target.value})}
+                      value={formData.satuan || ''}
+                      onChange={(e) => setFormData({...formData, satuan: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700"
+                      placeholder="Masukkan satuan"
                     />
                   </div>
                   <div>
@@ -754,10 +770,12 @@ export default function MasterDataPage() {
                       value={formData.status || 'active'}
                       onChange={(e) => setFormData({...formData, status: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700"
+                      aria-label="Status obat"
                       required
                     >
                       <option value="active">Aktif</option>
                       <option value="inactive">Tidak Aktif</option>
+                      <option value="retired">Pensiun</option>
                     </select>
                   </div>
                 </div>
@@ -801,18 +819,20 @@ export default function MasterDataPage() {
                     <label className="block text-sm font-medium mb-1">Kode ICD-10 *</label>
                     <input
                       type="text"
-                      value={formData.code || ''}
-                      onChange={(e) => setFormData({...formData, code: e.target.value})}
+                      value={formData.kode_icd || ''}
+                      onChange={(e) => setFormData({...formData, kode_icd: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700"
+                      placeholder="Masukkan kode ICD-10"
                       required
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Deskripsi *</label>
                     <textarea
-                      value={formData.description || ''}
-                      onChange={(e) => setFormData({...formData, description: e.target.value})}
+                      value={formData.nama_diagnosa || ''}
+                      onChange={(e) => setFormData({...formData, nama_diagnosa: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700"
+                      placeholder="Masukkan deskripsi diagnosis"
                       rows={3}
                       required
                     />
@@ -821,17 +841,20 @@ export default function MasterDataPage() {
                     <label className="block text-sm font-medium mb-1">Bab/Kelompok</label>
                     <input
                       type="text"
-                      value={formData.chapter || ''}
-                      onChange={(e) => setFormData({...formData, chapter: e.target.value})}
+                      value={formData.kategori || ''}
+                      onChange={(e) => setFormData({...formData, kategori: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700"
+                      placeholder="Masukkan bab atau kelompok"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Status *</label>
                     <select
-                      value={formData.status || 'active'}
-                      onChange={(e) => setFormData({...formData, status: e.target.value})}
+                      value={formData.aktif !== undefined ? (formData.aktif ? 'active' : 'inactive') : 'active'}
+                      onChange={(e) => setFormData({...formData, aktif: e.target.value === 'active'})}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700"
+                      aria-label="Status diagnosis ICD-10"
+                      title="Status diagnosis ICD-10"
                       required
                     >
                       <option value="active">Aktif</option>

@@ -29,6 +29,14 @@ const MobileJKNPage = lazy(() => import('@/roles/pendaftaran/pages/mobile-jkn'))
 const AppointmentPage = lazy(() => import('@/components/dashboard/pendaftaran/appointment/page'))
 const BPJSIntegrationPage = lazy(() => import('@/components/dashboard/pendaftaran/bpjs-integration/page'))
 
+// Lazy load doctor modules
+const EMRPage = lazy(() => import('@/components/dashboard/dokter/emr/page'))
+const CPPTPage = lazy(() => import('@/components/dashboard/dokter/cppt/page'))
+const DiagnosisPage = lazy(() => import('@/components/dashboard/dokter/diagnosis/page'))
+const ResepPage = lazy(() => import('@/components/dashboard/dokter/resep/page'))
+const OrderLabPage = lazy(() => import('@/components/dashboard/dokter/order-lab/page'))
+const OrderRadPage = lazy(() => import('@/components/dashboard/dokter/order-rad/page'))
+
 interface ModularDashboardProps {
   role: string
   module?: string
@@ -69,6 +77,26 @@ export default function ModularDashboard({ role, module }: ModularDashboardProps
           return <BPJSIntegrationPage />
         default:
           return <PendaftaranDashboard />
+      }
+    }
+
+    // Handle module routing for dokter
+    if (role === 'dokter' && module) {
+      switch (module) {
+        case 'emr':
+          return <EMRPage />
+        case 'cppt':
+          return <CPPTPage />
+        case 'diagnosis':
+          return <DiagnosisPage />
+        case 'resep':
+          return <ResepPage />
+        case 'order-lab':
+          return <OrderLabPage />
+        case 'order-rad':
+          return <OrderRadPage />
+        default:
+          return <DokterDashboard />
       }
     }
 

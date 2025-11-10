@@ -21,7 +21,7 @@ class DoctorController extends Controller
             'page' => 'nullable|integer|min:1',
             'per_page' => 'nullable|integer|min:1|max:100',
             'search' => 'nullable|string|max:255',
-            'specialty' => 'nullable|string|max:100',
+            'spesialisasi' => 'nullable|string|max:100',
             'status' => ['nullable', Rule::in(['active', 'inactive', 'retired'])],
         ]);
 
@@ -40,16 +40,16 @@ class DoctorController extends Controller
             $query->search($request->search);
         }
 
-        if ($request->has('specialty')) {
-            $query->where('specialty', 'like', '%' . $request->specialty . '%');
+        if ($request->has('spesialisasi')) {
+            $query->where('spesialisasi', 'like', '%' . $request->spesialisasi . '%');
         }
 
         if ($request->has('status')) {
             $query->where('status', $request->status);
         }
 
-        // Order by name
-        $query->orderBy('name', 'asc');
+        // Order by nama_dokter
+        $query->orderBy('nama_dokter', 'asc');
 
         $doctors = $query->paginate(
             $request->get('per_page', 15),
@@ -70,11 +70,11 @@ class DoctorController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'specialty' => 'required|string|max:100',
-            'license_number' => 'required|string|max:50|unique:doctors,license_number',
-            'phone' => 'nullable|string|max:20',
-            'email' => 'nullable|email|max:255',
+            'nama_dokter' => 'required|string|max:255',
+            'spesialisasi' => 'required|string|max:100',
+            'no_str' => 'required|string|max:50|unique:m_dokter,no_str',
+            'telepon' => 'nullable|string|max:20',
+            'alamat' => 'nullable|string|max:255',
             'schedule' => 'nullable|json',
             'status' => ['nullable', Rule::in(['active', 'inactive', 'retired'])]
         ]);
@@ -91,11 +91,12 @@ class DoctorController extends Controller
             DB::beginTransaction();
 
             $doctor = Doctor::create([
-                'name' => $request->name,
-                'specialty' => $request->specialty,
-                'license_number' => $request->license_number,
-                'phone' => $request->phone,
-                'email' => $request->email,
+                'nama_dokter' => $request->nama_dokter,
+                'spesialisasi' => $request->spesialisasi,
+                'no_str' => $request->no_str,
+                'no_sip' => $request->no_sip ?? null,
+                'telepon' => $request->telepon,
+                'alamat' => $request->alamat,
                 'schedule' => $request->schedule,
                 'status' => $request->status ?? 'active'
             ]);
@@ -104,7 +105,7 @@ class DoctorController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Doctor created successfully',
+                'message' => 'Dokter berhasil dibuat',
                 'data' => $doctor
             ], 201);
 
@@ -113,7 +114,7 @@ class DoctorController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create doctor',
+                'message' => 'Gagal membuat dokter',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -136,11 +137,11 @@ class DoctorController extends Controller
     public function update(Request $request, Doctor $doctor): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|required|string|max:255',
-            'specialty' => 'sometimes|required|string|max:100',
-            'license_number' => ['sometimes', 'required', 'string', 'max:50', Rule::unique('doctors')->ignore($doctor->id)],
-            'phone' => 'nullable|string|max:20',
-            'email' => 'nullable|email|max:255',
+            'nama_dokter' => 'sometimes|required|string|max:255',
+            'spesialisasi' => 'sometimes|required|string|max:100',
+            'no_str' => ['sometimes', 'required', 'string', 'max:50', Rule::unique('m_dokter')->ignore($doctor->id)],
+            'telepon' => 'nullable|string|max:20',
+            'alamat' => 'nullable|string|max:255',
             'schedule' => 'nullable|json',
             'status' => ['sometimes', Rule::in(['active', 'inactive', 'retired'])]
         ]);
@@ -155,19 +156,19 @@ class DoctorController extends Controller
 
         try {
             $doctor->update($request->only([
-                'name', 'specialty', 'license_number', 'phone', 'email', 'schedule', 'status'
+                'nama_dokter', 'spesialisasi', 'no_str', 'no_sip', 'telepon', 'alamat', 'schedule', 'status'
             ]));
 
             return response()->json([
                 'success' => true,
-                'message' => 'Doctor updated successfully',
+                'message' => 'Dokter berhasil diperbarui',
                 'data' => $doctor
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update doctor',
+                'message' => 'Gagal memperbarui dokter',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -191,13 +192,13 @@ class DoctorController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Doctor deleted successfully'
+                'message' => 'Dokter berhasil dihapus'
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete doctor',
+                'message' => 'Gagal menghapus dokter',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -213,9 +214,9 @@ class DoctorController extends Controller
             'active_doctors' => Doctor::where('status', 'active')->count(),
             'inactive_doctors' => Doctor::where('status', 'inactive')->count(),
             'retired_doctors' => Doctor::where('status', 'retired')->count(),
-            'by_specialty' => Doctor::selectRaw('specialty, COUNT(*) as count')
-                                  ->groupBy('specialty')
-                                  ->pluck('count', 'specialty')
+            'by_specialty' => Doctor::selectRaw('spesialisasi, COUNT(*) as count')
+                                  ->groupBy('spesialisasi')
+                                  ->pluck('count', 'spesialisasi')
                                   ->toArray(),
         ];
 

@@ -14,6 +14,9 @@ const components: ComponentMap = {
     emr: dynamic(() => import('@/components/dashboard/dokter/emr/page')),
     cppt: dynamic(() => import('@/components/dashboard/dokter/cppt/page')),
     diagnosis: dynamic(() => import('@/components/dashboard/dokter/diagnosis/page')),
+    resep: dynamic(() => import('@/components/dashboard/dokter/resep/page')),
+    'order-lab': dynamic(() => import('@/components/dashboard/dokter/order-lab/page')),
+    'order-rad': dynamic(() => import('@/components/dashboard/dokter/order-rad/page')),
   },
 
   // Registration components

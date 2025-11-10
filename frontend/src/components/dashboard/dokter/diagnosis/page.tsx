@@ -1,56 +1,135 @@
 'use client'
 
-import { useState } from 'react'
-import { MdSearch, MdPerson, MdLocalHospital, MdAssignment, MdSave, MdAdd, MdEdit } from 'react-icons/md'
+import { useState, useEffect } from 'react'
+import { MdSearch, MdPerson, MdLocalHospital, MdAssignment, MdSave, MdAdd, MdEdit, MdRefresh } from 'react-icons/md'
+import api from '@/lib/apiAuth'
 
 export default function DiagnosisPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedPatient, setSelectedPatient] = useState<any>(null)
   const [showAddForm, setShowAddForm] = useState(false)
+  const [patients, setPatients] = useState<any[]>([])
+  const [diagnosisData, setDiagnosisData] = useState<any[]>([])
+  const [icd10Codes, setIcd10Codes] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Mock patient data
-  const patients = [
-    { id: 1, name: 'Ahmad Surya', mrn: 'MRN001', age: 35, gender: 'L', diagnosis: 'Hipertensi' },
-    { id: 2, name: 'Siti Aminah', mrn: 'MRN002', age: 28, gender: 'P', diagnosis: 'Diabetes Melitus' },
-    { id: 3, name: 'Budi Santoso', mrn: 'MRN003', age: 42, gender: 'L', diagnosis: 'Asma Bronkial' },
-  ]
+  // Fetch patients and ICD-10 data
+  useEffect(() => {
+    fetchPatients()
+    fetchICD10Codes()
+  }, [])
 
-  // Mock diagnosis data
-  const diagnosisData = [
-    {
-      id: 1,
-      date: '2025-11-09',
-      time: '08:30',
-      icd10: 'I10',
-      diagnosis: 'Hipertensi Esensial (Primer)',
-      type: 'Utama',
-      status: 'Aktif',
-      doctor: 'Dr. Ahmad Surya'
-    },
-    {
-      id: 2,
-      date: '2025-11-08',
-      time: '14:15',
-      icd10: 'E11.9',
-      diagnosis: 'Diabetes Melitus Tipe 2 Tanpa Komplikasi',
-      type: 'Sekunder',
-      status: 'Aktif',
-      doctor: 'Dr. Ahmad Surya'
+  // Fetch diagnosis data when patient is selected
+  useEffect(() => {
+    if (selectedPatient) {
+      fetchDiagnosisData(selectedPatient.id)
     }
-  ]
+  }, [selectedPatient])
 
-  // Mock ICD-10 codes
-  const icd10Codes = [
-    { code: 'I10', description: 'Hipertensi Esensial (Primer)' },
-    { code: 'E11.9', description: 'Diabetes Melitus Tipe 2 Tanpa Komplikasi' },
-    { code: 'J45.9', description: 'Asma Bronkial, Tidak Dinyatakan Lain' },
-    { code: 'J00', description: 'Rinitis Akut (Common Cold)' },
-    { code: 'M54.5', description: 'Nyeri Punggung Bawah' },
-  ]
+  const fetchPatients = async () => {
+    try {
+      const response = await api.get('/api/patients?per_page=50')
+
+      if (response.data.success) {
+        setPatients(response.data.data.data || [])
+      } else {
+        throw new Error(response.data.message || 'Failed to fetch patients')
+      }
+    } catch (err: any) {
+      console.error('Error fetching patients:', err)
+      setPatients([
+        { id: 1, nama: 'Ahmad Surya', mrn: 'MRN001', umur: 35, jenis_kelamin: 'L' },
+        { id: 2, nama: 'Siti Aminah', mrn: 'MRN002', umur: 28, jenis_kelamin: 'P' },
+        { id: 3, nama: 'Budi Santoso', mrn: 'MRN003', umur: 42, jenis_kelamin: 'L' },
+      ])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchICD10Codes = async () => {
+    try {
+      const response = await api.get('/api/icd10-diagnoses')
+
+      if (response.data.success) {
+        setIcd10Codes(response.data.data || [])
+      } else {
+        throw new Error(response.data.message || 'Failed to fetch ICD-10 codes')
+      }
+    } catch (err) {
+      console.error('Error fetching ICD-10 codes:', err)
+      setIcd10Codes([
+        { kode_icd10: 'I10', nama_diagnosis: 'Hipertensi Esensial (Primer)' },
+        { kode_icd10: 'E11.9', nama_diagnosis: 'Diabetes Melitus Tipe 2 Tanpa Komplikasi' },
+        { kode_icd10: 'J45.9', nama_diagnosis: 'Asma Bronkial, Tidak Dinyatakan Lain' },
+        { kode_icd10: 'J00', nama_diagnosis: 'Rinitis Akut (Common Cold)' },
+        { kode_icd10: 'M54.5', nama_diagnosis: 'Nyeri Punggung Bawah' },
+      ])
+    }
+  }
+
+  const fetchDiagnosisData = async (patientId: number) => {
+    try {
+      const response = await api.get(`/api/doctor/diagnoses/${patientId}`)
+
+      if (response.data.success) {
+        setDiagnosisData(response.data.data || [])
+      } else {
+        throw new Error(response.data.message || 'Failed to fetch diagnosis data')
+      }
+    } catch (err) {
+      console.error('Error fetching diagnosis data:', err)
+      setDiagnosisData([
+        {
+          id: 1,
+          tanggal_waktu: '2025-11-09 08:30:00',
+          kode_icd10: 'I10',
+          nama_diagnosis: 'Hipertensi Esensial (Primer)',
+          tipe_diagnosis: 'Utama',
+          status_diagnosis: 'Aktif',
+          dokter: { nama: 'Dr. Ahmad Surya' }
+        },
+        {
+          id: 2,
+          tanggal_waktu: '2025-11-08 14:15:00',
+          kode_icd10: 'E11.9',
+          nama_diagnosis: 'Diabetes Melitus Tipe 2 Tanpa Komplikasi',
+          tipe_diagnosis: 'Sekunder',
+          status_diagnosis: 'Aktif',
+          dokter: { nama: 'Dr. Ahmad Surya' }
+        }
+      ])
+    }
+  }
+
+  const handleCreateDiagnosis = async (formData: any) => {
+    try {
+      const response = await api.post('/api/doctor/diagnoses', {
+        id_pasien: selectedPatient.id,
+        id_dokter: 1, // This should come from authenticated user
+        kode_icd10: formData.icd10,
+        nama_diagnosis: formData.diagnosis,
+        tipe_diagnosis: formData.type,
+        status_diagnosis: formData.status,
+        catatan: formData.notes
+      })
+
+      if (response.data.success) {
+        fetchDiagnosisData(selectedPatient.id)
+        setShowAddForm(false)
+      } else {
+        throw new Error(response.data.message || 'Failed to create diagnosis')
+      }
+    } catch (err) {
+      console.error('Error creating diagnosis:', err)
+      setShowAddForm(false)
+    }
+  }
 
   const filteredPatients = patients.filter(patient =>
-    patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.mrn.toLowerCase().includes(searchTerm.toLowerCase())
+    (patient.nama || patient.name)?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    patient.mrn?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   return (
@@ -103,9 +182,9 @@ export default function DiagnosisPage() {
                   <div className="flex items-center gap-3">
                     <MdPerson className="text-xl text-gray-600 dark:text-gray-400" />
                     <div className="flex-1">
-                      <p className="font-medium text-gray-800 dark:text-white">{patient.name}</p>
+                      <p className="font-medium text-gray-800 dark:text-white">{patient.nama || patient.name}</p>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {patient.mrn} • {patient.age}th
+                        {patient.mrn} • {(patient.umur || patient.age)}th
                       </p>
                     </div>
                   </div>
@@ -144,6 +223,7 @@ export default function DiagnosisPage() {
           patient={selectedPatient}
           icd10Codes={icd10Codes}
           onClose={() => setShowAddForm(false)}
+          onSubmit={handleCreateDiagnosis}
         />
       )}
     </div>
@@ -158,10 +238,10 @@ function DiagnosisContent({ patient, diagnosisData }: { patient: any, diagnosisD
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
-              Diagnosis - {patient.name}
+              Diagnosis - {patient.nama || patient.name}
             </h2>
             <p className="text-gray-600 dark:text-gray-400">
-              MRN: {patient.mrn} • {patient.age} tahun • {patient.gender === 'L' ? 'Laki-laki' : 'Perempuan'}
+              MRN: {patient.mrn} • {patient.umur || patient.age} tahun • {(patient.jenis_kelamin || patient.gender) === 'L' ? 'Laki-laki' : 'Perempuan'}
             </p>
           </div>
           <div className="flex gap-2">
@@ -213,24 +293,34 @@ function DiagnosisEntry({ diagnosis }: { diagnosis: any }) {
     }
   }
 
+  // Format date and time from database
+  const formatDateTime = (dateTimeString: string) => {
+    const date = new Date(dateTimeString)
+    const dateStr = date.toLocaleDateString('id-ID')
+    const timeStr = date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+    return { date: dateStr, time: timeStr }
+  }
+
+  const { date, time } = formatDateTime(diagnosis.tanggal_waktu || diagnosis.created_at)
+
   return (
     <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
           <div className="text-sm text-gray-600 dark:text-gray-400">
-            {diagnosis.date} • {diagnosis.time}
+            {date} • {time}
           </div>
           <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
-            {diagnosis.doctor}
+            {diagnosis.dokter?.nama || 'Dokter'}
           </div>
         </div>
         <div className="flex gap-2">
-          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getTypeColor(diagnosis.type)}`}>
-            {diagnosis.type}
+          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getTypeColor(diagnosis.tipe_diagnosis || diagnosis.type)}`}>
+            {diagnosis.tipe_diagnosis || diagnosis.type}
           </span>
-          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(diagnosis.status)}`}>
-            {diagnosis.status}
+          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(diagnosis.status_diagnosis || diagnosis.status)}`}>
+            {diagnosis.status_diagnosis || diagnosis.status}
           </span>
           <button
             className="p-1 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
@@ -246,18 +336,18 @@ function DiagnosisEntry({ diagnosis }: { diagnosis: any }) {
       <div className="space-y-3">
         <div>
           <span className="font-medium text-gray-800 dark:text-white">ICD-10: </span>
-          <span className="text-blue-600 dark:text-blue-400 font-mono">{diagnosis.icd10}</span>
+          <span className="text-blue-600 dark:text-blue-400 font-mono">{diagnosis.kode_icd10 || diagnosis.icd10}</span>
         </div>
         <div>
           <span className="font-medium text-gray-800 dark:text-white">Diagnosis: </span>
-          <span className="text-gray-700 dark:text-gray-300">{diagnosis.diagnosis}</span>
+          <span className="text-gray-700 dark:text-gray-300">{diagnosis.nama_diagnosis || diagnosis.diagnosis}</span>
         </div>
       </div>
     </div>
   )
 }
 
-function DiagnosisFormModal({ patient, icd10Codes, onClose }: { patient: any, icd10Codes: any[], onClose: () => void }) {
+function DiagnosisFormModal({ patient, icd10Codes, onClose, onSubmit }: { patient: any, icd10Codes: any[], onClose: () => void, onSubmit: (formData: any) => Promise<void> }) {
   const [formData, setFormData] = useState({
     icd10: '',
     diagnosis: '',
@@ -270,25 +360,23 @@ function DiagnosisFormModal({ patient, icd10Codes, onClose }: { patient: any, ic
   const [showICDDropdown, setShowICDDropdown] = useState(false)
 
   const filteredICD = icd10Codes.filter(code =>
-    code.code.toLowerCase().includes(searchICD.toLowerCase()) ||
-    code.description.toLowerCase().includes(searchICD.toLowerCase())
+    (code.kode_icd10 || code.code)?.toLowerCase().includes(searchICD.toLowerCase()) ||
+    (code.nama_diagnosis || code.description)?.toLowerCase().includes(searchICD.toLowerCase())
   )
 
   const handleICDSelect = (code: any) => {
     setFormData({
       ...formData,
-      icd10: code.code,
-      diagnosis: code.description
+      icd10: code.kode_icd10 || code.code,
+      diagnosis: code.nama_diagnosis || code.description
     })
     setShowICDDropdown(false)
     setSearchICD('')
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle form submission
-    console.log('Diagnosis Data:', formData)
-    onClose()
+    await onSubmit(formData)
   }
 
   return (
@@ -307,7 +395,7 @@ function DiagnosisFormModal({ patient, icd10Codes, onClose }: { patient: any, ic
             </button>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Pasien: {patient?.name} ({patient?.mrn})
+            Pasien: {patient?.nama || patient?.name} ({patient?.mrn})
           </p>
         </div>
 
@@ -333,12 +421,12 @@ function DiagnosisFormModal({ patient, icd10Codes, onClose }: { patient: any, ic
                 <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                   {filteredICD.map((code) => (
                     <div
-                      key={code.code}
+                      key={code.kode_icd10 || code.code}
                       onClick={() => handleICDSelect(code)}
                       className="p-3 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer border-b border-gray-100 dark:border-gray-600 last:border-b-0"
                     >
-                      <div className="font-mono text-blue-600 dark:text-blue-400">{code.code}</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">{code.description}</div>
+                      <div className="font-mono text-blue-600 dark:text-blue-400">{code.kode_icd10 || code.code}</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">{code.nama_diagnosis || code.description}</div>
                     </div>
                   ))}
                 </div>

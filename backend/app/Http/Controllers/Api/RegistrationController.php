@@ -156,7 +156,7 @@ class RegistrationController extends Controller
     {
         $registration->load([
             'patient:id,mrn,name,nik,birth_date,gender,phone,address',
-            'doctor:id,nama_dokter as name',
+            'doctor:id,name',
             'creator:id,name'
         ]);
 
@@ -212,7 +212,7 @@ class RegistrationController extends Controller
             $registration->update($updateData);
 
             // Load relationships for response
-            $registration->load(['patient:id,mrn,name', 'doctor:id,nama_dokter as name', 'creator:id,name']);
+            $registration->load(['patient:id,mrn,name', 'doctor:id,name', 'creator:id,name']);
 
             return response()->json([
                 'success' => true,

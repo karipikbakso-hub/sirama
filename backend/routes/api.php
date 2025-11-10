@@ -15,42 +15,64 @@ use App\Http\Controllers\Api\BpjsIntegrationController;
 use App\Http\Controllers\Api\BpjsConfigurationController;
 use App\Http\Controllers\Api\PatientCommunicationController;
 use App\Http\Controllers\Api\DoctorController;
+use App\Http\Controllers\Api\DoctorModuleController;
 use App\Http\Controllers\Api\MedicineController;
 use App\Http\Controllers\Api\Icd10DiagnosisController;
 use App\Http\Controllers\Api\MobileJknController;
+use App\Http\Controllers\Api\RolesController;
+use App\Http\Controllers\Api\DashboardHomeController;
 
 Route::get('/sanctum/csrf-cookie', [CsrfCookieController::class, 'show']);
 
 // Public routes (no authentication required)
 Route::get('appointments/statistics', [AppointmentController::class, 'statistics']);
-
-// Authentication routes
-Route::middleware('auth:sanctum')->get('/user', function () {
-    $user = auth()->user();
-    $role = $user->getRoleNames()->first() ?? 'user';
-
-    return response()->json([
-        'id' => $user->id,
-        'name' => $user->name,
-        'email' => $user->email,
-        'role' => $role, // ← pastikan sama
-    ]);
-});
+Route::get('patients-search', [PatientController::class, 'search']); // Make patient search public for autocomplete
 
 // Protected API routes
-Route::middleware('auth:sanctum')->group(function () {
-    // Patient management routes
-    Route::apiResource('patients', PatientController::class);
-    Route::get('patients-search', [PatientController::class, 'search']);
-    Route::get('patients/find-by-nik', [PatientController::class, 'findByNik']);
-    Route::get('patients-statistics', [PatientController::class, 'statistics']);
+Route::middleware(['web'])->group(function () {
+    // Authentication routes
+    Route::get('/user', function () {
+        $user = auth()->user();
+        $role = $user->getRoleNames()->first() ?? 'user';
+        $permissions = $user->getAllPermissions()->pluck('name')->toArray();
 
-    // Registration management routes
-    Route::apiResource('registrations', RegistrationController::class);
-    Route::patch('registrations/{registration}/status', [RegistrationController::class, 'updateStatus']);
-    Route::post('queue/generate', [RegistrationController::class, 'generateQueue']);
-    Route::get('registrations-statistics', [RegistrationController::class, 'statistics']);
-    Route::get('queue-list', [RegistrationController::class, 'queueList']);
+        return response()->json([
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $role,
+            'permissions' => $permissions,
+        ]);
+    });
+
+    // Patient management routes - Pendaftaran & Admin
+    Route::middleware(['permission:view patients'])->group(function () {
+        Route::get('patients', [PatientController::class, 'index']);
+        Route::get('patients/{patient}', [PatientController::class, 'show']);
+        Route::get('patients/find-by-nik', [PatientController::class, 'findByNik']);
+        Route::get('patients-statistics', [PatientController::class, 'statistics']);
+    });
+
+    Route::middleware(['permission:create patients'])->post('patients', [PatientController::class, 'store']);
+    Route::middleware(['permission:edit patients'])->put('patients/{patient}', [PatientController::class, 'update']);
+    Route::middleware(['permission:delete patients'])->delete('patients/{patient}', [PatientController::class, 'destroy']);
+
+    // Registration management routes - Pendaftaran & Admin
+    Route::middleware(['permission:view registrations'])->group(function () {
+        Route::get('registrations', [RegistrationController::class, 'index']);
+        Route::get('registrations/{registration}', [RegistrationController::class, 'show']);
+        Route::get('registrations-statistics', [RegistrationController::class, 'statistics']);
+        Route::get('queue-list', [RegistrationController::class, 'queueList']);
+        Route::get('queue', [RegistrationController::class, 'queueList']);
+    });
+
+    Route::middleware(['permission:create registrations'])->post('registrations', [RegistrationController::class, 'store']);
+    Route::middleware(['permission:edit registrations'])->group(function () {
+        Route::put('registrations/{registration}', [RegistrationController::class, 'update']);
+        Route::patch('registrations/{registration}/status', [RegistrationController::class, 'updateStatus']);
+    });
+    Route::middleware(['permission:delete registrations'])->delete('registrations/{registration}', [RegistrationController::class, 'destroy']);
+    Route::middleware(['permission:manage queues'])->post('queue/generate', [RegistrationController::class, 'generateQueue']);
 
     // SEP management routes
     Route::apiResource('seps', SepController::class);
@@ -129,6 +151,31 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('icd10-diagnoses/recently-used', [Icd10DiagnosisController::class, 'recentlyUsed']);
     Route::get('icd10-diagnoses/by-chapter/{chapter}', [Icd10DiagnosisController::class, 'byChapter']);
 
+    // Doctor Module routes
+    Route::prefix('doctor')->group(function () {
+        // EMR routes
+        Route::get('emr/{patientId}', [DoctorModuleController::class, 'getPatientEmr']);
+
+        // CPPT routes
+        Route::get('cppt/{patientId}', [DoctorModuleController::class, 'getCpptEntries']);
+        Route::post('cppt', [DoctorModuleController::class, 'createCpptEntry']);
+
+        // Diagnosis routes
+        Route::get('diagnoses', [DoctorModuleController::class, 'getIcd10Diagnoses']);
+
+        // Prescription routes
+        Route::get('prescriptions/{patientId}', [DoctorModuleController::class, 'getPrescriptions']);
+        Route::post('prescriptions', [DoctorModuleController::class, 'createPrescription']);
+
+        // Lab Order routes
+        Route::get('lab-orders/{patientId}', [DoctorModuleController::class, 'getLabOrders']);
+        Route::post('lab-orders', [DoctorModuleController::class, 'createLabOrder']);
+
+        // Radiology Order routes
+        Route::get('radiology-orders/{patientId}', [DoctorModuleController::class, 'getRadiologyOrders']);
+        Route::post('radiology-orders', [DoctorModuleController::class, 'createRadiologyOrder']);
+    });
+
     // Mobile JKN routes (temporarily without auth for testing)
     Route::get('mobile-jkn/statistics', [MobileJknController::class, 'statistics']);
     Route::post('mobile-jkn/register', [MobileJknController::class, 'register']);
@@ -137,6 +184,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('mobile-jkn/activities', [MobileJknController::class, 'getActivities']);
     Route::get('mobile-jkn/features', [MobileJknController::class, 'getFeatures']);
     Route::patch('mobile-jkn/update-contact', [MobileJknController::class, 'updateContact']);
+
+    // Roles routes
+    Route::get('roles', [RolesController::class, 'index']);
+
+    // Dashboard Home routes
+    Route::get('dashboard/home', [DashboardHomeController::class, 'index']);
 });
 
 // Public Mobile JKN routes moved to web.php for testing (no CSRF)

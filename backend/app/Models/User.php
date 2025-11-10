@@ -7,12 +7,21 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use Spatie\Permission\Traits\HasRoles; 
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasRoles, HasFactory, Notifiable;
+
+    /**
+     * Determine if the user can access the Filament admin panel.
+     * Note: This method will be used when Filament is properly installed
+     */
+    public function canAccessFilament(): bool
+    {
+        return $this->hasRole(['admin', 'super-admin']);
+    }
 
     /**
      * The attributes that are mass assignable.

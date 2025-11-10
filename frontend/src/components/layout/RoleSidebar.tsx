@@ -26,10 +26,12 @@ export default function RoleSidebar({ role }: { role: string }) {
     setExpandedCategories(newExpanded)
   }
 
-  // Modular navigation for all roles
+  // Modular navigation for all roles - use query parameters for content switching
   const handleMenuClick = (href: string) => {
-    // Use proper Next.js navigation to the actual route
-    router.push(href)
+    const moduleName = href?.split('/').pop() || 'dashboard';
+    const currentParams = searchParams ? new URLSearchParams(searchParams) : new URLSearchParams();
+    currentParams.set('module', moduleName);
+    router.replace(`/dashboard/${role}?${currentParams.toString()}`, { scroll: false });
   }
 
   // Check if menu has mixed structure (standalone items + categories)
@@ -80,7 +82,10 @@ export default function RoleSidebar({ role }: { role: string }) {
               // Check if this is a standalone menu item
               if ('href' in navItem) {
                 const item = navItem as MenuItem
-                const isActive = pathname === item.href
+                // Check if current menu matches the module query parameter
+                const currentModule = searchParams?.get('module')
+                const menuModule = item.href?.split('/').pop()
+                const isActive = currentModule === menuModule || (pathname === item.href && !currentModule)
 
                 return (
                   <button
@@ -182,7 +187,10 @@ export default function RoleSidebar({ role }: { role: string }) {
                     }`}>
                       <div className="ml-6 mt-2 space-y-1">
                         {category.items.map((item, itemIndex) => {
-                          const isActive = pathname === item.href
+                          // Check if current menu matches the module query parameter for category items too
+                          const currentModule = searchParams?.get('module')
+                          const menuModule = item.href?.split('/').pop()
+                          const isActive = currentModule === menuModule || (pathname === item.href && !currentModule)
 
                           return (
                             <button

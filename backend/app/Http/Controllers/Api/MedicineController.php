@@ -21,8 +21,8 @@ class MedicineController extends Controller
             'page' => 'nullable|integer|min:1',
             'per_page' => 'nullable|integer|min:1|max:100',
             'search' => 'nullable|string|max:255',
-            'category' => 'nullable|string|max:100',
-            'status' => ['nullable', Rule::in(['active', 'inactive'])],
+            'golongan_obat' => 'nullable|string|max:100',
+            'aktif' => ['nullable', Rule::in([true, false, '1', '0'])],
         ]);
 
         if ($validator->fails()) {
@@ -40,16 +40,16 @@ class MedicineController extends Controller
             $query->search($request->search);
         }
 
-        if ($request->has('category')) {
-            $query->where('category', 'like', '%' . $request->category . '%');
+        if ($request->has('golongan_obat')) {
+            $query->where('golongan_obat', 'like', '%' . $request->golongan_obat . '%');
         }
 
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
+        if ($request->has('aktif')) {
+            $query->where('aktif', $request->aktif);
         }
 
-        // Order by name
-        $query->orderBy('name', 'asc');
+        // Order by nama_obat
+        $query->orderBy('nama_obat', 'asc');
 
         $medicines = $query->paginate(
             $request->get('per_page', 15),
@@ -70,12 +70,12 @@ class MedicineController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'generic_name' => 'nullable|string|max:255',
-            'category' => 'nullable|string|max:100',
-            'unit' => 'nullable|string|max:50',
-            'stock_quantity' => 'nullable|integer|min:0',
-            'status' => ['nullable', Rule::in(['active', 'inactive'])]
+            'nama_obat' => 'required|string|max:255',
+            'nama_generik' => 'nullable|string|max:255',
+            'golongan_obat' => 'nullable|string|max:100',
+            'satuan' => 'nullable|string|max:50',
+            'stok_minimum' => 'nullable|integer|min:0',
+            'aktif' => ['nullable', Rule::in([true, false, '1', '0'])]
         ]);
 
         if ($validator->fails()) {
@@ -90,19 +90,19 @@ class MedicineController extends Controller
             DB::beginTransaction();
 
             $medicine = Medicine::create([
-                'name' => $request->name,
-                'generic_name' => $request->generic_name,
-                'category' => $request->category,
-                'unit' => $request->unit,
-                'stock_quantity' => $request->stock_quantity ?? 0,
-                'status' => $request->status ?? 'active'
+                'nama_obat' => $request->nama_obat,
+                'nama_generik' => $request->nama_generik,
+                'golongan_obat' => $request->golongan_obat,
+                'satuan' => $request->satuan,
+                'stok_minimum' => $request->stok_minimum ?? 0,
+                'aktif' => $request->aktif ?? true
             ]);
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Medicine created successfully',
+                'message' => 'Obat berhasil dibuat',
                 'data' => $medicine
             ], 201);
 
@@ -111,7 +111,7 @@ class MedicineController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create medicine',
+                'message' => 'Gagal membuat obat',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -134,12 +134,12 @@ class MedicineController extends Controller
     public function update(Request $request, Medicine $medicine): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|required|string|max:255',
-            'generic_name' => 'nullable|string|max:255',
-            'category' => 'nullable|string|max:100',
-            'unit' => 'nullable|string|max:50',
-            'stock_quantity' => 'nullable|integer|min:0',
-            'status' => ['sometimes', Rule::in(['active', 'inactive'])]
+            'nama_obat' => 'sometimes|required|string|max:255',
+            'nama_generik' => 'nullable|string|max:255',
+            'golongan_obat' => 'nullable|string|max:100',
+            'satuan' => 'nullable|string|max:50',
+            'stok_minimum' => 'nullable|integer|min:0',
+            'aktif' => ['sometimes', Rule::in([true, false, '1', '0'])]
         ]);
 
         if ($validator->fails()) {
@@ -152,19 +152,19 @@ class MedicineController extends Controller
 
         try {
             $medicine->update($request->only([
-                'name', 'generic_name', 'category', 'unit', 'stock_quantity', 'status'
+                'nama_obat', 'nama_generik', 'golongan_obat', 'satuan', 'stok_minimum', 'aktif'
             ]));
 
             return response()->json([
                 'success' => true,
-                'message' => 'Medicine updated successfully',
+                'message' => 'Obat berhasil diperbarui',
                 'data' => $medicine
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update medicine',
+                'message' => 'Gagal memperbarui obat',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -180,13 +180,13 @@ class MedicineController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Medicine deleted successfully'
+                'message' => 'Obat berhasil dihapus'
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete medicine',
+                'message' => 'Gagal menghapus obat',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -199,13 +199,13 @@ class MedicineController extends Controller
     {
         $stats = [
             'total_medicines' => Medicine::count(),
-            'active_medicines' => Medicine::where('status', 'active')->count(),
-            'inactive_medicines' => Medicine::where('status', 'inactive')->count(),
-            'low_stock' => Medicine::where('stock_quantity', '<=', 10)->count(),
-            'by_category' => Medicine::selectRaw('category, COUNT(*) as count')
-                                  ->whereNotNull('category')
-                                  ->groupBy('category')
-                                  ->pluck('count', 'category')
+            'active_medicines' => Medicine::where('aktif', true)->count(),
+            'inactive_medicines' => Medicine::where('aktif', false)->count(),
+            'low_stock' => Medicine::where('stok_minimum', '<=', 10)->count(),
+            'by_category' => Medicine::selectRaw('golongan_obat, COUNT(*) as count')
+                                  ->whereNotNull('golongan_obat')
+                                  ->groupBy('golongan_obat')
+                                  ->pluck('count', 'golongan_obat')
                                   ->toArray(),
         ];
 
@@ -220,9 +220,9 @@ class MedicineController extends Controller
      */
     public function lowStock(): JsonResponse
     {
-        $medicines = Medicine::where('stock_quantity', '<=', 10)
-                            ->where('status', 'active')
-                            ->orderBy('stock_quantity', 'asc')
+        $medicines = Medicine::where('stok_minimum', '<=', 10)
+                            ->where('aktif', true)
+                            ->orderBy('stok_minimum', 'asc')
                             ->get();
 
         return response()->json([
@@ -236,9 +236,9 @@ class MedicineController extends Controller
      */
     public function byCategory(string $category): JsonResponse
     {
-        $medicines = Medicine::where('category', $category)
-                            ->where('status', 'active')
-                            ->orderBy('name', 'asc')
+        $medicines = Medicine::where('golongan_obat', $category)
+                            ->where('aktif', true)
+                            ->orderBy('nama_obat', 'asc')
                             ->get();
 
         return response()->json([

@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const apiData = axios.create({
-  baseURL: 'http://localhost:8000/', // Laravel base URL
+  baseURL: typeof window !== 'undefined' ? 'http://localhost:8000' : '', // Laravel base URL
   withCredentials: true,
 })
 

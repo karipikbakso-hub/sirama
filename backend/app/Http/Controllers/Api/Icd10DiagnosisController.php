@@ -41,15 +41,15 @@ class Icd10DiagnosisController extends Controller
         }
 
         if ($request->has('chapter')) {
-            $query->where('chapter', 'like', '%' . $request->chapter . '%');
+            $query->where('kategori', 'like', '%' . $request->chapter . '%');
         }
 
         if ($request->has('status')) {
-            $query->where('is_active', $request->status === 'active' ? 1 : 0);
+            $query->where('aktif', $request->status === 'active' ? 1 : 0);
         }
 
-        // Order by code
-        $query->orderBy('code', 'asc');
+        // Order by kode_icd
+        $query->orderBy('kode_icd', 'asc');
 
         $diagnoses = $query->paginate(
             $request->get('per_page', 15),
@@ -70,7 +70,7 @@ class Icd10DiagnosisController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'code' => 'required|string|max:10|unique:icd10_diagnoses,code',
+            'code' => 'required|string|max:10|unique:m_diagnosa,kode_icd',
             'description' => 'required|string|max:500',
             'chapter' => 'nullable|string|max:100',
             'status' => ['nullable', Rule::in(['active', 'inactive'])]
@@ -88,10 +88,10 @@ class Icd10DiagnosisController extends Controller
             DB::beginTransaction();
 
             $diagnosis = Icd10Diagnosis::create([
-                'code' => $request->code,
-                'description' => $request->description,
-                'chapter' => $request->chapter,
-                'is_active' => ($request->status ?? 'active') === 'active' ? 1 : 0
+                'kode_icd' => $request->code,
+                'nama_diagnosa' => $request->description,
+                'kategori' => $request->chapter,
+                'aktif' => ($request->status ?? 'active') === 'active' ? 1 : 0
             ]);
 
             DB::commit();
@@ -130,7 +130,7 @@ class Icd10DiagnosisController extends Controller
     public function update(Request $request, Icd10Diagnosis $icd10Diagnosis): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'code' => ['sometimes', 'required', 'string', 'max:10', Rule::unique('icd10_diagnoses')->ignore($icd10Diagnosis->id)],
+            'code' => ['sometimes', 'required', 'string', 'max:10', Rule::unique('m_diagnosa')->ignore($icd10Diagnosis->id)],
             'description' => 'sometimes|required|string|max:500',
             'chapter' => 'nullable|string|max:100',
             'status' => ['sometimes', Rule::in(['active', 'inactive'])]
@@ -145,12 +145,14 @@ class Icd10DiagnosisController extends Controller
         }
 
         try {
-            $updateData = $request->only([
-                'code', 'description', 'chapter'
-            ]);
+            $updateData = [
+                'kode_icd' => $request->code,
+                'nama_diagnosa' => $request->description,
+                'kategori' => $request->chapter,
+            ];
 
             if ($request->has('status')) {
-                $updateData['is_active'] = $request->status === 'active' ? 1 : 0;
+                $updateData['aktif'] = $request->status === 'active' ? 1 : 0;
             }
 
             $icd10Diagnosis->update($updateData);
@@ -199,12 +201,12 @@ class Icd10DiagnosisController extends Controller
     {
         $stats = [
             'total_icd10' => Icd10Diagnosis::count(),
-            'active_icd10' => Icd10Diagnosis::where('is_active', 1)->count(),
-            'inactive_icd10' => Icd10Diagnosis::where('is_active', 0)->count(),
-            'by_chapter' => Icd10Diagnosis::selectRaw('chapter, COUNT(*) as count')
-                                  ->whereNotNull('chapter')
-                                  ->groupBy('chapter')
-                                  ->pluck('count', 'chapter')
+            'active_icd10' => Icd10Diagnosis::where('aktif', 1)->count(),
+            'inactive_icd10' => Icd10Diagnosis::where('aktif', 0)->count(),
+            'by_chapter' => Icd10Diagnosis::selectRaw('kategori, COUNT(*) as count')
+                                  ->whereNotNull('kategori')
+                                  ->groupBy('kategori')
+                                  ->pluck('count', 'kategori')
                                   ->toArray(),
         ];
 
@@ -220,9 +222,9 @@ class Icd10DiagnosisController extends Controller
     public function mostUsed(): JsonResponse
     {
         // This would typically join with patient_histories or registrations
-        // For now, return active diagnoses ordered by code
-        $diagnoses = Icd10Diagnosis::where('is_active', 1)
-                                  ->orderBy('code', 'asc')
+        // For now, return active diagnoses ordered by kode_icd
+        $diagnoses = Icd10Diagnosis::where('aktif', 1)
+                                  ->orderBy('kode_icd', 'asc')
                                   ->limit(20)
                                   ->get();
 
@@ -239,7 +241,7 @@ class Icd10DiagnosisController extends Controller
     {
         // This would typically check recent usage in patient_histories
         // For now, return recently created diagnoses
-        $diagnoses = Icd10Diagnosis::where('is_active', 1)
+        $diagnoses = Icd10Diagnosis::where('aktif', 1)
                                   ->orderBy('created_at', 'desc')
                                   ->limit(20)
                                   ->get();
@@ -255,9 +257,9 @@ class Icd10DiagnosisController extends Controller
      */
     public function byChapter(string $chapter): JsonResponse
     {
-        $diagnoses = Icd10Diagnosis::where('chapter', $chapter)
-                                  ->where('is_active', 1)
-                                  ->orderBy('code', 'asc')
+        $diagnoses = Icd10Diagnosis::where('kategori', $chapter)
+                                  ->where('aktif', 1)
+                                  ->orderBy('kode_icd', 'asc')
                                   ->get();
 
         return response()->json([
