@@ -10,16 +10,22 @@ const getCookieValue = (name: string): string | null => {
 }
 
 const api = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: typeof window !== 'undefined' ? 'http://localhost:8000/api' : '/api',
   withCredentials: true, // penting untuk cookie/session SPA
   headers: {
-    'Cache-Control': 'no-cache',
+    'Cache-Control': 'public, max-age=300', // 5 minute cache untuk GET requests
     'X-Requested-With': 'XMLHttpRequest',
   },
 })
 
-// Add request interceptor to include CSRF token
+// Add request interceptor to include CSRF token and auth token
 api.interceptors.request.use((config) => {
+  // Include auth token if available
+  const token = localStorage.getItem('auth_token')
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`
+  }
+
   // For state-changing operations, include CSRF token
   if (['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase() || '')) {
     const csrfToken = getCookieValue('XSRF-TOKEN')
