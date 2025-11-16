@@ -14,6 +14,8 @@ class User extends Authenticatable
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasApiTokens, HasRoles, HasFactory, Notifiable;
 
+    protected $guard_name = 'web';
+
     /**
      * Determine if the user can access the Filament admin panel.
      * Note: This method will be used when Filament is properly installed

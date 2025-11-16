@@ -1,33 +1,66 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useAuthContext } from '@/hooks/AuthContext'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAuthStore } from '@/store/auth'
+import { getPrimaryRole, getDashboardRoute } from '@/lib/roleUtils'
 
 export default function LoginForm() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const { login, error, loading, user } = useAuthContext()
+  const { login, fetchUser, isLoading, error } = useAuthStore()
   const router = useRouter()
 
-  useEffect(() => {
-    if (user) {
-      router.push(`/dashboard/${user.role}`)
-    }
-  }, [user, router])
+  // Show error message
+  const errorMessage = error || null
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    await login(email, password)
+  const handleLogin = async (formData: FormData) => {
+    const email = (formData.get('email') as string)?.trim()
+    const password = (formData.get('password') as string)?.trim()
+
+    // Form validation
+    if (!email) {
+      alert('Email wajib diisi')
+      return
+    }
+    if (!password) {
+      alert('Kata sandi wajib diisi')
+      return
+    }
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      alert('Format email tidak valid')
+      return
+    }
+
+    try {
+      // 1. Login first (get token + basic user data)
+      await login(email, password)
+
+      // 2. CRITICAL: Fetch full user data with roles & permissions
+      await fetchUser()
+
+      // 3. Get user data and determine dashboard route based on role
+      const userData = useAuthStore.getState().user
+      const primaryRole = getPrimaryRole(userData)
+      const dashboardRoute = getDashboardRoute(primaryRole)
+
+      console.log('Login redirect:', { userData, primaryRole, dashboardRoute })
+
+      // 4. Set login success flag for AuthProvider (if needed)
+      localStorage.setItem('sirama-login-success', 'true')
+
+      // 5. Redirect to role-specific dashboard
+      router.push(dashboardRoute)
+    } catch (err: any) {
+      console.error('Login error:', err)
+      alert(err?.response?.data?.message || err?.message || 'Login gagal. Silakan coba lagi.')
+    }
   }
 
-  if (user) {
-    return (
-      <div className="w-full max-w-md text-center py-6">
-        <p className="text-gray-400 text-sm animate-pulse">Mengalihkan ke dashboard...</p>
-      </div>
-    )
+  // Calculate button state based on form data
+  const isFormValid = (email: string, password: string) => {
+    const trimmedEmail = email.trim()
+    const trimmedPassword = password.trim()
+    return trimmedEmail && trimmedPassword && /\S+@\S+\.\S+/.test(trimmedEmail)
   }
 
   return (
@@ -68,21 +101,13 @@ export default function LoginForm() {
             </div>
           </div>
 
-          {/* Error */}
-          {error && (
-            <div className="mb-5 p-3 bg-red-900/30 border border-red-700 text-red-300 text-sm rounded-lg animate-pulse">
-              {error}
-            </div>
-          )}
-
-          {/* Form */}
-          <form onSubmit={handleLogin} className="space-y-5">
+          {/* Form - Server Action */}
+          <form action={handleLogin} className="space-y-5">
             <div>
               <label className="text-xs font-medium text-gray-400 mb-1 block">Email</label>
               <input
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                name="email"
                 className="w-full px-4 py-3 bg-[#131a13] border border-green-800 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none placeholder:text-gray-500 text-sm transition duration-200"
                 placeholder="Masukkan email Anda"
                 required
@@ -94,8 +119,7 @@ export default function LoginForm() {
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  name="password"
                   className="w-full px-4 py-3 pr-12 bg-[#131a13] border border-green-800 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none placeholder:text-gray-500 text-sm transition duration-200"
                   placeholder="Masukkan kata sandi"
                   required
@@ -133,12 +157,29 @@ export default function LoginForm() {
               </div>
             </div>
 
+            {/* Error Message */}
+            {errorMessage && (
+              <div className="text-red-400 text-sm text-center bg-red-900/20 border border-red-700/50 rounded-lg p-3">
+                {errorMessage}
+              </div>
+            )}
+
             <button
               type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-green-700 via-amber-700 to-green-800 hover:from-green-800 hover:via-amber-800 hover:to-green-900 text-white font-semibold py-3 rounded-lg shadow-lg hover:shadow-amber-800/40 transition duration-300 disabled:opacity-60"
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-green-700 via-amber-700 to-green-800 hover:from-green-800 hover:via-amber-800 hover:to-green-900 text-white font-semibold py-3 rounded-lg shadow-lg hover:shadow-amber-800/40 transition duration-300 disabled:opacity-60 flex items-center justify-center"
             >
-              {loading ? 'Memproses...' : 'Masuk ke Sistem'}
+              {isLoading ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Memproses...
+                </>
+              ) : (
+                'Masuk ke Sistem'
+              )}
             </button>
           </form>
 

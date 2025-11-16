@@ -1,15 +1,19 @@
 'use client'
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname } from 'next/navigation'
+import Link from 'next/link'
 import { menuByRole, MenuItem, MenuCategory } from '@/lib/menuByRole'
 import { RoleLabelMap, Role } from '@/types/role'
-import { MdHome, MdExpandMore, MdExpandLess, MdChevronRight } from 'react-icons/md'
+import { MdHome, MdExpandMore, MdExpandLess, MdChevronRight, MdMenu, MdClose } from 'react-icons/md'
 import { useState } from 'react'
+import { clsx } from 'clsx'
 
-export default function RoleSidebar({ role }: { role: string }) {
+export default function RoleSidebar({ role, isMobileOpen = false, onClose }: {
+  role: string
+  isMobileOpen?: boolean
+  onClose?: () => void
+}) {
   const pathname = usePathname()
-  const router = useRouter()
-  const searchParams = useSearchParams()
   const navItems = menuByRole[role] ?? []
   const roleLabel = RoleLabelMap[role as Role] || role
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['Pendaftaran Pasien']))
@@ -26,13 +30,6 @@ export default function RoleSidebar({ role }: { role: string }) {
     setExpandedCategories(newExpanded)
   }
 
-  // Modular navigation for all roles - use query parameters for content switching
-  const handleMenuClick = (href: string) => {
-    const moduleName = href?.split('/').pop() || 'dashboard';
-    const currentParams = searchParams ? new URLSearchParams(searchParams) : new URLSearchParams();
-    currentParams.set('module', moduleName);
-    router.replace(`/dashboard/${role}?${currentParams.toString()}`, { scroll: false });
-  }
 
   // Check if menu has mixed structure (standalone items + categories)
   const hasMixedStructure = navItems.length > 0 && navItems.some(item => 'items' in item)
@@ -82,15 +79,14 @@ export default function RoleSidebar({ role }: { role: string }) {
               // Check if this is a standalone menu item
               if ('href' in navItem) {
                 const item = navItem as MenuItem
-                // Check if current menu matches the module query parameter
-                const currentModule = searchParams?.get('module')
-                const menuModule = item.href?.split('/').pop()
-                const isActive = currentModule === menuModule || (pathname === item.href && !currentModule)
+                // Check if current path matches the menu href (direct path comparison)
+                const isActive = pathname === item.href
 
                 return (
-                  <button
+                  <Link
                     key={item.href}
-                    onClick={() => handleMenuClick(item.href)}
+                    href={item.href}
+                    prefetch={true}
                     className={`w-full group relative flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-left transition-all duration-200 ${
                       isActive
                         ? 'text-slate-800 dark:text-slate-200'
@@ -126,7 +122,7 @@ export default function RoleSidebar({ role }: { role: string }) {
                     }`}>
                       <MdChevronRight className="text-sm" />
                     </div>
-                  </button>
+                  </Link>
                 )
               } else {
                 // This is a category
@@ -187,15 +183,14 @@ export default function RoleSidebar({ role }: { role: string }) {
                     }`}>
                       <div className="ml-6 mt-2 space-y-1">
                         {category.items.map((item, itemIndex) => {
-                          // Check if current menu matches the module query parameter for category items too
-                          const currentModule = searchParams?.get('module')
-                          const menuModule = item.href?.split('/').pop()
-                          const isActive = currentModule === menuModule || (pathname === item.href && !currentModule)
+                          // Check if current path matches the menu href for category items (direct path comparison)
+                          const isActive = pathname === item.href
 
                           return (
-                            <button
+                            <Link
                               key={item.href}
-                              onClick={() => handleMenuClick(item.href)}
+                              href={item.href}
+                              prefetch={true}
                               className={`w-full group relative flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm text-left transition-all duration-200 ${
                                 isActive
                                   ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-slate-800 dark:text-slate-200'
@@ -226,7 +221,7 @@ export default function RoleSidebar({ role }: { role: string }) {
                               }`}>
                                 <MdChevronRight className="text-sm" />
                               </div>
-                            </button>
+                            </Link>
                           )
                         })}
                       </div>

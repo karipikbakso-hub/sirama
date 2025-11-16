@@ -31,17 +31,13 @@ Route::get('patients-search', [PatientController::class, 'search']); // Make pat
 // Protected API routes
 Route::middleware(['web'])->group(function () {
     // Authentication routes
-    Route::get('/user', function () {
+    Route::middleware(['auth:sanctum'])->get('/user', function () {
         $user = auth()->user();
-        $role = $user->getRoleNames()->first() ?? 'user';
-        $permissions = $user->getAllPermissions()->pluck('name')->toArray();
 
         return response()->json([
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'role' => $role,
-            'permissions' => $permissions,
+            'user' => $user,
+            'roles' => $user->getRoleNames(),
+            'permissions' => $user->getAllPermissions()->pluck('name'),
         ]);
     });
 
@@ -193,3 +189,20 @@ Route::middleware(['web'])->group(function () {
 });
 
 // Public Mobile JKN routes moved to web.php for testing (no CSRF)
+
+Route::get('/patients', function () { return response()->json(['ok' => true]); })->middleware('permission:view-patient');
+Route::post('/patients', function () { return response()->json(['ok' => true]); })->middleware('permission:edit-patient');
+Route::get('/admin/dashboard', function () { return response()->json(['ok' => true]); })->middleware('role:admin');
+
+// Test routes for middleware
+Route::get('/admin/test', function () {
+    return response()->json(['message' => 'Access granted for admin']);
+})->middleware('role:admin');
+
+Route::get('/patient/test', function () {
+    return response()->json(['message' => 'Access granted for view-patient']);
+})->middleware('permission:view-patient');
+
+Route::get('/doctor/test', function () {
+    return response()->json(['message' => 'Access granted for dokter']);
+})->middleware('role:dokter');

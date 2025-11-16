@@ -21,4 +21,7 @@ Route::prefix('public')->group(function () {
     \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
 ]);
 
-require __DIR__.'/auth.php';
+// Auth routes with /auth prefix for frontend consistency
+Route::prefix('auth')->group(function () {
+    require __DIR__.'/auth.php';
+});

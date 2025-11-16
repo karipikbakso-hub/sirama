@@ -2,18 +2,27 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import useAuth from '@/hooks/useAuth'
+import { useAuth } from '@/hooks/useAuth'
+import { getPrimaryRole, getDashboardRoute } from '@/lib/roleUtils'
+
 
 export default function DashboardFallback() {
-  const { user, loading } = useAuth()
+  const { user, isLoading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (!loading && user) {
-      const role = user.roles?.[0]?.name?.toLowerCase()
-      if (role) router.replace(`/dashboard/${role}`)
+    console.log('Dashboard fallback:', { user, isLoading })
+    if (!isLoading && user) {
+      const primaryRole = getPrimaryRole(user)
+      const dashboardRoute = getDashboardRoute(primaryRole)
+
+      console.log('Dashboard redirect logic:', { primaryRole, dashboardRoute })
+
+      if (dashboardRoute !== '/dashboard') {
+        router.replace(dashboardRoute)
+      }
     }
-  }, [user, loading, router])
+  }, [user, isLoading, router])
 
   return (
     <div className="mt-20 text-center">

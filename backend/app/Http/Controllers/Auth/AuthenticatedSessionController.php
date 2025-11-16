@@ -7,6 +7,7 @@ use App\Http\Requests\Auth\LoginRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -15,23 +16,77 @@ class AuthenticatedSessionController extends Controller
      */
     public function store(LoginRequest $request): \Illuminate\Http\JsonResponse
     {
-        // Ensure no existing authentication interferes
-        Auth::logout();
+        try {
+            // Clear any existing authentication
+            Auth::logout();
 
-        $request->authenticate();
-        $request->session()->regenerate();
+            // Clear session
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
 
-        $user = Auth::user();
+            // Authenticate user
+            $request->authenticate();
 
-        // ✅ Ambil role dari Spatie Permission
-        $role = $user->getRoleNames()->first() ?? 'user';
+            // Regenerate session for security
+            $request->session()->regenerate();
 
-        return response()->json([
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'role' => $role,
-        ], 200, ['Content-Type' => 'application/json']);
+            $user = Auth::user();
+
+            if (!$user) {
+                return response()->json([
+                    'message' => 'Authentication failed',
+                    'error' => 'User not found'
+                ], 401);
+            }
+
+            // IMPORTANT: FORCE FROM SPATIE ONLY - ignore any legacy 'role' column
+            $role = $user->getRoleNames()->first() ?? 'user'; // Primary role (first one)
+            $roles = $user->getRoleNames()->unique()->toArray(); // All unique roles array
+            $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+
+            // Update last login tracking
+            $user->update([
+                'last_login_at' => now(),
+                'last_login_ip' => $request->ip(),
+            ]);
+
+            Log::info('User logged in successfully', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'role' => $role,
+                'ip' => $request->ip(),
+            ]);
+
+            // Issue SANCTUM token for API authentication
+            $token = $user->createToken('api-token')->plainTextToken;
+
+            return response()->json([
+                'data' => [
+                    'user' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'role' => $role,
+                        'roles' => $roles,
+                        'permissions' => $permissions,
+                    ],
+                    'token' => $token,
+                ],
+                'message' => 'Login successful'
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Login failed', [
+                'error' => $e->getMessage(),
+                'email' => $request->email,
+                'ip' => $request->ip(),
+            ]);
+
+            return response()->json([
+                'message' => 'Login failed',
+                'error' => $e->getMessage()
+            ], 401);
+        }
     }
 
     /**
@@ -39,17 +94,37 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request): Response
     {
-        // Logout current user
-        Auth::guard('web')->logout();
+        try {
+            $user = Auth::user();
 
-        // Invalidate and regenerate session completely
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-        $request->session()->regenerate();
+            if ($user) {
+                Log::info('User logged out', [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                ]);
+            }
 
-        // Clear any cached authentication data
-        $request->session()->forget('login_web_' . sha1('Illuminate\Auth\SessionGuard'));
+            // Logout from web guard
+            Auth::guard('web')->logout();
 
-        return response()->noContent();
+            // Invalidate and regenerate session completely
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return response()->json([
+                'message' => 'Logged out successfully'
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Logout failed', [
+                'error' => $e->getMessage(),
+                'user_id' => Auth::id(),
+            ]);
+
+            return response()->json([
+                'message' => 'Logout failed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

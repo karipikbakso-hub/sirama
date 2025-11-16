@@ -34,8 +34,27 @@ class RegisteredUserController extends Controller
 
         event(new Registered($user));
 
-        Auth::login($user);
+        // Issue SANCTUM token instead of login
+        $token = $user->createToken('api-token')->plainTextToken;
 
-        return response()->noContent();
+        // Get role
+        $role = $user->getRoleNames()->first() ?? 'user';
+
+        // Get permissions
+        $permissions = $user->getAllPermissions()->pluck('name')->toArray();
+
+        return response()->json([
+            'data' => [
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $role,
+                    'permissions' => $permissions,
+                ],
+                'token' => $token,
+            ],
+            'message' => 'Registration successful'
+        ], 201);
     }
 }

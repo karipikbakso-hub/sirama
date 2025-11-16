@@ -1,19 +1,19 @@
 'use client'
 
-import useAuth from '@/hooks/useAuth'
+import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
 import { ReactNode, useEffect } from 'react'
 
 export default function ProtectedLayout({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth()
+  const { user, isLoading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (loading) return // ✅ Jangan redirect saat masih loading
+    if (isLoading) return // ✅ Jangan redirect saat masih loading
     if (!user) router.push('/login')
-  }, [loading, user, router])
+  }, [isLoading, user, router])
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="p-4 text-sm text-gray-500 text-center">
         Memuat sesi Anda...

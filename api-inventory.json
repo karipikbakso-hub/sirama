@@ -1,0 +1,642 @@
+{
+  "api_inventory": {
+    "system_overview": {
+      "name": "SIRAMA - Hospital Information System",
+      "version": "Laravel 12",
+      "description": "Comprehensive Hospital Information System with 9 roles and ~100 features",
+      "authentication": "Laravel Sanctum (Token-based)",
+      "authorization": "Spatie Permission Package (Role-based with permissions)",
+      "api_version": "v1",
+      "base_url": "/api"
+    },
+    "security_layers": {
+      "authentication_middleware": ["web", "auth:sanctum"],
+      "authorization_middleware": ["permission:*", "role:*"],
+      "csrf_protection": "Enabled via Sanctum",
+      "rate_limiting": "Laravel default throttling middleware"
+    },
+    "endpoints_inventory": [
+      {
+        "module": "Authentication",
+        "controller": "CsrfCookieController",
+        "routes": [
+          {
+            "method": "GET",
+            "uri": "/sanctum/csrf-cookie",
+            "action": "show",
+            "middleware": [],
+            "description": "Retrieve CSRF token for SPA authentication",
+            "public": true
+          },
+          {
+            "method": "GET",
+            "middleware": ["auth:sanctum"],
+            "uri": "/user",
+            "action": "AuthenticatedSessionController@show",
+            "description": "Get authenticated user details with roles and permissions",
+            "public": false
+          }
+        ]
+      },
+      {
+        "module": "Patient Management",
+        "controller": "PatientController",
+        "routes": [
+          {
+            "method": "GET",
+            "uri": "/patients",
+            "action": "index",
+            "middleware": ["permission:view patients"],
+            "parameters": ["page", "per_page", "search", "status", "registration_date_from", "registration_date_to"],
+            "description": "List patients with pagination and filtering"
+          },
+          {
+            "method": "GET",
+            "uri": "/patients/{patient}",
+            "action": "show",
+            "middleware": ["permission:view patients"],
+            "description": "Get patient details with related registrations"
+          },
+          {
+            "method": "GET",
+            "uri": "/patients/find-by-nik",
+            "action": "findByNik",
+            "middleware": ["permission:view patients"],
+            "parameters": ["nik"],
+            "description": "Find patient by NIK (Indonesian ID number)"
+          },
+          {
+            "method": "POST",
+            "uri": "/patients",
+            "action": "store",
+            "middleware": ["permission:create patients"],
+            "parameters": ["name", "nik", "birth_date", "gender", "phone", "address", "emergency_contact", "bpjs_number", "status"],
+            "description": "Create new patient with auto-generated MRN"
+          },
+          {
+            "method": "PUT",
+            "uri": "/patients/{patient}",
+            "action": "update",
+            "middleware": ["permission:edit patients"],
+            "description": "Update patient information"
+          },
+          {
+            "method": "DELETE",
+            "uri": "/patients/{patient}",
+            "action": "destroy",
+            "middleware": ["permission:delete patients"],
+            "description": "Delete patient (checks for active registrations)"
+          },
+          {
+            "method": "GET",
+            "uri": "/patients-search",
+            "action": "search",
+            "middleware": [],
+            "parameters": ["q", "limit"],
+            "description": "Public endpoint for patient search (autocomplete)",
+            "public": true
+          },
+          {
+            "method": "GET",
+            "uri": "/patients-statistics",
+            "action": "statistics",
+            "middleware": ["permission:view patients"],
+            "description": "Get patient statistics (counts by status, gender, new patients this month)"
+          }
+        ]
+      },
+      {
+        "module": "Registration Management",
+        "controller": "RegistrationController",
+        "routes": [
+          {
+            "method": "GET",
+            "uri": "/registrations",
+            "action": "index",
+            "middleware": ["permission:view registrations"],
+            "description": "List registrations with pagination"
+          },
+          {
+            "method": "GET",
+            "uri": "/registrations/{registration}",
+            "action": "show",
+            "middleware": ["permission:view registrations"]
+          },
+          {
+            "method": "GET",
+            "uri": "/registrations-statistics",
+            "action": "statistics",
+            "middleware": ["permission:view registrations"]
+          },
+          {
+            "method": "GET",
+            "uri": "/queue-list",
+            "action": "queueList",
+            "middleware": ["permission:view registrations"]
+          },
+          {
+            "method": "POST",
+            "uri": "/registrations",
+            "action": "store",
+            "middleware": ["permission:create registrations"]
+          },
+          {
+            "method": "PUT",
+            "uri": "/registrations/{registration}",
+            "action": "update",
+            "middleware": ["permission:edit registrations"]
+          },
+          {
+            "method": "PATCH",
+            "uri": "/registrations/{registration}/status",
+            "action": "updateStatus",
+            "middleware": ["permission:edit registrations"]
+          },
+          {
+            "method": "POST",
+            "uri": "/queue/generate",
+            "action": "generateQueue",
+            "middleware": ["permission:manage queues"]
+          }
+        ]
+      },
+      {
+        "module": "Appointment Management",
+        "controller": "AppointmentController",
+        "routes": [
+          {
+            "method": "GET",
+            "uri": "/appointments/statistics",
+            "action": "statistics",
+            "description": "Public appointment statistics",
+            "public": true
+          },
+          {
+            "method": "GET",
+            "uri": "/appointments",
+            "action": "index",
+            "middleware": ["permission:view appointments"]
+          },
+          {
+            "method": "GET",
+            "uri": "/appointments/today",
+            "action": "today",
+            "middleware": ["permission:view appointments"]
+          },
+          {
+            "method": "GET",
+            "uri": "/appointments/upcoming",
+            "action": "upcoming",
+            "middleware": ["permission:view appointments"]
+          },
+          {
+            "method": "POST",
+            "uri": "/appointments",
+            "action": "store",
+            "middleware": ["permission:create appointments"]
+          },
+          {
+            "method": "GET",
+            "uri": "/appointments/{appointment}",
+            "action": "show",
+            "middleware": ["permission:view appointments"]
+          },
+          {
+            "method": "PUT",
+            "uri": "/appointments/{appointment}",
+            "action": "update",
+            "middleware": ["permission:edit appointments"]
+          },
+          {
+            "method": "DELETE",
+            "uri": "/appointments/{appointment}",
+            "action": "destroy",
+            "middleware": ["permission:delete appointments"]
+          },
+          {
+            "method": "PATCH",
+            "uri": "/appointments/{appointment}/status",
+            "action": "updateStatus",
+            "middleware": ["permission:edit appointments"]
+          },
+          {
+            "method": "POST",
+            "uri": "/appointments/{appointment}/confirm",
+            "action": "confirm",
+            "middleware": ["permission:edit appointments"]
+          },
+          {
+            "method": "POST",
+            "uri": "/appointments/{appointment}/cancel",
+            "action": "cancel",
+            "middleware": ["permission:edit appointments"]
+          }
+        ]
+      },
+      {
+        "module": "Doctor Module",
+        "controller": "DoctorModuleController",
+        "routes": [
+          {
+            "method": "GET",
+            "uri": "/doctor/emr/{patientId}",
+            "action": "getPatientEmr",
+            "middleware": ["auth:sanctum"],
+            "description": "Get patient EMR data"
+          },
+          {
+            "method": "GET",
+            "uri": "/doctor/cppt/{patientId}",
+            "action": "getCpptEntries",
+            "middleware": ["auth:sanctum"],
+            "parameters": ["page", "per_page"],
+            "description": "Get CPPT entries for patient"
+          },
+          {
+            "method": "POST",
+            "uri": "/doctor/cppt",
+            "action": "createCpptEntry",
+            "middleware": ["auth:sanctum"],
+            "description": "Create new CPPT entry (SOAP documentation)"
+          },
+          {
+            "method": "GET",
+            "uri": "/doctor/diagnoses",
+            "action": "getIcd10Diagnoses",
+            "middleware": ["auth:sanctum"],
+            "parameters": ["search", "page", "per_page"],
+            "description": "Search ICD-10 diagnoses"
+          },
+          {
+            "method": "GET",
+            "uri": "/doctor/prescriptions/{patientId}",
+            "action": "getPrescriptions",
+            "middleware": ["auth:sanctum"],
+            "description": "Get patient prescriptions"
+          },
+          {
+            "method": "POST",
+            "uri": "/doctor/prescriptions",
+            "action": "createPrescription",
+            "middleware": ["auth:sanctum"],
+            "description": "Create new prescription"
+          },
+          {
+            "method": "GET",
+            "uri": "/doctor/lab-orders/{patientId}",
+            "action": "getLabOrders",
+            "middleware": ["auth:sanctum"],
+            "description": "Get patient lab orders"
+          },
+          {
+            "method": "POST",
+            "uri": "/doctor/lab-orders",
+            "action": "createLabOrder",
+            "middleware": ["auth:sanctum"],
+            "description": "Create lab order"
+          },
+          {
+            "method": "GET",
+            "uri": "/doctor/radiology-orders/{patientId}",
+            "action": "getRadiologyOrders",
+            "middleware": ["auth:sanctum"],
+            "description": "Get patient radiology orders"
+          },
+          {
+            "method": "POST",
+            "uri": "/doctor/radiology-orders",
+            "action": "createRadiologyOrder",
+            "middleware": ["auth:sanctum"],
+            "description": "Create radiology order"
+          }
+        ]
+      },
+      {
+        "module": "SEP Management",
+        "controller": "SepController",
+        "routes": [
+          {"method": "GET", "uri": "/seps", "action": "index", "middleware": ["permission:view seps"]},
+          {"method": "POST", "uri": "/seps", "action": "store", "middleware": ["permission:create seps"]},
+          {"method": "GET", "uri": "/seps/{sep}", "action": "show", "middleware": ["permission:view seps"]},
+          {"method": "PUT", "uri": "/seps/{sep}", "action": "update", "middleware": ["permission:edit seps"]},
+          {"method": "DELETE", "uri": "/seps/{sep}", "action": "destroy", "middleware": ["permission:delete seps"]},
+          {"method": "GET", "uri": "/seps-statistics", "action": "statistics", "middleware": ["permission:view seps"]}
+        ]
+      },
+      {
+        "module": "Queue Management",
+        "controller": "QueueManagementController",
+        "routes": [
+          {"method": "GET", "uri": "/queue-managements", "action": "index", "middleware": ["permission:manage queues"]},
+          {"method": "POST", "uri": "/queue-managements", "action": "store", "middleware": ["permission:manage queues"]},
+          {"method": "GET", "uri": "/queue-managements/{queueManagement}", "action": "show"},
+          {"method": "PUT", "uri": "/queue-managements/{queueManagement}", "action": "update"},
+          {"method": "DELETE", "uri": "/queue-managements/{queueManagement}", "action": "destroy"},
+          {"method": "GET", "uri": "/queue-managements/active", "action": "active"},
+          {"method": "GET", "uri": "/queue-managements/today", "action": "today"},
+          {"method": "POST", "uri": "/queue-managements/{queueManagement}/call-next", "action": "callNext"},
+          {"method": "POST", "uri": "/queue-managements/{queueManagement}/skip", "action": "skip"}
+        ]
+      },
+      {
+        "module": "Referral Management",
+        "controller": "ReferralController",
+        "routes": [
+          {"method": "GET", "uri": "/referrals", "action": "index", "middleware": ["permission:view referrals"]},
+          {"method": "POST", "uri": "/referrals", "action": "store", "middleware": ["permission:create referrals"]},
+          {"method": "GET", "uri": "/referrals/{referral}", "action": "show", "middleware": ["permission:view referrals"]},
+          {"method": "PUT", "uri": "/referrals/{referral}", "action": "update", "middleware": ["permission:edit referrals"]},
+          {"method": "DELETE", "uri": "/referrals/{referral}", "action": "destroy", "middleware": ["permission:delete referrals"]},
+          {"method": "GET", "uri": "/referrals/pending", "action": "pending", "middleware": ["permission:view referrals"]},
+          {"method": "GET", "uri": "/referrals/emergency", "action": "emergency", "middleware": ["permission:view referrals"]},
+          {"method": "PATCH", "uri": "/referrals/{referral}/approve", "action": "approve", "middleware": ["permission:edit referrals"]},
+          {"method": "PATCH", "uri": "/referrals/{referral}/reject", "action": "reject", "middleware": ["permission:edit referrals"]},
+          {"method": "GET", "uri": "/referrals/statistics", "action": "statistics"}
+        ]
+      },
+      {
+        "module": "BPJS Integration",
+        "controller": "BpjsIntegrationController",
+        "routes": [
+          {"method": "GET", "uri": "/bpjs-integrations", "action": "index", "middleware": ["permission:manage bpjs"]},
+          {"method": "POST", "uri": "/bpjs-integrations", "action": "store", "middleware": ["permission:manage bpjs"]},
+          {"method": "GET", "uri": "/bpjs-integrations/{bpjsIntegration}", "action": "show"},
+          {"method": "PUT", "uri": "/bpjs-integrations/{bpjsIntegration}", "action": "update"},
+          {"method": "DELETE", "uri": "/bpjs-integrations/{bpjsIntegration}", "action": "destroy"},
+          {"method": "GET", "uri": "/bpjs-integrations/successful", "action": "successful"},
+          {"method": "GET", "uri": "/bpjs-integrations/failed", "action": "failed"},
+          {"method": "GET", "uri": "/bpjs-integrations/statistics", "action": "statistics"},
+          {"method": "GET", "uri": "/bpjs-integration", "action": "index"},
+          {"method": "POST", "uri": "/bpjs-integration/sync", "action": "sync"},
+          {"method": "POST", "uri": "/bpjs-integration/test-connection", "action": "testConnection"},
+          {"method": "GET", "uri": "/bpjs-integration/configuration", "action": "getConfiguration"},
+          {"method": "POST", "uri": "/bpjs-integration/configuration", "action": "updateConfiguration"},
+          {"method": "GET", "uri": "/bpjs-integration/logs", "action": "getLogs"}
+        ]
+      },
+      {
+        "module": "BPJS Configuration",
+        "controller": "BpjsConfigurationController",
+        "routes": [
+          {"method": "GET", "uri": "/bpjs-configurations", "action": "index", "middleware": ["permission:manage bpjs"]},
+          {"method": "POST", "uri": "/bpjs-configurations", "action": "store", "middleware": ["permission:manage bpjs"]},
+          {"method": "GET", "uri": "/bpjs-configurations/{bpjsConfiguration}", "action": "show"},
+          {"method": "PUT", "uri": "/bpjs-configurations/{bpjsConfiguration}", "action": "update"},
+          {"method": "DELETE", "uri": "/bpjs-configurations/{bpjsConfiguration}", "action": "destroy"},
+          {"method": "GET", "uri": "/bpjs-configurations/active", "action": "active"}
+        ]
+      },
+      {
+        "module": "Patient Communication",
+        "controller": "PatientCommunicationController",
+        "routes": [
+          {"method": "GET", "uri": "/patient-communications", "action": "index", "middleware": ["permission:manage communications"]},
+          {"method": "POST", "uri": "/patient-communications", "action": "store", "middleware": ["permission:manage communications"]},
+          {"method": "GET", "uri": "/patient-communications/{patientCommunication}", "action": "show"},
+          {"method": "PUT", "uri": "/patient-communications/{patientCommunication}", "action": "update"},
+          {"method": "DELETE", "uri": "/patient-communications/{patientCommunication}", "action": "destroy"},
+          {"method": "GET", "uri": "/patient-communications/sent", "action": "sent"},
+          {"method": "GET", "uri": "/patient-communications/delivered", "action": "delivered"},
+          {"method": "GET", "uri": "/patient-communications/statistics", "action": "statistics"}
+        ]
+      },
+      {
+        "module": "Master Doctors",
+        "controller": "DoctorController",
+        "routes": [
+          {"method": "GET", "uri": "/doctors", "action": "index", "middleware": ["permission:view doctors"]},
+          {"method": "POST", "uri": "/doctors", "action": "store", "middleware": ["permission:create doctors"]},
+          {"method": "GET", "uri": "/doctors/{doctor}", "action": "show", "middleware": ["permission:view doctors"]},
+          {"method": "PUT", "uri": "/doctors/{doctor}", "action": "update", "middleware": ["permission:edit doctors"]},
+          {"method": "DELETE", "uri": "/doctors/{doctor}", "action": "destroy", "middleware": ["permission:delete doctors"]},
+          {"method": "GET", "uri": "/doctors-statistics", "action": "statistics", "middleware": ["permission:view doctors"]}
+        ]
+      },
+      {
+        "module": "Master Medicines",
+        "controller": "MedicineController",
+        "routes": [
+          {"method": "GET", "uri": "/medicines", "action": "index", "middleware": ["permission:view medicines"]},
+          {"method": "POST", "uri": "/medicines", "action": "store", "middleware": ["permission:create medicines"]},
+          {"method": "GET", "uri": "/medicines/{medicine}", "action": "show", "middleware": ["permission:view medicines"]},
+          {"method": "PUT", "uri": "/medicines/{medicine}", "action": "update", "middleware": ["permission:edit medicines"]},
+          {"method": "DELETE", "uri": "/medicines/{medicine}", "action": "destroy", "middleware": ["permission:delete medicines"]},
+          {"method": "GET", "uri": "/medicines-statistics", "action": "statistics"},
+          {"method": "GET", "uri": "/medicines/low-stock", "action": "lowStock"},
+          {"method": "GET", "uri": "/medicines/by-category/{category}", "action": "byCategory"}
+        ]
+      },
+      {
+        "module": "ICD-10 Diagnoses",
+        "controller": "Icd10DiagnosisController",
+        "routes": [
+          {"method": "GET", "uri": "/icd10-diagnoses", "action": "index", "middleware": ["permission:view diagnoses"]},
+          {"method": "POST", "uri": "/icd10-diagnoses", "action": "store", "middleware": ["permission:create diagnoses"]},
+          {"method": "GET", "uri": "/icd10-diagnoses/{icd10Diagnosis}", "action": "show", "middleware": ["permission:view diagnoses"]},
+          {"method": "PUT", "uri": "/icd10-diagnoses/{icd10Diagnosis}", "action": "update", "middleware": ["permission:edit diagnoses"]},
+          {"method": "DELETE", "uri": "/icd10-diagnoses/{icd10Diagnosis}", "action": "destroy", "middleware": ["permission:delete diagnoses"]},
+          {"method": "GET", "uri": "/icd10-diagnoses-statistics", "action": "statistics"},
+          {"method": "GET", "uri": "/icd10-diagnoses/most-used", "action": "mostUsed"},
+          {"method": "GET", "uri": "/icd10-diagnoses/recently-used", "action": "recentlyUsed"},
+          {"method": "GET", "uri": "/icd10-diagnoses/by-chapter/{chapter}", "action": "byChapter"}
+        ]
+      },
+      {
+        "module": "Emergency Registration",
+        "controller": "EmergencyRegistrationController",
+        "routes": [
+          {"method": "GET", "uri": "/emergency-registrations", "action": "index", "middleware": ["permission:manage emergencies"]},
+          {"method": "POST", "uri": "/emergency-registrations", "action": "store", "middleware": ["permission:manage emergencies"]},
+          {"method": "GET", "uri": "/emergency-registrations/{emergencyRegistration}", "action": "show"},
+          {"method": "PUT", "uri": "/emergency-registrations/{emergencyRegistration}", "action": "update"},
+          {"method": "DELETE", "uri": "/emergency-registrations/{emergencyRegistration}", "action": "destroy"},
+          {"method": "GET", "uri": "/emergency-registrations/active", "action": "active"},
+          {"method": "GET", "uri": "/emergency-registrations/today", "action": "today"},
+          {"method": "GET", "uri": "/emergency-registrations/statistics", "action": "statistics"}
+        ]
+      },
+      {
+        "module": "Patient History",
+        "controller": "PatientHistoryController",
+        "routes": [
+          {"method": "GET", "uri": "/patient-histories", "action": "index", "middleware": ["permission:view patient histories"]},
+          {"method": "POST", "uri": "/patient-histories", "action": "store", "middleware": ["permission:create patient histories"]},
+          {"method": "GET", "uri": "/patient-histories/{patientHistory}", "action": "show"},
+          {"method": "PUT", "uri": "/patient-histories/{patientHistory}", "action": "update"},
+          {"method": "DELETE", "uri": "/patient-histories/{patientHistory}", "action": "destroy"},
+          {"method": "GET", "uri": "/patient-histories/patient/{patientId}", "action": "byPatient"},
+          {"method": "GET", "uri": "/patient-histories/statistics", "action": "statistics"}
+        ]
+      },
+      {
+        "module": "Mobile JKN",
+        "controller": "MobileJknController",
+        "routes": [
+          {"method": "GET", "uri": "/mobile-jkn/statistics", "action": "statistics"},
+          {"method": "POST", "uri": "/mobile-jkn/register", "action": "register"},
+          {"method": "POST", "uri": "/mobile-jkn/verify-card", "action": "verifyCard"},
+          {"method": "POST", "uri": "/mobile-jkn/generate-qr", "action": "generateQR"},
+          {"method": "GET", "uri": "/mobile-jkn/activities", "action": "getActivities"},
+          {"method": "GET", "uri": "/mobile-jkn/features", "action": "getFeatures"},
+          {"method": "PATCH", "uri": "/mobile-jkn/update-contact", "action": "updateContact"}
+        ]
+      },
+      {
+        "module": "Roles Management",
+        "controller": "RolesController",
+        "routes": [
+          {"method": "GET", "uri": "/roles", "action": "index", "middleware": ["auth:sanctum"]}
+        ]
+      },
+      {
+        "module": "Dashboard",
+        "controller": "DashboardHomeController",
+        "routes": [
+          {"method": "GET", "uri": "/dashboard/home", "action": "index", "middleware": ["auth:sanctum"]}
+        ]
+      }
+    ],
+    "controllers_list": [
+      "AppointmentController",
+      "AuditController",
+      "BackupController",
+      "BORController",
+      "BpjsConfigurationController",
+      "BpjsIntegrationController",
+      "CpptController",
+      "CpptNursingController",
+      "DailyReportController",
+      "DashboardHomeController",
+      "DiagnosisController",
+      "DistribusiObatController",
+      "DoctorController",
+      "DoctorModuleController",
+      "EmergencyRegistrationController",
+      "ErrorMonitoringController",
+      "ExaminationController",
+      "ExecutiveDashboardController",
+      "HasilSurveyController",
+      "Icd10DiagnosisController",
+      "IndikatorKualitasController",
+      "IntegrationController",
+      "KPIController",
+      "LaboratoriumController",
+      "LOSController",
+      "MedicineController",
+      "MobileJknController",
+      "NursingDashboardController",
+      "NursingQueueController",
+      "PatientCommunicationController",
+      "PatientController",
+      "PatientHistoryController",
+      "PendapatanController",
+      "PenjaminController",
+      "PoliController",
+      "QueueManagementController",
+      "RadiologiController",
+      "ReferralController",
+      "RegistrationController",
+      "ResepController",
+      "RolePermissionController",
+      "RolesController",
+      "SatusehatController",
+      "SepController",
+      "SystemConfigurationController",
+      "TriaseController",
+      "UserController",
+      "VitalSignsController"
+    ],
+    "models_overview": [
+      {
+        "model": "Patient",
+        "fillable": ["mrn", "name", "nik", "birth_date", "gender", "phone", "address", "emergency_contact", "bpjs_number", "status"],
+        "relationships": ["registrations", "patientHistories"],
+        "features": ["Auto-generated MRN", "Search scopes", "Media collections (medical records, x-rays, lab results)"]
+      },
+      {
+        "model": "Registration",
+        "features": ["Queue management", "Doctor assignment", "Status tracking"]
+      },
+      {
+        "model": "Appointment",
+        "features": ["Scheduling", "Status management", "Public statistics"]
+      },
+      {
+        "model": "Doctor",
+        "features": ["Master doctor data"]
+      },
+      {
+        "model": "Medicine",
+        "features": ["Stock management", "Category-based organization"]
+      },
+      {
+        "model": "Icd10Diagnosis",
+        "features": ["ICD-10 codes", "Search functionality", "Usage tracking"]
+      },
+      {
+        "model": "CatatanCppt",
+        "features": ["SOAP documentation", "Multi-professional entries"]
+      },
+      {
+        "model": "ResepObat",
+        "features": ["Prescription management", "Medicine details"]
+      },
+      {
+        "model": "PesananLab",
+        "features": ["Laboratory order management", "Urgency levels"]
+      },
+      {
+        "model": "PesananRadiologi",
+        "features": ["Radiology order management", "Urgency levels"]
+      }
+    ],
+    "testing_endpoints": [
+      {
+        "uri": "/admin/test",
+        "method": "GET",
+        "middleware": "role:admin",
+        "description": "Test admin role access"
+      },
+      {
+        "uri": "/patient/test",
+        "method": "GET",
+        "middleware": "permission:view-patient",
+        "description": "Test view-patient permission"
+      },
+      {
+        "uri": "/doctor/test",
+        "method": "GET",
+        "middleware": "role:dokter",
+        "description": "Test doctor role access"
+      }
+    ],
+    "api_readiness_status": {
+      "overall_status": "READY",
+      "authentication_implemented": true,
+      "authorization_implemented": true,
+      "validation_implemented": true,
+      "error_handling_implemented": true,
+      "pagination_implemented": true,
+      "search_filtering_implemented": true,
+      "resource_management": "CRUD operations for all models",
+      "relationships_handled": true,
+      "statistics_endpoints": "Available for key modules",
+      "mobile_integration_ready": true,
+      "external_integrations": ["BPJS", "SatuSehat"],
+      "queue_system_ready": true,
+      "emergency_module_ready": true,
+      "reporting_system": "Implemented",
+      "audit_system": "Implemented"
+    },
+    "frontend_integration_notes": [
+      "All endpoints return consistent JSON responses",
+      "Error responses follow Laravel validation format",
+      "Pagination uses Laravel's default structure",
+      "Authentication tokens managed via Sanctum",
+      "Role-based permissions checked on backend",
+      "File uploads supported via media library integration",
+      "Real-time features implemented via Laravel Broadcasting (not shown in API)",
+      "Queue management includes announcement system"
+    ]
+  }
+}

@@ -1,0 +1,245 @@
+{
+  "frontend": {
+    "framework": "Next.js 16",
+    "structure": {
+      "app": {
+        "pages": [
+          "/",
+          "/login",
+          "/dashboard",
+          "/dashboard/[role]",
+          "/dashboard/[role]/[menu]",
+          "/dashboard/[role]/admin",
+          "/dashboard/[role]/admin/user",
+          "/dashboard/[role]/admin/role",
+          "/dashboard/[role]/admin/audit",
+          "/dashboard/[role]/admin/backup",
+          "/dashboard/[role]/admin/settings",
+          "/dashboard/[role]/admin/integration",
+          "/dashboard/[role]/admin/error-log",
+          "/dashboard/[role]/pendaftaran",
+          "/dashboard/[role]/pendaftaran/page",
+          "/dashboard/[role]/pendaftaran/registrasi",
+          "/dashboard/[role]/pendaftaran/pasien",
+          "/dashboard/[role]/pendaftaran/pasien-baru",
+          "/dashboard/[role]/pendaftaran/antrian-management",
+          "/dashboard/[role]/pendaftaran/antrian-prioritas",
+          "/dashboard/[role]/pendaftaran/rujukan",
+          "/dashboard/[role]/pendaftaran/laporan-harian",
+          "/dashboard/[role]/pendaftaran/kpi",
+          "/dashboard/[role]/pendaftaran/appointment",
+          "/dashboard/[role]/pendaftaran/satusehat-sync",
+          "/dashboard/[role]/dokter/emr",
+          "/dashboard/[role]/dokter/cppt",
+          "/dashboard/[role]/dokter/order-lab",
+          "/dashboard/[role]/dokter/order-rad",
+          "/dashboard/[role]/perawat/distribusi-obat",
+          "/dashboard/[role]/laboratorium",
+          "/dashboard/[role]/apoteker",
+          "/dashboard/[role]/kasir",
+          "/dashboard/[role]/manajemen.rs",
+          "/dashboard/[role]/manajemenrs/analisis-los",
+          "/dashboard/[role]/radiologi"
+        ],
+        "layouts": [
+          "layout.tsx",
+          "dashboard/layout.tsx",
+          "dashboard/[role]/layout.tsx"
+        ],
+        "api": []
+      },
+      "components": {
+        "ui": [
+          "card",
+          "table",
+          "badge",
+          "button",
+          "form",
+          "input",
+          "dialog",
+          "tooltip",
+          "skeleton",
+          "alert",
+          "label",
+          "textarea",
+          "tabs",
+          "searchable-select"
+        ],
+        "layouts": [
+          "RoleSidebar",
+          "RoleHeader",
+          "ProtectedLayout",
+          "PersistentSidebar"
+        ],
+        "features": [
+          "auth/LoginForm",
+          "auth/RoleGuard",
+          "role/StatsCard",
+          "role/DashboardGrid",
+          "emr/ExaminationForm",
+          "emr/ExaminationFormSimple",
+          "table/columns/doctorTodayPatientsColumns",
+          "table/columns/appointmentColumns",
+          "dash/ModularDashboard",
+          "dash/RoleDashboard"
+        ]
+      },
+      "lib": [
+        "api",
+        "roleUtils",
+        "menuByRole",
+        "queryClient",
+        "toast",
+        "utils/role"
+      ],
+      "hooks": [
+        "useAuth",
+        "useEmrExamination",
+        "role/usePendaftaranDashboard",
+        "role/useAdminDashboard",
+        "role/useDokterDashboard",
+        "role/usePerawatDashboard",
+        "role/useApotekerDashboard",
+        "role/useKasirDashboard",
+        "role/useManajemenRsDashboard",
+        "AuthContext"
+      ],
+      "store": [
+        "auth"
+      ],
+      "types": [
+        "role/admin",
+        "role/pendaftaran",
+        "role/index"
+      ]
+    },
+    "dependencies": {
+      "key_packages": [
+        "next@16.0.0",
+        "react@19.2.0",
+        "typescript@^5",
+        "@tanstack/react-query@^5.90.6",
+        "@tanstack/react-table@^8.21.3",
+        "axios@^1.13.1",
+        "tailwindcss@^3.4.3",
+        "shadcn/ui",
+        "zod@^4.1.12",
+        "react-hook-form@^7.66.0",
+        "zustand@^5.0.8",
+        "chart.js@^4.5.1",
+        "recharts@^3.3.0",
+        "lucide-react@^0.548.0",
+        "next-themes@^0.4.6"
+      ]
+    }
+  },
+  "backend": {
+    "framework": "Laravel 12",
+    "structure": {
+      "controllers": [
+        "Auth/AuthenticatedSessionController",
+        "Auth/RegisteredUserController",
+        "Api/ExaminationController",
+        "Api/LaboratoriumController",
+        "Controller (abstract)"
+      ],
+      "models": [
+        "User",
+        "Patient",
+        "Registration",
+        "Doctor",
+        "Appointment",
+        "Pemeriksaan",
+        "Diagnosa",
+        "DiagnosisPasien",
+        "Resep",
+        "ResepDetail",
+        "ResepObat",
+        "Medicine",
+        "ObatKeluar",
+        "Billing",
+        "Pembayaran",
+        "Penjamin",
+        "PesananLab",
+        "PesananRadiologi",
+        "Laboratorium",
+        "Radiologi",
+        "MasterLaboratorium",
+        "MasterRadiologi",
+        "Poli",
+        "EmergencyRegistration",
+        "RawatInap",
+        "Ruangan",
+        "QueueManagement",
+        "QueuePriority",
+        "QueueLog",
+        "QueueSession",
+        "QueueAnnouncement",
+        "Referral",
+        "SatusehatSyncLog",
+        "Sep",
+        "BpjsIntegration",
+        "BpjsConfiguration",
+        "MobileJknAppointment",
+        "OnehealthConfig",
+        "PatientHistory",
+        "PatientCommunication",
+        "PenugasanDokter",
+        "AuditLog",
+        "BackupHistory",
+        "BackupSchedule",
+        "ApiLog",
+        "CatatanCppt",
+        "CpptEntry",
+        "CpptNursingEntry",
+        "HasilSurvey",
+        "LampiranPemeriksaan",
+        "Icd10Diagnosis",
+        "SystemLog",
+        "SystemConfiguration"
+      ],
+      "services": [],
+      "middleware": [],
+      "requests": []
+    },
+    "routes": {
+      "api": [
+        "Authenticated routes (login, logout, user management)",
+        "Admin routes (users, roles, audit, backup, settings)",
+        "Pendaftaran routes (registrations, patients, appointments)",
+        "Dokter routes (examinations, EMR, CPPT, lab/rad orders)",
+        "Laboratorium routes (tests, results)",
+        "Radiologi routes (orders, results)",
+        "Perawat routes (medication distribution)",
+        "Apoteker routes (prescriptions)",
+        "Queue management routes",
+        "BPJS integration routes",
+        "SATUSEHAT integration routes"
+      ],
+      "web": [
+        "Authentication routes",
+        "Admin panel (Filament)",
+        "Public API documentation"
+      ]
+    },
+    "database": {
+      "migrations": [
+        "Core system migrations (users, roles)",
+        "Patient management migrations",
+        "Medical record migrations (examinations, diagnoses)",
+        "Prescription system migrations",
+        "Laboratory system migrations",
+        "Radiology system migrations",
+        "Queue management migrations",
+        "Billing and payment migrations",
+        "BPJS integration migrations",
+        "SATUSEHAT integration migrations",
+        "Audit and logging migrations"
+      ],
+      "seeders": [
+        "RolesSeeder",
+        "DatabaseSeeder"
+      ]
+    }
+  }
+}

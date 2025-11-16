@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { FaUsers, FaCalendarAlt, FaListAlt, FaShieldAlt, FaChartBar, FaClock, FaUserCheck, FaFileAlt } from 'react-icons/fa'
 import api from '@/lib/apiAuth'
 
@@ -14,6 +15,7 @@ interface DashboardStats {
 }
 
 export default function PendaftaranDashboard() {
+  const router = useRouter()
   const [stats, setStats] = useState<DashboardStats>({
     totalPatients: 0,
     todayRegistrations: 0,
@@ -216,41 +218,41 @@ export default function PendaftaranDashboard() {
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <a
-              href="/dashboard/pendaftaran/registrasi"
+            <button
+              onClick={() => router.push('/dashboard/pendaftaran/registrasi')}
               className="flex flex-col items-center p-4 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg transition-all duration-300 transform hover:scale-105"
             >
               <FaUserCheck className="text-2xl mb-2" />
               <span className="font-medium text-center">Registrasi Pasien</span>
               <span className="text-xs text-blue-100 mt-1">Buat registrasi baru</span>
-            </a>
+            </button>
 
-            <a
-              href="/dashboard/pendaftaran/pasien"
+            <button
+              onClick={() => router.push('/dashboard/pendaftaran/pasien')}
               className="flex flex-col items-center p-4 bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-lg transition-all duration-300 transform hover:scale-105"
             >
               <FaUsers className="text-2xl mb-2" />
               <span className="font-medium text-center">Data Pasien</span>
               <span className="text-xs text-green-100 mt-1">Kelola data pasien</span>
-            </a>
+            </button>
 
-            <a
-              href="/dashboard/pendaftaran/antrian"
+            <button
+              onClick={() => router.push('/dashboard/pendaftaran/antrian')}
               className="flex flex-col items-center p-4 bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg transition-all duration-300 transform hover:scale-105"
             >
               <FaListAlt className="text-2xl mb-2" />
               <span className="font-medium text-center">Antrian</span>
               <span className="text-xs text-orange-100 mt-1">Pantau antrian pasien</span>
-            </a>
+            </button>
 
-            <a
-              href="/dashboard/pendaftaran/sep"
+            <button
+              onClick={() => router.push('/dashboard/pendaftaran/sep')}
               className="flex flex-col items-center p-4 bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-lg transition-all duration-300 transform hover:scale-105"
             >
               <FaShieldAlt className="text-2xl mb-2" />
               <span className="font-medium text-center">SEP</span>
               <span className="text-xs text-purple-100 mt-1">Kelola surat BPJS</span>
-            </a>
+            </button>
           </div>
         </div>
       </div>

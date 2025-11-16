@@ -5,37 +5,44 @@ import { menuByRole, MenuItem } from '@/lib/menuByRole'
 import { capitalize } from '@/lib/utils'
 
 // Lazy load 7 main role dashboards (Kemenkes Standards)
-const AdminDashboard = lazy(() => import('@/components/dashboard/admin/page'))
-const PendaftaranDashboard = lazy(() => import('@/components/dashboard/pendaftaran/page'))
-const DokterDashboard = lazy(() => import('@/components/dashboard/dokter/page'))
-const PerawatDashboard = lazy(() => import('@/components/dashboard/perawat/page'))
-const ApotekerDashboard = lazy(() => import('@/components/dashboard/apoteker/page'))
-const KasirDashboard = lazy(() => import('@/components/dashboard/kasir/page'))
-const ManajemenRsDashboard = lazy(() => import('@/components/dashboard/manajemenrs/page'))
+const AdminDashboard = lazy(() => import('@/app/dashboard/[role]/admin/page'))
+const PendaftaranDashboard = lazy(() => import('@/app/dashboard/[role]/pendaftaran/page'))
+const DokterDashboard = lazy(() => import('@/app/dashboard/[role]/dokter/page'))
+const PerawatDashboard = lazy(() => import('@/app/dashboard/[role]/perawat/page'))
+const ApotekerDashboard = lazy(() => import('@/app/dashboard/[role]/apoteker/page'))
+const KasirDashboard = lazy(() => import('@/app/dashboard/[role]/kasir/page'))
+const ManajemenRsDashboard = lazy(() => import('@/app/dashboard/[role]/manajemenrs/page'))
+
+// Lazy load admin modules
+const AdminUserPage = lazy(() => import('@/app/dashboard/[role]/admin/user/page'))
+const AdminRolePage = lazy(() => import('@/app/dashboard/[role]/admin/role/page'))
+const AdminAuditPage = lazy(() => import('@/app/dashboard/[role]/admin/audit/page'))
+const AdminBackupPage = lazy(() => import('@/app/dashboard/[role]/admin/backup/page'))
+const AdminSettingsPage = lazy(() => import('@/app/dashboard/[role]/admin/settings/page'))
 
 // Lazy load pendaftaran modules
-const RegistrasiPage = lazy(() => import('@/components/dashboard/pendaftaran/registrasi/page'))
-const PasienPage = lazy(() => import('@/components/dashboard/pendaftaran/pasien/page'))
-const AntrianPage = lazy(() => import('@/components/dashboard/pendaftaran/antrian/page'))
-const SEPPage = lazy(() => import('@/components/dashboard/pendaftaran/sep/page'))
-const KPIPage = lazy(() => import('@/roles/pendaftaran/pages/kpi'))
-const RiwayatPage = lazy(() => import('@/roles/pendaftaran/pages/riwayat'))
-const RegistrasiIGDPage = lazy(() => import('@/roles/pendaftaran/pages/registrasi-igd'))
-const AntrianManagementPage = lazy(() => import('@/roles/pendaftaran/pages/antrian-management'))
-const RujukanPage = lazy(() => import('@/roles/pendaftaran/pages/rujukan'))
-const MasterDataPage = lazy(() => import('@/roles/pendaftaran/pages/master-data'))
-const NotificationsPage = lazy(() => import('@/roles/pendaftaran/pages/notifications'))
-const MobileJKNPage = lazy(() => import('@/roles/pendaftaran/pages/mobile-jkn'))
-const AppointmentPage = lazy(() => import('@/components/dashboard/pendaftaran/appointment/page'))
-const BPJSIntegrationPage = lazy(() => import('@/components/dashboard/pendaftaran/bpjs-integration/page'))
+const RegistrasiPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/registrasi/page'))
+const PasienPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/pasien/page'))
+const AntrianPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/antrian/page'))
+const SEPPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/sep/page'))
+const KPIPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/kpi/page'))
+const RiwayatPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/riwayat/page'))
+const RegistrasiIGDPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/registrasi-igd/page'))
+const AntrianManagementPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/antrian-management/page'))
+const RujukanPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/rujukan/page'))
+const MasterDataPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/master-data/page'))
+const NotificationsPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/notifications/page'))
+const MobileJKNPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/mobile-jkn/page'))
+const AppointmentPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/appointment/page'))
+const BPJSIntegrationPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/bpjs-integration/page'))
 
 // Lazy load doctor modules
-const EMRPage = lazy(() => import('@/components/dashboard/dokter/emr/page'))
-const CPPTPage = lazy(() => import('@/components/dashboard/dokter/cppt/page'))
-const DiagnosisPage = lazy(() => import('@/components/dashboard/dokter/diagnosis/page'))
-const ResepPage = lazy(() => import('@/components/dashboard/dokter/resep/page'))
-const OrderLabPage = lazy(() => import('@/components/dashboard/dokter/order-lab/page'))
-const OrderRadPage = lazy(() => import('@/components/dashboard/dokter/order-rad/page'))
+const EMRPage = lazy(() => import('@/app/dashboard/[role]/dokter/emr/page'))
+const CPPTPage = lazy(() => import('@/app/dashboard/[role]/dokter/cppt/page'))
+const DiagnosisPage = lazy(() => import('@/app/dashboard/[role]/dokter/diagnosis/page'))
+const ResepPage = lazy(() => import('@/app/dashboard/[role]/dokter/resep/page'))
+const OrderLabPage = lazy(() => import('@/app/dashboard/[role]/dokter/order-lab/page'))
+const OrderRadPage = lazy(() => import('@/app/dashboard/[role]/dokter/order-rad/page'))
 
 interface ModularDashboardProps {
   role: string
@@ -44,6 +51,24 @@ interface ModularDashboardProps {
 
 export default function ModularDashboard({ role, module }: ModularDashboardProps) {
   const renderDashboard = () => {
+    // Handle module routing for admin
+    if (role === 'admin' && module) {
+      switch (module) {
+        case 'user':
+          return <AdminUserPage />
+        case 'role':
+          return <AdminRolePage />
+        case 'audit':
+          return <AdminAuditPage />
+        case 'backup':
+          return <AdminBackupPage />
+        case 'settings':
+          return <AdminSettingsPage />
+        default:
+          return <AdminDashboard />
+      }
+    }
+
     // Handle module routing for pendaftaran
     if (role === 'pendaftaran' && module) {
       switch (module) {

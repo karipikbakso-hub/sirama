@@ -1,14 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { FaUserCircle, FaBars } from 'react-icons/fa';
 import { MdLogout, MdSettings, MdDarkMode, MdLightMode, MdNotifications, MdSearch } from 'react-icons/md';
-import useAuth from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/useAuth';
 import api from '@/lib/apiAuth';
 import { RoleLabelMap, Role } from '@/types/role';
 
 export default function RoleHeader({ role }: { role: string }) {
+  const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -106,14 +108,16 @@ export default function RoleHeader({ role }: { role: string }) {
                     </p>
                   </div>
 
-                  <a
-                    href="/dashboard/profile"
+                  <button
+                    onClick={() => {
+                      router.push('/dashboard/profile');
+                      setDropdownOpen(false);
+                    }}
                     className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
-                    onClick={() => setDropdownOpen(false)}
                   >
                     <MdSettings className="text-lg" />
                     Profile Settings
-                  </a>
+                  </button>
 
                   <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
 

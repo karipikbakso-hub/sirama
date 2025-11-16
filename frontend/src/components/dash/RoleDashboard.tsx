@@ -1,9 +1,9 @@
 'use client'
 
-import useAuth from '@/hooks/useAuth'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function RoleDashboardClient({ role }: { role: string }) {
-  const { user, loading } = useAuth()
+  const { user, isLoading } = useAuth()
 
   if (!role) {
     return (
@@ -13,7 +13,7 @@ export default function RoleDashboardClient({ role }: { role: string }) {
     )
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <p className="text-center text-sm text-gray-500 py-8">
         Memuat sesi Anda...
