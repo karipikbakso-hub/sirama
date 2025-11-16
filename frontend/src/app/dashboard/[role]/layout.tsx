@@ -1,80 +1,52 @@
-// app/dashboard/[role]/layout.tsx - Role-Specific Dashboard UI Layout
-// AuthProvider sudah ada di parent (dashboard/layout.tsx)
+// app/dashboard/[role]/layout.tsx
 'use client'
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/store/auth'
+import useAuth from '@/hooks/useAuth'
 import RoleHeader from '@/components/layout/RoleHeader'
 import RoleSidebar from '@/components/layout/RoleSidebar'
 import * as React from 'react'
 
-interface DashboardLayoutProps {
+export default function DashboardLayout({
+  children,
+  params,
+}: {
   children: React.ReactNode
   params: Promise<{ role: string }>
-}
-
-export default function DashboardLayout({ children, params }: DashboardLayoutProps) {
+}) {
+  const { user, loading } = useAuth()
+  const router = useRouter()
   const resolvedParams = React.use(params)
   const requestedRole = resolvedParams.role
-  const { user, loading } = useAuthStore()
-  const router = useRouter()
 
   useEffect(() => {
-    // Check for auth cookies first to prevent long loading states
-    const hasAuthCookies = typeof window !== 'undefined' &&
-      (document.cookie.includes('laravel_session') || document.cookie.includes('XSRF-TOKEN'))
-
-    // Immediate redirect if no auth cookies present (server-side auth failure)
-    if (!hasAuthCookies && !loading) {
-      console.log('No auth cookies found, redirecting to login')
-      window.location.href = '/login'
-      return
-    }
-
-    // Only proceed with auth checks if loading is complete
     if (loading) return
 
+    // 🔐 Belum login → ke /login
     if (!user) {
-      // Auth fetch completed but no user - authentication failed
-      console.log('Auth fetch completed but no user, redirecting to login')
-      window.location.href = '/login'
+      router.push('/login')
       return
     }
 
-    // Check role mismatch
-    const userRole = user.role?.toLowerCase() || 'user'
-    if (userRole !== requestedRole.toLowerCase()) {
-      // Role doesn't match URL - redirect to correct role dashboard
-      console.log(`Role mismatch: user has ${userRole}, but accessing ${requestedRole}`)
+    // 🔐 Role tidak sesuai → redirect ke role yang benar
+    const userRole = user.role || (user.roles?.[0]?.name?.toLowerCase() || 'user')
+    if (userRole !== requestedRole) {
       router.push(`/dashboard/${userRole}`)
-      return
     }
   }, [user, loading, requestedRole, router])
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-r-transparent" />
-          <p className="mt-2 text-gray-600">Verifying access...</p>
+          <p className="mt-2 text-gray-600">Memverifikasi akses...</p>
         </div>
       </div>
     )
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-red-500 border-r-transparent" />
-          <p className="mt-2 text-gray-600">Access denied - redirecting...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Render dashboard only when user is authenticated and role matches
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
       <RoleSidebar role={requestedRole} />
