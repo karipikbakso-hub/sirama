@@ -10,9 +10,40 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Spatie\Permission\Models\Role;
+use Illuminate\Support\Str;
 
 class UserController extends Controller
 {
+    /**
+     * Format user data for API responses.
+     */
+    private function formatUserData(User $user)
+    {
+        $user->load('roles');
+        $userRoles = $user->roles->map(function($role) {
+            return [
+                'id' => $role->id,
+                'name' => $this->getRoleLabel($role->name),
+                'slug' => $role->name
+            ];
+        });
+
+        return [
+            'id' => (string) $user->id,
+            'username' => $user->username,
+            'email' => $user->email,
+            'fullName' => $user->name,
+            'nip' => $user->nip,
+            'phone' => $user->phone,
+            'roles' => $userRoles,
+            'status' => $user->is_active ? 'active' : 'inactive', // Map for table display
+            'isActive' => $user->is_active,
+            'lastLoginAt' => $user->last_login_at ? $user->last_login_at->toISOString() : null,
+            'createdAt' => $user->created_at->toISOString(),
+            'updatedAt' => $user->updated_at->toISOString(),
+        ];
+    }
+
     /**
      * Display a listing of users.
      */
@@ -26,23 +57,30 @@ class UserController extends Controller
                 $search = $request->search;
                 $query->where(function($q) use ($search) {
                     $q->where('name', 'LIKE', "%{$search}%")
-                      ->orWhere('email', 'LIKE', "%{$search}%");
+                      ->orWhere('email', 'LIKE', "%{$search}%")
+                      ->orWhere('username', 'LIKE', "%{$search}%");
                 });
             }
 
-            // Role filter using Spatie relationship
+            // Role filter using Spatie relationship - MUST specify guard to match roles
             if ($request->has('role') && $request->role !== 'all') {
+                Log::info('🔍 Role filter activated:', [
+                    'requested_role' => $request->role,
+                    'guard_name' => 'web'
+                ]);
+
                 $query->whereHas('roles', function($q) use ($request) {
-                    $q->where('name', $request->role);
+                    $q->where('name', $request->role)
+                      ->where('guard_name', 'web'); // Match roles guard with User model
                 });
             }
 
-            // Status filter
+            // Status filter using is_active column
             if ($request->has('status') && $request->status !== 'all') {
                 if ($request->status === 'active') {
-                    $query->whereNotNull('email_verified_at');
+                    $query->where('is_active', true);
                 } elseif ($request->status === 'inactive') {
-                    $query->whereNull('email_verified_at');
+                    $query->where('is_active', false);
                 }
             }
 
@@ -52,21 +90,43 @@ class UserController extends Controller
 
             // Transform data for frontend
             $users->getCollection()->transform(function ($user) {
+                $userRoles = $user->roles->map(function($role) {
+                    return [
+                        'id' => $role->id,
+                        'name' => $this->getRoleLabel($role->name),
+                        'slug' => $role->name
+                    ];
+                });
+
                 return [
-                    'id' => $user->id,
-                    'name' => $user->name,
+                    'id' => (string) $user->id,
+                    'username' => $user->username,
                     'email' => $user->email,
-                    'role' => $user->roles->first()?->name ?? 'No Role',
-                    'status' => $user->email_verified_at ? 'active' : 'inactive',
-                    'last_login' => $user->last_login_at,
-                    'created_at' => $user->created_at->format('Y-m-d'),
-                    'updated_at' => $user->updated_at->format('Y-m-d H:i:s'),
+                    'fullName' => $user->name, // Map name to fullName for frontend
+                    'nip' => $user->nip,
+                    'phone' => $user->phone,
+                    'roles' => $userRoles,
+                    'status' => $user->is_active ? 'active' : 'inactive', // Map for table display
+                    'isActive' => $user->is_active,
+                    'lastLoginAt' => $user->last_login_at ? $user->last_login_at->toISOString() : null,
+                    'createdAt' => $user->created_at->toISOString(),
+                    'updatedAt' => $user->updated_at->toISOString(),
                 ];
             });
 
             return response()->json([
                 'success' => true,
-                'data' => $users,
+                'data' => [
+                    'data' => $users->items(),
+                    'meta' => [
+                        'current_page' => $users->currentPage(),
+                        'per_page' => $users->perPage(),
+                        'total' => $users->total(),
+                        'last_page' => $users->lastPage(),
+                        'from' => $users->firstItem(),
+                        'to' => $users->lastItem(),
+                    ]
+                ],
                 'message' => 'Users retrieved successfully'
             ]);
 
@@ -86,13 +146,17 @@ class UserController extends Controller
     public function store(Request $request)
     {
         try {
-            // Validate role exists in database
-            $roleNames = Role::where('guard_name', 'web')->pluck('name')->toArray();
             $validator = Validator::make($request->all(), [
-                'name' => 'required|string|max:255',
-                'email' => 'required|string|email|max:255|unique:users',
+                'username' => 'required|string|max:255|unique:users,username',
+                'email' => 'required|string|email|max:255|unique:users,email',
+                'fullName' => 'required|string|max:255', // Map from frontend fullName
                 'password' => 'required|string|min:8',
-                'role' => 'required|string|in:' . implode(',', $roleNames),
+                'password_confirmation' => 'required|string|same:password',
+                'nip' => 'nullable|string|size:18',
+                'phone' => 'nullable|string|regex:/^08\d{8,11}$/',
+                'roleIds' => 'required|array|min:1',
+                'roleIds.*' => 'exists:roles,id',
+                'isActive' => 'boolean'
             ]);
 
             if ($validator->fails()) {
@@ -106,34 +170,32 @@ class UserController extends Controller
             DB::beginTransaction();
 
             $user = User::create([
-                'name' => $request->name,
+                'username' => $request->username,
+                'name' => $request->fullName, // Map fullName to name column
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
+                'nip' => $request->nip,
+                'phone' => $request->phone,
+                'is_active' => $request->isActive ?? true, // Default to active
                 'email_verified_at' => now(), // Auto verify for admin created users
             ]);
 
-            // Assign role using Spatie
-            $user->assignRole($request->role);
+            // Get role names from role IDs and assign using Spatie
+            $roles = Role::whereIn('id', $request->roleIds)->get();
+            $user->syncRoles($roles);
 
             // Log user creation
             $this->logUserAction('create', $user->id, 'User created', [
                 'user_name' => $user->name,
                 'user_email' => $user->email,
-                'user_role' => $request->role
+                'user_roles' => $roles->pluck('name')->toArray()
             ]);
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'data' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'role' => $request->role,
-                    'status' => 'active',
-                    'created_at' => $user->created_at->format('Y-m-d'),
-                ],
+                'data' => $this->formatUserData($user),
                 'message' => 'User created successfully'
             ], 201);
 
@@ -185,13 +247,15 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         try {
-            // Validate role exists in database
-            $roleNames = Role::where('guard_name', 'web')->pluck('name')->toArray();
             $validator = Validator::make($request->all(), [
-                'name' => 'required|string|max:255',
+                'username' => 'required|string|max:255|unique:users,username,' . $user->id,
                 'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
-                'role' => 'required|string|in:' . implode(',', $roleNames),
-                'status' => 'sometimes|in:active,inactive',
+                'fullName' => 'required|string|max:255',
+                'nip' => 'nullable|string|size:18',
+                'phone' => 'nullable|string|regex:/^08\d{8,11}$/',
+                'roleIds' => 'required|array|min:1',
+                'roleIds.*' => 'exists:roles,id',
+                'isActive' => 'boolean'
             ]);
 
             if ($validator->fails()) {
@@ -204,40 +268,40 @@ class UserController extends Controller
 
             DB::beginTransaction();
 
-            $oldRole = $user->roles->first()?->name ?? 'No Role';
+            $oldRoles = $user->roles->pluck('name')->toArray();
             $oldData = [
+                'username' => $user->username,
                 'name' => $user->name,
                 'email' => $user->email,
-                'role' => $oldRole,
-                'status' => $user->email_verified_at ? 'active' : 'inactive'
+                'nip' => $user->nip,
+                'phone' => $user->phone,
+                'roles' => $oldRoles,
+                'is_active' => $user->is_active
             ];
 
             $user->update([
-                'name' => $request->name,
+                'username' => $request->username,
+                'name' => $request->fullName,
                 'email' => $request->email,
+                'nip' => $request->nip,
+                'phone' => $request->phone,
+                // Keep existing is_active if not provided (don't change user status just by editing details)
+                'is_active' => $request->has('isActive') ? $request->isActive : $user->is_active,
             ]);
 
-            // Update role using Spatie
-            if ($request->role !== $oldRole) {
-                $user->syncRoles([$request->role]);
-            }
+            // Update roles using Spatie
+            $roles = Role::whereIn('id', $request->roleIds)->get();
+            $user->syncRoles($roles);
 
-            // Handle status update
-            if ($request->has('status')) {
-                if ($request->status === 'active') {
-                    $user->email_verified_at = now();
-                } else {
-                    $user->email_verified_at = null;
-                }
-                $user->save();
-            }
-
-            $newRole = $user->roles->first()?->name ?? 'No Role';
+            $newRoles = $roles->pluck('name')->toArray();
             $newData = [
+                'username' => $user->username,
                 'name' => $user->name,
                 'email' => $user->email,
-                'role' => $newRole,
-                'status' => $user->email_verified_at ? 'active' : 'inactive'
+                'nip' => $user->nip,
+                'phone' => $user->phone,
+                'roles' => $newRoles,
+                'is_active' => $user->is_active
             ];
 
             // Log user update
@@ -250,14 +314,7 @@ class UserController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'role' => $newRole,
-                    'status' => $user->email_verified_at ? 'active' : 'inactive',
-                    'updated_at' => $user->updated_at->format('Y-m-d H:i:s'),
-                ],
+                'data' => $this->formatUserData($user),
                 'message' => 'User updated successfully'
             ]);
 
@@ -278,28 +335,66 @@ class UserController extends Controller
     public function destroy(User $user)
     {
         try {
+            Log::info('🗑️ Starting user deletion process:', [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'user_email' => $user->email,
+                'auth_user_id' => auth()->id(),
+                'is_deleting_own_account' => auth()->check() && auth()->id() === $user->id
+            ]);
+
             // Prevent deletion of the current authenticated user
             if (auth()->check() && auth()->id() === $user->id) {
+                Log::warning('⛔ Attempted to delete own account:', [
+                    'user_id' => $user->id,
+                    'user_name' => $user->name
+                ]);
                 return response()->json([
                     'success' => false,
                     'message' => 'Cannot delete your own account'
                 ], 403);
             }
 
+            Log::info('📊 Checking user relationships before deletion...');
+
+            // Check if user has related records that might prevent deletion
+            $hasRoles = $user->roles()->count();
+            $hasModelHasRoles = DB::table('model_has_roles')->where('model_id', $user->id)->count();
+
+            Log::info('📋 User relationship status:', [
+                'has_roles' => $hasRoles,
+                'model_has_roles_records' => $hasModelHasRoles,
+                'user_id' => $user->id
+            ]);
+
             DB::beginTransaction();
+            Log::info('🔄 Transaction started for user deletion');
 
             $userData = [
                 'user_name' => $user->name,
                 'user_email' => $user->email,
-                'user_role' => $user->role
+                'user_role' => $user->role,
+                'has_roles_relationships' => $hasRoles
             ];
 
             // Log user deletion
             $this->logUserAction('delete', $user->id, 'User deleted', $userData);
 
-            $user->delete();
+            try {
+                Log::info('🎯 Attempting to delete user record');
+                $deleteResult = $user->delete();
+                Log::info('✅ User delete result:', ['result' => $deleteResult]);
+            } catch (\Exception $deleteException) {
+                Log::error('❌ User delete failed in transaction:', [
+                    'error' => $deleteException->getMessage(),
+                    'user_id' => $user->id
+                ]);
+                throw $deleteException;
+            }
 
+            Log::info('🔄 Committing transaction');
             DB::commit();
+            Log::info('✅ Transaction committed successfully');
 
             return response()->json([
                 'success' => true,
@@ -307,8 +402,16 @@ class UserController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            Log::error('🚨 Error deleting user - ROLLING BACK:', [
+                'error' => $e->getMessage(),
+                'user_id' => $user->id,
+                'trace' => $e->getTraceAsString()
+            ]);
+
             DB::rollBack();
-            Log::error('Error deleting user: ' . $e->getMessage());
+
+            Log::error('❌ Transaction rolled back due to error');
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete user',
@@ -324,7 +427,8 @@ class UserController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'password' => 'required|string|min:8|confirmed',
+                'password' => 'required|string|min:8',
+                'password_confirmation' => 'required|string|same:password',
             ]);
 
             if ($validator->fails()) {
@@ -332,6 +436,14 @@ class UserController extends Controller
                     'success' => false,
                     'message' => 'Validation failed',
                     'errors' => $validator->errors()
+                ], 422);
+            }
+
+            // Prevent resetting password for inactive users
+            if (!$user->isActive()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot reset password for inactive users'
                 ], 422);
             }
 
@@ -366,6 +478,131 @@ class UserController extends Controller
     }
 
     /**
+     * Toggle user active status.
+     */
+    public function toggleStatus(Request $request, User $user)
+    {
+        try {
+            // Prevent admin from deactivating themselves
+            if (auth()->check() && auth()->id() === $user->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot deactivate your own account'
+                ], 403);
+            }
+
+            $newStatus = !$user->is_active;
+
+            DB::beginTransaction();
+
+            $user->update([
+                'is_active' => $newStatus,
+            ]);
+
+            // Log status change
+            $this->logUserAction($newStatus ? 'activate' : 'deactivate', $user->id,
+                'User ' . ($newStatus ? 'activated' : 'deactivated'), [
+                'user_name' => $user->name,
+                'user_email' => $user->email,
+                'new_status' => $newStatus
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'data' => $this->formatUserData($user),
+                'message' => 'User ' . ($newStatus ? 'activated' : 'deactivated') . ' successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error toggling user status: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to toggle user status',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Bulk actions for multiple users.
+     */
+    public function bulkAction(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'action' => 'required|in:activate,deactivate,delete',
+            'user_ids' => 'required|array|min:1',
+            'user_ids.*' => 'exists:users,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $action = $request->action;
+        $userIds = $request->user_ids;
+
+        try {
+            DB::beginTransaction();
+
+            $users = User::whereIn('id', $userIds)->get();
+            $processed = 0;
+            $skipped = [];
+
+            foreach ($users as $user) {
+                // Skip current user for critical actions
+                if (auth()->check() && auth()->id() == $user->id &&
+                    in_array($action, ['deactivate', 'delete'])) {
+                    $skipped[] = $user->name;
+                    continue;
+                }
+
+                if ($action === 'activate' && !$user->is_active) {
+                    $user->update(['is_active' => true]);
+                    $processed++;
+                } elseif ($action === 'deactivate' && $user->is_active) {
+                    $user->update(['is_active' => false]);
+                    $processed++;
+                } elseif ($action === 'delete') {
+                    $user->delete();
+                    $processed++;
+                }
+            }
+
+            // Log bulk action
+            $this->logUserAction('bulk_' . $action, 0, "Bulk $action: $processed users processed",
+                ['user_ids' => $userIds, 'processed' => $processed, 'skipped' => $skipped]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'processed' => $processed,
+                    'skipped' => $skipped,
+                    'total_requested' => count($userIds)
+                ],
+                'message' => "Bulk action completed: $processed users $action" . (count($skipped) > 0 ? ', ' . count($skipped) . ' skipped' : '')
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error performing bulk action: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to perform bulk action',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Get user statistics.
      */
     public function statistics()
@@ -373,8 +610,8 @@ class UserController extends Controller
         try {
             $stats = [
                 'total_users' => User::count(),
-                'active_users' => User::whereNotNull('email_verified_at')->count(),
-                'inactive_users' => User::whereNull('email_verified_at')->count(),
+                'active_users' => User::where('is_active', true)->count(),
+                'inactive_users' => User::where('is_active', false)->count(),
                 'role_distribution' => DB::table('model_has_roles')
                     ->join('roles', 'model_has_roles.role_id', '=', 'roles.id')
                     ->select('roles.name', DB::raw('count(*) as count'))
@@ -413,6 +650,7 @@ class UserController extends Controller
     public function getRoles()
     {
         try {
+            // Use 'web' guard to match User model guard_name
             $roles = Role::where('guard_name', 'web')
                 ->orderBy('name')
                 ->get()

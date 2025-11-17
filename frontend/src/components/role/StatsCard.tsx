@@ -2,6 +2,7 @@
 
 import { ReactNode } from 'react'
 import { MdTrendingUp, MdTrendingDown, MdTrendingFlat } from 'react-icons/md'
+import { LucideIcon } from 'lucide-react'
 
 interface StatsCardProps {
   title: string
@@ -11,6 +12,9 @@ interface StatsCardProps {
   icon: ReactNode
   color?: string
   className?: string
+  subtitle?: string
+  trend?: string
+  trendLabel?: string
 }
 
 export function StatsCard({

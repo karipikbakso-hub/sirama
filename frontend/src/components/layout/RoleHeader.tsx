@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
@@ -51,10 +52,10 @@ export default function RoleHeader({ role }: { role: string }) {
             <FaBars className="text-lg text-gray-600 dark:text-gray-400" />
           </button>
 
-          {/* Breadcrumbs */}
+          {/* Dashboard Breadcrumbs */}
           <div className="hidden md:flex items-center gap-2 text-sm">
             <span className="text-gray-500 dark:text-gray-400">Dashboard</span>
-            <span className="text-gray-400">/</span>
+            <span className="text-gray-400">{'>'}</span>
             <span className="text-gray-900 dark:text-white font-medium capitalize">{roleLabel}</span>
           </div>
         </div>

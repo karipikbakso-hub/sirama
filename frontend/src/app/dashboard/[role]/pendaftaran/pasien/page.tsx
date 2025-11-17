@@ -160,14 +160,6 @@ export default function PatientEMRPage() {
 
   return (
     <div className="min-h-screen p-4 md:p-8 transition-all duration-500 bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-slate-950 dark:via-neutral-900 dark:to-slate-800 text-gray-900 dark:text-gray-100">
-      <div className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold mb-2 tracking-wide bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-          Data Pasien (EMR)
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Electronic Medical Records - Sistem rekam medis elektronik terintegrasi
-        </p>
-      </div>
 
       {/* Search */}
       <div className="bg-white/70 dark:bg-slate-900/60 border border-gray-200 dark:border-slate-800 backdrop-blur-md shadow-xl rounded-2xl p-6 mb-6">

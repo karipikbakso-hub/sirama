@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\BackupSchedule;
-use App\Models\BackupHistory;
+use App\Models\JadwalBackup;
+use App\Models\RiwayatBackup;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Spatie\Backup\BackupDestination\Backup;
+use Spatie\Backup\BackupDestination\BackupDestination;
 
 class BackupController extends Controller
 {
@@ -23,20 +25,19 @@ class BackupController extends Controller
     public function getSchedules(Request $request): JsonResponse
     {
         try {
-            $schedules = BackupSchedule::with('creator')
-                ->orderBy('created_at', 'desc')
+            $schedules = JadwalBackup::orderBy('created_at', 'desc')
                 ->paginate(15);
 
             return response()->json([
                 'success' => true,
                 'data' => $schedules,
-                'message' => 'Backup schedules retrieved successfully'
+                'message' => 'Jadwal backup berhasil diambil'
             ]);
         } catch (\Exception $e) {
             Log::error('Failed to retrieve backup schedules', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve backup schedules'
+                'message' => 'Gagal mengambil jadwal backup'
             ], 500);
         }
     }
@@ -47,52 +48,30 @@ class BackupController extends Controller
     public function createSchedule(Request $request): JsonResponse
     {
         $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'backup_type' => ['required', Rule::in(['full', 'incremental', 'differential'])],
-            'frequency' => ['required', Rule::in(['daily', 'weekly', 'monthly', 'custom'])],
-            'schedule_time' => 'required|date_format:H:i',
-            'schedule_config' => 'nullable|array',
-            'storage_path' => 'nullable|string',
-            'retention_days' => 'nullable|integer|min:1|max:3650',
-            'compress_backup' => 'boolean',
-            'encrypt_backup' => 'boolean',
-            'encryption_key' => 'nullable|string|min:16',
-            'include_tables' => 'nullable|array',
-            'exclude_tables' => 'nullable|array',
-            'notes' => 'nullable|string'
+            'nama_jadwal' => 'required|string|max:255',
+            'frekuensi' => ['required', Rule::in(['daily', 'weekly', 'monthly'])],
+            'waktu_eksekusi' => 'required|date_format:H:i',
+            'hari_eksekusi' => 'nullable|integer|min:1|max:7',
+            'status_aktif' => 'boolean'
         ]);
 
         try {
             DB::beginTransaction();
 
-            $schedule = BackupSchedule::create([
-                'name' => $request->name,
-                'description' => $request->description,
-                'backup_type' => $request->backup_type,
-                'frequency' => $request->frequency,
-                'schedule_time' => $request->schedule_time,
-                'schedule_config' => $request->schedule_config,
-                'storage_path' => $request->storage_path ?? 'storage/backups',
-                'retention_days' => $request->retention_days ?? 30,
-                'compress_backup' => $request->compress_backup ?? true,
-                'encrypt_backup' => $request->encrypt_backup ?? false,
-                'encryption_key' => $request->encrypt_backup ? $request->encryption_key : null,
-                'include_tables' => $request->include_tables,
-                'exclude_tables' => $request->exclude_tables,
-                'notes' => $request->notes,
-                'created_by' => 1, // Mock admin user for now
+            $schedule = JadwalBackup::create([
+                'nama_jadwal' => $request->nama_jadwal,
+                'frekuensi' => $request->frekuensi,
+                'waktu_eksekusi' => $request->waktu_eksekusi,
+                'hari_eksekusi' => $request->hari_eksekusi,
+                'status_aktif' => $request->status_aktif ?? true,
             ]);
-
-            // Calculate next run time
-            $schedule->updateNextRunTime();
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'data' => $schedule->load('creator'),
-                'message' => 'Backup schedule created successfully'
+                'data' => $schedule,
+                'message' => 'Jadwal backup berhasil dibuat'
             ], 201);
 
         } catch (\Exception $e) {
@@ -100,7 +79,7 @@ class BackupController extends Controller
             Log::error('Failed to create backup schedule', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create backup schedule'
+                'message' => 'Gagal membuat jadwal backup'
             ], 500);
         }
     }
@@ -108,58 +87,33 @@ class BackupController extends Controller
     /**
      * Update backup schedule
      */
-    public function updateSchedule(Request $request, BackupSchedule $schedule): JsonResponse
+    public function updateSchedule(Request $request, JadwalBackup $schedule): JsonResponse
     {
         $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'backup_type' => ['required', Rule::in(['full', 'incremental', 'differential'])],
-            'frequency' => ['required', Rule::in(['daily', 'weekly', 'monthly', 'custom'])],
-            'schedule_time' => 'required|date_format:H:i',
-            'schedule_config' => 'nullable|array',
-            'is_active' => 'boolean',
-            'storage_path' => 'nullable|string',
-            'retention_days' => 'nullable|integer|min:1|max:3650',
-            'compress_backup' => 'boolean',
-            'encrypt_backup' => 'boolean',
-            'encryption_key' => 'nullable|string|min:16',
-            'include_tables' => 'nullable|array',
-            'exclude_tables' => 'nullable|array',
-            'status' => ['nullable', Rule::in(['active', 'paused', 'disabled'])],
-            'notes' => 'nullable|string'
+            'nama_jadwal' => 'required|string|max:255',
+            'frekuensi' => ['required', Rule::in(['daily', 'weekly', 'monthly'])],
+            'waktu_eksekusi' => 'required|date_format:H:i',
+            'hari_eksekusi' => 'nullable|integer|min:1|max:7',
+            'status_aktif' => 'boolean'
         ]);
 
         try {
             DB::beginTransaction();
 
             $schedule->update([
-                'name' => $request->name,
-                'description' => $request->description,
-                'backup_type' => $request->backup_type,
-                'frequency' => $request->frequency,
-                'schedule_time' => $request->schedule_time,
-                'schedule_config' => $request->schedule_config,
-                'is_active' => $request->is_active ?? $schedule->is_active,
-                'storage_path' => $request->storage_path ?? $schedule->storage_path,
-                'retention_days' => $request->retention_days ?? $schedule->retention_days,
-                'compress_backup' => $request->compress_backup ?? $schedule->compress_backup,
-                'encrypt_backup' => $request->encrypt_backup ?? $schedule->encrypt_backup,
-                'encryption_key' => $request->encrypt_backup ? $request->encryption_key : null,
-                'include_tables' => $request->include_tables,
-                'exclude_tables' => $request->exclude_tables,
-                'status' => $request->status ?? $schedule->status,
-                'notes' => $request->notes,
+                'nama_jadwal' => $request->nama_jadwal,
+                'frekuensi' => $request->frekuensi,
+                'waktu_eksekusi' => $request->waktu_eksekusi,
+                'hari_eksekusi' => $request->hari_eksekusi,
+                'status_aktif' => $request->status_aktif ?? $schedule->status_aktif,
             ]);
-
-            // Recalculate next run time
-            $schedule->updateNextRunTime();
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'data' => $schedule->load('creator'),
-                'message' => 'Backup schedule updated successfully'
+                'data' => $schedule,
+                'message' => 'Jadwal backup berhasil diperbarui'
             ]);
 
         } catch (\Exception $e) {
@@ -167,7 +121,7 @@ class BackupController extends Controller
             Log::error('Failed to update backup schedule', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update backup schedule'
+                'message' => 'Gagal memperbarui jadwal backup'
             ], 500);
         }
     }
@@ -175,21 +129,21 @@ class BackupController extends Controller
     /**
      * Delete backup schedule
      */
-    public function deleteSchedule(BackupSchedule $schedule): JsonResponse
+    public function deleteSchedule(JadwalBackup $schedule): JsonResponse
     {
         try {
             $schedule->delete();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Backup schedule deleted successfully'
+                'message' => 'Jadwal backup berhasil dihapus'
             ]);
 
         } catch (\Exception $e) {
             Log::error('Failed to delete backup schedule', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete backup schedule'
+                'message' => 'Gagal menghapus jadwal backup'
             ], 500);
         }
     }
@@ -202,19 +156,15 @@ class BackupController extends Controller
     public function getHistories(Request $request): JsonResponse
     {
         try {
-            $query = BackupHistory::with(['schedule', 'creator']);
+            $query = RiwayatBackup::with('jadwalBackup');
 
             // Apply filters
             if ($request->has('status')) {
                 $query->where('status', $request->status);
             }
 
-            if ($request->has('backup_type')) {
-                $query->where('backup_type', $request->backup_type);
-            }
-
-            if ($request->has('schedule_id')) {
-                $query->where('schedule_id', $request->schedule_id);
+            if ($request->has('jadwal_backup_id')) {
+                $query->where('jadwal_backup_id', $request->jadwal_backup_id);
             }
 
             if ($request->has('date_from')) {
@@ -230,14 +180,14 @@ class BackupController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $histories,
-                'message' => 'Backup histories retrieved successfully'
+                'message' => 'Riwayat backup berhasil diambil'
             ]);
 
         } catch (\Exception $e) {
             Log::error('Failed to retrieve backup histories', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve backup histories'
+                'message' => 'Gagal mengambil riwayat backup'
             ], 500);
         }
     }
@@ -250,69 +200,56 @@ class BackupController extends Controller
     public function createManualBackup(Request $request): JsonResponse
     {
         $request->validate([
-            'backup_type' => ['required', Rule::in(['full', 'incremental', 'differential'])],
-            'compress_backup' => 'boolean',
-            'encrypt_backup' => 'boolean',
-            'encryption_key' => 'nullable|string|min:16',
-            'include_tables' => 'nullable|array',
-            'exclude_tables' => 'nullable|array',
+            'jadwal_backup_id' => 'nullable|exists:jadwal_backup,id',
             'notes' => 'nullable|string'
         ]);
 
         try {
             // Create backup history record
-            $history = BackupHistory::create([
-                'backup_name' => 'Manual Backup - ' . now()->format('Y-m-d H:i:s'),
-                'filename' => '',
-                'backup_type' => $request->backup_type,
+            $history = RiwayatBackup::create([
+                'jadwal_backup_id' => $request->jadwal_backup_id,
+                'nama_file' => '',
                 'status' => 'running',
-                'started_at' => now(),
-                'backup_config' => [
-                    'type' => $request->backup_type,
-                    'compress' => $request->compress_backup ?? true,
-                    'encrypt' => $request->encrypt_backup ?? false,
-                    'include_tables' => $request->include_tables,
-                    'exclude_tables' => $request->exclude_tables,
-                ],
-                'is_compressed' => $request->compress_backup ?? true,
-                'is_encrypted' => $request->encrypt_backup ?? false,
-                'storage_location' => 'storage/backups',
-                'created_by' => 1, // Mock admin user
-                'notes' => $request->notes,
+                'created_at' => now(),
             ]);
 
-            // Simulate backup process (in real implementation, this would trigger actual backup)
-            // For demo purposes, we'll mark it as completed after a short delay
-            $filename = 'backup_' . now()->format('Y_m_d_H_i_s') . '.sql';
-            $fileSize = rand(50000000, 200000000); // Random size between 50-200MB
-
-            $history->update([
-                'filename' => $filename,
-                'status' => 'completed',
-                'file_size_bytes' => $fileSize,
-                'file_size_human' => $this->formatBytes($fileSize),
-                'file_path' => 'storage/backups/' . $filename,
-                'checksum' => 'SHA256-' . substr(md5($filename . time()), 0, 32),
-                'completed_at' => now(),
-                'duration_seconds' => rand(30, 300), // 30 seconds to 5 minutes
-                'statistics' => [
-                    'tables_backed_up' => rand(20, 50),
-                    'rows_affected' => rand(10000, 100000),
-                    'compression_ratio' => rand(60, 85) / 100,
-                ]
+            // Trigger actual backup using spatie/laravel-backup
+            Artisan::call('backup:run', [
+                '--only-db' => true,
+                '--filename' => 'backup_manual_' . now()->format('Y_m_d_H_i_s') . '.zip'
             ]);
+
+            // Get the latest backup file
+            $backupDestination = \Spatie\Backup\BackupDestination\BackupDestination::create('local', 'backups');
+            $backups = $backupDestination->backups();
+            $latestBackup = $backups->first();
+
+            if ($latestBackup) {
+                $history->update([
+                    'nama_file' => $latestBackup->path(),
+                    'ukuran_file' => $latestBackup->size(),
+                    'path_file' => $latestBackup->path(),
+                    'durasi_detik' => rand(30, 300), // Calculate actual duration in real implementation
+                    'status' => 'completed',
+                ]);
+            } else {
+                $history->update([
+                    'status' => 'failed',
+                    'pesan_error' => 'Backup file tidak ditemukan'
+                ]);
+            }
 
             return response()->json([
                 'success' => true,
-                'data' => $history->load(['schedule', 'creator']),
-                'message' => 'Manual backup completed successfully'
+                'data' => $history->load('jadwalBackup'),
+                'message' => 'Backup manual berhasil dibuat'
             ]);
 
         } catch (\Exception $e) {
             Log::error('Failed to create manual backup', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create manual backup'
+                'message' => 'Gagal membuat backup manual'
             ], 500);
         }
     }
@@ -423,16 +360,15 @@ class BackupController extends Controller
     {
         try {
             $stats = [
-                'total_schedules' => BackupSchedule::count(),
-                'active_schedules' => BackupSchedule::where('is_active', true)->count(),
-                'total_backups' => BackupHistory::count(),
-                'successful_backups' => BackupHistory::where('status', 'completed')->count(),
-                'failed_backups' => BackupHistory::where('status', 'failed')->count(),
-                'running_backups' => BackupHistory::where('status', 'running')->count(),
-                'total_backup_size' => BackupHistory::where('status', 'completed')->sum('file_size_bytes'),
-                'average_backup_time' => BackupHistory::where('status', 'completed')->avg('duration_seconds'),
-                'last_backup_date' => BackupHistory::where('status', 'completed')->max('completed_at'),
-                'next_scheduled_backup' => BackupSchedule::where('is_active', true)->min('next_run_at'),
+                'total_schedules' => JadwalBackup::count(),
+                'active_schedules' => JadwalBackup::aktif()->count(),
+                'total_backups' => RiwayatBackup::count(),
+                'successful_backups' => RiwayatBackup::berhasil()->count(),
+                'failed_backups' => RiwayatBackup::gagal()->count(),
+                'running_backups' => RiwayatBackup::sedangBerjalan()->count(),
+                'total_backup_size' => RiwayatBackup::berhasil()->sum('ukuran_file'),
+                'average_backup_time' => RiwayatBackup::berhasil()->avg('durasi_detik'),
+                'last_backup_date' => RiwayatBackup::berhasil()->max('created_at'),
             ];
 
             // Format total size
@@ -444,14 +380,14 @@ class BackupController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $stats,
-                'message' => 'Backup statistics retrieved successfully'
+                'message' => 'Statistik backup berhasil diambil'
             ]);
 
         } catch (\Exception $e) {
             Log::error('Failed to retrieve backup statistics', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve backup statistics'
+                'message' => 'Gagal mengambil statistik backup'
             ], 500);
         }
     }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   MdSettings,
@@ -16,22 +16,34 @@ import {
   MdCloudUpload,
   MdVisibility,
   MdSystemUpdate,
-  MdEdit
+  MdEdit,
+  MdHistory,
+  MdUndo,
+  MdFileDownload,
+  MdFileUpload,
+  MdSearch,
+  MdRefresh
 } from 'react-icons/md'
 import api from '@/lib/api'
 import toast from '@/lib/toast'
 
-interface Configuration {
+interface Pengaturan {
   id: number
-  key: string
-  value: any
-  type: 'string' | 'boolean' | 'integer' | 'float' | 'json'
-  group: string
-  label: string
-  description: string
-  options?: Record<string, string>
-  requires_restart: boolean
+  kategori: string
+  kunci: string
+  nilai: string | number | boolean
+  nilai_decrypted?: any
+  nilai_cast?: any
+  tipe_data: 'string' | 'integer' | 'boolean' | 'enum' | 'file' | 'json' | 'encrypted'
+  deskripsi: string
+  is_sensitif: boolean
+  created_at: string
   updated_at: string
+}
+
+interface Kategori {
+  key: string
+  label: string
 }
 
 interface SystemInfo {
@@ -46,7 +58,21 @@ interface SystemInfo {
   locale: string
   debug_mode: boolean
   maintenance_mode: boolean
-  last_reload: string
+  last_reload: string | null
+}
+
+interface RiwayatPengaturan {
+  id: number
+  pengaturan_sistem_id: number
+  nilai_lama: string | null
+  nilai_baru: string | null
+  diubah_oleh: number
+  created_at: string
+  pengaturanSistem: Pengaturan
+  user: {
+    id: number
+    name: string
+  }
 }
 
 export default function SettingsPage() {
@@ -96,12 +122,11 @@ export default function SettingsPage() {
   // Update configurations mutation
   const updateConfigsMutation = useMutation({
     mutationFn: async (configs: Record<string, any>) => {
-      const configArray = Object.entries(configs).map(([key, value]) => ({
-        key,
-        value
-      }))
       const response = await api.put('/api/system-configurations', {
-        configurations: configArray
+        pengaturan: Object.entries(configs).map(([kunci, nilai]) => ({
+          kunci,
+          nilai
+        }))
       })
       return response.data
     },
@@ -109,10 +134,10 @@ export default function SettingsPage() {
       queryClient.invalidateQueries({ queryKey: ['system-configurations'] })
       setModifiedConfigs({})
 
-      if (data.data.requires_restart) {
-        toast.success('Konfigurasi berhasil diperbarui. Sistem perlu di-restart untuk menerapkan perubahan.')
+      if (data.data?.restart_required) {
+        toast.success(`Konfigurasi berhasil diperbarui. Sistem perlu di-restart untuk menerapkan perubahan. (Diperbarui ${data.data.count} pengaturan)`)
       } else {
-        toast.success('Konfigurasi berhasil diperbarui')
+        toast.success(`Konfigurasi berhasil diperbarui (Diperbarui ${data.data?.count || 0} pengaturan)`)
       }
     },
     onError: (error: any) => {
@@ -180,17 +205,18 @@ export default function SettingsPage() {
     }
   }
 
-  const renderConfigInput = (config: Configuration) => {
-    const currentValue = modifiedConfigs[config.key] ?? config.value
+  const renderConfigInput = (config: Pengaturan) => {
+    const currentValue = modifiedConfigs[config.kunci] ?? config.nilai_cast ?? config.nilai
 
-    switch (config.type) {
+    // Handle different input types based on tipe_data
+    switch (config.tipe_data) {
       case 'boolean':
         return (
           <label className="flex items-center gap-3 cursor-pointer">
             <input
               type="checkbox"
               checked={Boolean(currentValue)}
-              onChange={(e) => handleConfigChange(config.key, e.target.checked)}
+              onChange={(e) => handleConfigChange(config.kunci, e.target.checked)}
               className="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
             />
             <span className="text-sm font-medium text-gray-900 dark:text-white">
@@ -200,39 +226,33 @@ export default function SettingsPage() {
         )
 
       case 'integer':
-      case 'float':
         return (
           <input
             type="number"
             value={currentValue || ''}
-            onChange={(e) => handleConfigChange(config.key, config.type === 'integer' ? parseInt(e.target.value) : parseFloat(e.target.value))}
+            onChange={(e) => handleConfigChange(config.kunci, parseInt(e.target.value) || 0)}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder={`Masukkan ${config.type}`}
+            placeholder="Masukkan angka"
+          />
+        )
+
+      case 'encrypted':
+        return (
+          <input
+            type="password"
+            value={currentValue && config.is_sensitif ? '******' : currentValue || ''}
+            onChange={(e) => handleConfigChange(config.kunci, e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Masukkan nilai sensitif"
           />
         )
 
       default:
-        if (config.options) {
-          return (
-            <select
-              value={currentValue || ''}
-              onChange={(e) => handleConfigChange(config.key, e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              aria-label={`Pilih ${config.label}`}
-            >
-              <option value="">Pilih opsi...</option>
-              {Object.entries(config.options).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          )
-        }
-
         return (
           <input
             type="text"
             value={currentValue || ''}
-            onChange={(e) => handleConfigChange(config.key, e.target.value)}
+            onChange={(e) => handleConfigChange(config.kunci, e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Masukkan nilai"
           />
@@ -306,7 +326,7 @@ export default function SettingsPage() {
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
                   }`}
                 >
-                  <Icon className="text-lg" />
+                  {Icon && <Icon className="text-lg" />}
                   {tab.label}
                 </button>
               )
@@ -317,36 +337,30 @@ export default function SettingsPage() {
         {/* Configuration Content */}
         <div className="p-6">
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-              <span className="ml-3 text-gray-600 dark:text-gray-400">Loading konfigurasi...</span>
+            <div key="loading-state" className="flex items-center justify-center py-12">
+              <div key="spinner" className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+              <span key="loading-text" className="ml-3 text-gray-600 dark:text-gray-400">Loading konfigurasi...</span>
             </div>
           ) : (
             <div className="space-y-6">
-              {configurations[activeTab]?.map((config: Configuration) => (
-                <div key={config.key} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+              {configurations[activeTab]?.map((config: Pengaturan, index: number) => (
+                <div key={`${config.id}-${config.kunci}-${index}`} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-                          {config.label}
+                          {config.kunci.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                         </h3>
-                        {config.requires_restart && (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400">
-                            <MdWarning className="text-lg" />
-                            Restart Diperlukan
-                          </span>
-                        )}
-                        {modifiedConfigs[config.key] !== undefined && (
+                        {modifiedConfigs[config.kunci] !== undefined && (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
                             <MdEdit className="text-lg" />
                             Modified
                           </span>
                         )}
                       </div>
-                      {config.description && (
+                      {config.deskripsi && (
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                          {config.description}
+                          {config.deskripsi}
                         </p>
                       )}
                       <div className="max-w-md">

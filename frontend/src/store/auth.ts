@@ -16,6 +16,7 @@ interface AuthState {
   token: string | null
   isLoading: boolean
   isAuthenticated: boolean
+  isHydrated: boolean
   error: string | null
   hydrate: () => void  // ← NEW: Safe hydration method
   login: (email: string, password: string) => Promise<void>
@@ -28,6 +29,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   token: null,
   isLoading: false,
   isAuthenticated: false, // ← FIXED: Don't access localStorage in SSR
+  isHydrated: false, // ← Track hydration status
   error: null,
 
   login: async (email: string, password: string) => {
@@ -90,7 +92,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           set({
             token,
             user,
-            isAuthenticated: true
+            isAuthenticated: true,
+            isHydrated: true
           })
         } catch (error) {
           // Invalid stored user data, clear it
@@ -98,10 +101,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           set({
             token,
             user: null,
-            isAuthenticated: true
+            isAuthenticated: true,
+            isHydrated: true
           })
         }
+      } else {
+        // No token found, mark as hydrated
+        set({ isHydrated: true })
       }
+    } else {
+      // SSR, mark as hydrated (no localStorage available)
+      set({ isHydrated: true })
     }
   },
 

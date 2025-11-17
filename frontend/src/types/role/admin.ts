@@ -39,6 +39,31 @@ export interface BackupRecord {
   type: 'full' | 'incremental' | 'differential'
 }
 
+export interface JadwalBackup {
+  id: number
+  nama_jadwal: string
+  frekuensi: 'daily' | 'weekly' | 'monthly'
+  waktu_eksekusi: string
+  hari_eksekusi?: number
+  status_aktif: boolean
+  terakhir_dijalankan?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface RiwayatBackup {
+  id: number
+  jadwal_backup_id?: number
+  nama_file: string
+  ukuran_file?: number
+  path_file?: string
+  durasi_detik?: number
+  status: 'running' | 'completed' | 'failed' | 'cancelled'
+  pesan_error?: string
+  created_at: string
+  jadwalBackup?: JadwalBackup
+}
+
 // Constants
 export const ADMIN_PERMISSIONS = {
   USER_MANAGEMENT: 'manage_users',

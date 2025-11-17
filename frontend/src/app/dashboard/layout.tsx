@@ -2,9 +2,11 @@
 
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import useAuth from '@/hooks/useAuth'
+import { useAuth } from '@/hooks/useAuth'
 import RoleHeader from '@/components/layout/RoleHeader'
+import RoleSidebar from '@/components/layout/RoleSidebar'
 import { setGlobalRole } from '@/components/layout/PersistentSidebar'
+import * as React from 'react'
 
 export default function DashboardLayout({
   children,
@@ -13,7 +15,7 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, loading, isLoggedOut } = useAuth()
+  const { user, isLoading } = useAuth()
 
   // Extract role from pathname
   const requestedRole = pathname?.split('/')[2] || 'admin'
@@ -22,13 +24,7 @@ export default function DashboardLayout({
     // Update global sidebar role
     setGlobalRole(requestedRole)
 
-    if (loading) return
-
-    // 🔐 Check if user is logged out - redirect to login
-    if (isLoggedOut) {
-      router.push('/login')
-      return
-    }
+    if (isLoading) return
 
     // 🔐 Check if user is authenticated
     if (!user) {
@@ -37,14 +33,14 @@ export default function DashboardLayout({
     }
 
     // 🔐 Role validation - redirect to correct role dashboard
-    const userRole = user.role || (user.roles?.[0]?.name?.toLowerCase() || 'user')
+    const userRole = user.role || (user.roles?.[0]?.toLowerCase() || 'user')
     if (userRole !== requestedRole) {
       router.push(`/dashboard/${userRole}`)
     }
-  }, [user, loading, requestedRole, router, isLoggedOut])
+  }, [user, isLoading, requestedRole, router])
 
   // Show loading while verifying authentication
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
@@ -61,17 +57,18 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Main Content */}
-      <div className="flex flex-col min-h-screen">
+    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Sidebar */}
+      <RoleSidebar role={requestedRole} />
+
+      {/* Main Content - Account for sidebar width on desktop */}
+      <main className="flex-1 md:ml-64 min-h-screen">
         {/* Header */}
         <RoleHeader role={requestedRole} />
 
         {/* Page Content */}
-        <main className="flex-1 p-6 overflow-auto">
-          {children}
-        </main>
-      </div>
+        <div className="p-4 md:p-6">{children}</div>
+      </main>
     </div>
   )
 }

@@ -13,6 +13,7 @@ export interface DashboardTemplateProps {
   // Basic info
   title: string
   description?: string
+  showHeader?: boolean // New option to hide/show header
 
   // Stats cards
   stats: Array<{
@@ -71,6 +72,7 @@ export interface DashboardTemplateProps {
 export function DashboardTemplate({
   title,
   description,
+  showHeader = true,
   stats,
   statsColumns = 4,
   gridGap = 'md',
@@ -230,22 +232,24 @@ export function DashboardTemplate({
 
   return (
     <div className="space-y-8">
-      {/* Page Header */}
-      <PageHeader
-        title={title}
-        description={description}
-        actions={headerActions.map((action, index) => (
-          <Button
-            key={index}
-            variant={action.variant}
-            onClick={action.action}
-            disabled={isRefreshing && action.label === 'Refresh'}
-          >
-            <action.icon className="h-4 w-4 mr-2" />
-            {action.label}
-          </Button>
-        ))}
-      />
+      {/* Page Header - Conditional rendering */}
+      {showHeader && (
+        <PageHeader
+          title={title}
+          description={description}
+          actions={headerActions.map((action, index) => (
+            <Button
+              key={index}
+              variant={action.variant}
+              onClick={action.action}
+              disabled={isRefreshing && action.label === 'Refresh'}
+            >
+              <action.icon className="h-4 w-4 mr-2" />
+              {action.label}
+            </Button>
+          ))}
+        />
+      )}
 
       {/* Dashboard Sections */}
       {sections.map((section, index) => (

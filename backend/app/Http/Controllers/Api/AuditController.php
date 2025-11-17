@@ -7,21 +7,43 @@ use App\Models\AuditLog;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
 class AuditController extends Controller
 {
     /**
-     * Get audit logs with pagination and filtering
+     * Get audit logs with pagination and filtering (max 100 per page, date range limit)
      */
     public function index(Request $request): JsonResponse
     {
         try {
             $query = AuditLog::query();
 
+            // Enforce date range limit (max 30 days for performance)
+            if ($request->has('date_from') && $request->has('date_to')) {
+                $dateFrom = Carbon::parse($request->date_from);
+                $dateTo = Carbon::parse($request->date_to);
+                $daysDiff = $dateFrom->diffInDays($dateTo);
+
+                if ($daysDiff > 30) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Date range cannot exceed 30 days for performance reasons'
+                    ], 400);
+                }
+
+                $query->whereDate('created_at', '>=', $dateFrom)
+                      ->whereDate('created_at', '<=', $dateTo);
+            } elseif ($request->has('date_from')) {
+                $query->whereDate('created_at', '>=', $request->date_from);
+            } elseif ($request->has('date_to')) {
+                $query->whereDate('created_at', '<=', $request->date_to);
+            }
+
             // Apply filters
             if ($request->has('search') && $request->search) {
-                $search = $request->search;
+                $search = trim($request->search);
                 $query->where(function($q) use ($search) {
                     $q->where('action', 'like', "%{$search}%")
                       ->orWhere('description', 'like', "%{$search}%")
@@ -29,51 +51,24 @@ class AuditController extends Controller
                 });
             }
 
-            if ($request->has('level') && $request->level !== 'all') {
-                $query->where('level', $request->level);
-            }
-
             if ($request->has('module') && $request->module !== 'all') {
-                // Map module names back to resource types
-                $moduleMap = [
-                    'User Management' => 'user',
-                    'Patient Management' => 'patient',
-                    'Registration' => 'registration',
-                    'Appointments' => 'appointment',
-                    'Prescriptions' => 'prescription',
-                    'Laboratory' => 'lab_order',
-                    'Radiology' => 'radiology_order',
-                    'Billing' => 'billing',
-                    'Payments' => 'payment',
-                    'System Configuration' => 'system_config',
-                    'Role Management' => 'role',
-                    'Permission Management' => 'permission',
-                    'Audit System' => 'audit_log',
-                    'API Integration' => 'api_log',
-                    'System Backup' => 'backup',
-                    'Reports' => 'report'
-                ];
-
-                $resourceType = $moduleMap[$request->module] ?? $request->module;
-                $query->where('resource_type', $resourceType);
+                $query->where('resource_type', $request->module);
             }
 
             if ($request->has('user') && $request->user !== 'all') {
                 $query->where('user_name', $request->user);
             }
 
-            if ($request->has('date_from')) {
-                $query->whereDate('created_at', '>=', $request->date_from);
+            if ($request->has('ip_address') && $request->ip_address) {
+                $query->where('ip_address', 'like', "%{$request->ip_address}%");
             }
 
-            if ($request->has('date_to')) {
-                $query->whereDate('created_at', '<=', $request->date_to);
-            }
-
-            // Order by latest first
+            // Order by latest first (use index)
             $query->orderBy('created_at', 'desc');
 
-            $logs = $query->paginate($request->get('per_page', 20));
+            // Pagination (max 100 per page for performance)
+            $perPage = min($request->get('per_page', 20), 100);
+            $logs = $query->paginate($perPage);
 
             // Transform data for frontend
             $transformedLogs = $logs->getCollection()->map(function($log) {
@@ -81,13 +76,13 @@ class AuditController extends Controller
                     'id' => $log->id,
                     'timestamp' => $log->created_at->format('Y-m-d H:i:s'),
                     'action' => $log->action,
-                    'user' => $log->user_name ?? 'System',
+                    'user' => $log->getUserName(),
                     'details' => $log->description ?? '',
                     'ipAddress' => $log->ip_address ?? '',
-                    'status' => $log->status,
-                    'module' => $log->module,
-                    'old_values' => $log->old_values,
-                    'new_values' => $log->new_values,
+                    'status' => $log->status, // This uses the getStatusAttribute from model
+                    'module' => $log->getModuleName(),
+                    'old_values' => $this->maskSensitiveData($log->old_values),
+                    'new_values' => $this->maskSensitiveData($log->new_values),
                     'user_agent' => $log->user_agent
                 ];
             });
@@ -121,7 +116,7 @@ class AuditController extends Controller
     public function show($id): JsonResponse
     {
         try {
-            $log = AuditLog::findOrFail($id);
+            $log = AuditLog::with('user:id,name')->findOrFail($id);
 
             return response()->json([
                 'success' => true,
@@ -129,15 +124,13 @@ class AuditController extends Controller
                     'id' => $log->id,
                     'timestamp' => $log->created_at->format('Y-m-d H:i:s'),
                     'action' => $log->action,
-                    'user' => $log->user_name ?? 'System',
+                    'user' => $log->getUserName(),
                     'details' => $log->description ?? '',
                     'ipAddress' => $log->ip_address ?? '',
                     'status' => $log->status,
-                    'module' => $log->module,
-                    'level' => $log->level,
-                    'resource_type' => $log->resource_type,
-                    'old_values' => $log->old_values,
-                    'new_values' => $log->new_values,
+                    'module' => $log->getModuleName(),
+                    'old_values' => $this->maskSensitiveData($log->old_values),
+                    'new_values' => $this->maskSensitiveData($log->new_values),
                     'user_agent' => $log->user_agent,
                     'created_at' => $log->created_at,
                     'updated_at' => $log->updated_at
@@ -157,7 +150,7 @@ class AuditController extends Controller
     public function deleteOldLogs(Request $request): JsonResponse
     {
         $request->validate([
-            'days' => 'required|integer|min:1|max:365'
+            'days' => 'required|integer|min=1|max=365'
         ]);
 
         try {
@@ -195,38 +188,52 @@ class AuditController extends Controller
     }
 
     /**
-     * Get audit statistics
+     * Get audit statistics (cached in Redis if available)
      */
     public function getStatistics(): JsonResponse
     {
         try {
-            $stats = [
-                'total_logs' => AuditLog::count(),
-                'today_logs' => AuditLog::whereDate('created_at', today())->count(),
-                'week_logs' => AuditLog::where('created_at', '>=', now()->startOfWeek())->count(),
-                'month_logs' => AuditLog::where('created_at', '>=', now()->startOfMonth())->count(),
-                'by_level' => [
-                    'info' => AuditLog::where('level', 'info')->count(),
-                    'warning' => AuditLog::where('level', 'warning')->count(),
-                    'error' => AuditLog::where('level', 'error')->count(),
-                    'success' => AuditLog::where('level', 'success')->count()
-                ],
-                'by_module' => AuditLog::selectRaw('resource_type, COUNT(*) as count')
-                    ->groupBy('resource_type')
-                    ->get()
-                    ->mapWithKeys(function($item) {
-                        $moduleName = (new AuditLog(['resource_type' => $item->resource_type]))->module;
-                        return [$moduleName => $item->count];
-                    }),
-                'recent_users' => AuditLog::select('user_name')
-                    ->whereNotNull('user_name')
-                    ->where('user_name', '!=', 'System')
-                    ->distinct()
-                    ->orderBy('created_at', 'desc')
-                    ->limit(10)
-                    ->pluck('user_name')
-                    ->toArray()
-            ];
+            // Use cache if available
+            $cacheKey = 'audit_stats';
+
+            if (Cache::has($cacheKey)) {
+                $stats = Cache::get($cacheKey);
+            } else {
+                $stats = [
+                    'total_logs' => AuditLog::count(),
+                    'today_logs' => AuditLog::whereDate('created_at', today())->count(),
+                    'week_logs' => AuditLog::where('created_at', '>=', now()->startOfWeek())->count(),
+                    'month_logs' => AuditLog::where('created_at', '>=', now()->startOfMonth())->count(),
+                    'by_level' => AuditLog::selectRaw('level, COUNT(*) as count')
+                        ->groupBy('level')
+                        ->orderBy('count', 'desc')
+                        ->limit(10)
+                        ->get()
+                        ->mapWithKeys(function($item) {
+                            return [ucfirst($item->level) => $item->count];
+                        }),
+                    'by_module' => AuditLog::selectRaw('resource_type, COUNT(*) as count')
+                        ->groupBy('resource_type')
+                        ->orderBy('count', 'desc')
+                        ->get()
+                        ->mapWithKeys(function($item) {
+                            $moduleLabel = AuditLog::getModuleLabel($item->resource_type);
+                            return [$moduleLabel => $item->count];
+                        }),
+                    'recent_users' => AuditLog::select('user_name')
+                        ->whereNotNull('user_name')
+                        ->where('user_name', '!=', 'System')
+                        ->orderBy('created_at', 'desc')
+                        ->get()
+                        ->unique('user_name')
+                        ->take(10)
+                        ->pluck('user_name')
+                        ->values()
+                        ->toArray()
+                ];
+
+                Cache::put($cacheKey, $stats, now()->addMinutes(5)); // Cache for 5 minutes
+            }
 
             return response()->json([
                 'success' => true,
@@ -255,6 +262,7 @@ class AuditController extends Controller
                 ->where('user_name', '!=', 'System')
                 ->distinct()
                 ->orderBy('user_name')
+                ->get()
                 ->pluck('user_name')
                 ->toArray();
 
@@ -280,10 +288,11 @@ class AuditController extends Controller
                 ->distinct()
                 ->orderBy('resource_type')
                 ->get()
-                ->map(function($log) {
+                ->map(function($item) {
+                    $resourceType = $item->resource_type;
                     return [
-                        'value' => $log->resource_type,
-                        'label' => $log->module
+                        'value' => $resourceType,
+                        'label' => AuditLog::getModuleLabel($resourceType)
                     ];
                 })
                 ->unique('label')
@@ -310,7 +319,6 @@ class AuditController extends Controller
             'format' => 'required|in:csv,json',
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date',
-            'level' => 'nullable|string',
             'module' => 'nullable|string'
         ]);
 
@@ -325,39 +333,30 @@ class AuditController extends Controller
                 $query->whereDate('created_at', '<=', $request->date_to);
             }
 
-            if ($request->level) {
-                $query->where('level', $request->level);
+            if ($request->module) {
+                $query->where('resource_type', $request->module);
             }
 
-            if ($request->module) {
-                $moduleMap = [
-                    'User Management' => 'user',
-                    'Patient Management' => 'patient',
-                    'Registration' => 'registration',
-                    'Appointments' => 'appointment',
-                    'Prescriptions' => 'prescription',
-                    'Laboratory' => 'lab_order',
-                    'Radiology' => 'radiology_order',
-                    'Billing' => 'billing',
-                    'Payments' => 'payment',
-                    'System Configuration' => 'system_config',
-                    'Role Management' => 'role',
-                    'Permission Management' => 'permission',
-                    'Audit System' => 'audit_log',
-                    'API Integration' => 'api_log',
-                    'System Backup' => 'backup',
-                    'Reports' => 'report'
-                ];
-
-                $resourceType = $moduleMap[$request->module] ?? $request->module;
-                $query->where('resource_type', $resourceType);
+            // Enforce max 30 days for export
+            if ($request->date_from && $request->date_to) {
+                $dateFrom = Carbon::parse($request->date_from);
+                $dateTo = Carbon::parse($request->date_to);
+                if ($dateFrom->diffInDays($dateTo) > 30) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Export limited to maximum 30 days range'
+                    ], 400);
+                }
+            } elseif (!$request->date_from && !$request->date_to) {
+                // Default to last 30 days if no date range
+                $query->where('created_at', '>=', now()->subDays(30));
             }
 
             $logs = $query->orderBy('created_at', 'desc')->get();
 
             if ($request->format === 'csv') {
                 // Generate CSV content
-                $csvContent = "ID,Timestamp,Action,User,Module,Level,Description,IP Address\n";
+                $csvContent = "ID,Timestamp,Action,User,Module,Status,Description,IP Address\n";
 
                 foreach ($logs as $log) {
                     $csvContent .= sprintf(
@@ -365,9 +364,9 @@ class AuditController extends Controller
                         $log->id,
                         $log->created_at->format('Y-m-d H:i:s'),
                         '"' . str_replace('"', '""', $log->action) . '"',
-                        '"' . str_replace('"', '""', $log->user_name ?? 'System') . '"',
-                        '"' . str_replace('"', '""', $log->module) . '"',
-                        $log->level,
+                        '"' . str_replace('"', '""', $log->getUserName()) . '"',
+                        '"' . str_replace('"', '""', $log->getModuleName()) . '"',
+                        $log->status,
                         '"' . str_replace('"', '""', $log->description ?? '') . '"',
                         $log->ip_address ?? ''
                     );
@@ -383,10 +382,25 @@ class AuditController extends Controller
                 ]);
             } else {
                 // Return JSON
+                $exportData = $logs->map(function($log) {
+                    return [
+                        'id' => $log->id,
+                        'timestamp' => $log->created_at->format('Y-m-d H:i:s'),
+                        'action' => $log->action,
+                        'user' => $log->getUserName(),
+                        'module' => $log->getModuleName(),
+                        'status' => $log->status,
+                        'description' => $log->description,
+                        'ip_address' => $log->ip_address,
+                        'old_values' => $this->maskSensitiveData($log->old_values),
+                        'new_values' => $this->maskSensitiveData($log->new_values),
+                    ];
+                });
+
                 return response()->json([
                     'success' => true,
                     'data' => [
-                        'content' => base64_encode($logs->toJson(JSON_PRETTY_PRINT)),
+                        'content' => base64_encode($exportData->toJson(JSON_PRETTY_PRINT)),
                         'filename' => 'audit_logs_' . now()->format('Y-m-d_H-i-s') . '.json',
                         'mime_type' => 'application/json'
                     ]
@@ -402,5 +416,21 @@ class AuditController extends Controller
                 'message' => 'Gagal mengekspor audit logs'
             ], 500);
         }
+    }
+
+    /**
+     * Mask sensitive data in old/new values
+     */
+    private function maskSensitiveData($values)
+    {
+        if (!is_array($values)) return $values;
+
+        $sensitiveKeys = ['password', 'token', 'secret', 'key', 'api_key', 'email', 'phone'];
+        foreach ($sensitiveKeys as $key) {
+            if (isset($values[$key])) {
+                $values[$key] = '***MASKED***';
+            }
+        }
+        return $values;
     }
 }

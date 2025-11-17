@@ -19,6 +19,12 @@ return new class extends Migration
             $table->string('password');
             $table->rememberToken();
             $table->timestamps();
+
+            // SIRAMA Hospital additional columns
+            $table->string('username')->unique()->nullable(); // Login username
+            $table->boolean('is_active')->default(true); // Active status
+            $table->string('nip', 18)->nullable(); // 18-digit employee ID
+            $table->string('phone', 15)->nullable(); // Indonesian phone format
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {

@@ -127,6 +127,15 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        'database' => [
+            'driver' => 'monolog',
+            'level' => env('LOG_LEVEL', 'debug'),
+            'handler' => \App\Logging\DatabaseHandler::class,
+            'handler_with' => [
+                'table' => 'system_logs',
+            ],
+        ],
+
     ],
 
 ];

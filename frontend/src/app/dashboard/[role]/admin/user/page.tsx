@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   MdPerson,
@@ -20,26 +20,42 @@ import {
   MdError,
   MdWarning
 } from 'react-icons/md'
+import { Switch } from '@/components/ui/switch'
 import api from '@/lib/api'
 import toast from '@/lib/toast'
 
 interface User {
   id: number
-  name: string
+  name?: string
+  username?: string
+  fullName?: string
   email: string
-  role: string
+  role?: string // untuk backward compatibility
+  roles?: Array<{id: number, name: string, label?: string, guard_name: string}>
   status: 'active' | 'inactive'
-  last_login: string | null
-  created_at: string
-  updated_at: string
+  isActive: boolean
+  lastLoginAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+interface Role {
+  id: number
+  name: string
+  label?: string
+  guard_name: string
 }
 
 interface UserFormData {
   name: string
   email: string
   role: string
+  username?: string
+  fullName?: string
   password?: string
   password_confirmation?: string
+  roleIds?: number[]
+  isActive?: boolean
 }
 
 export default function UserPage() {
@@ -53,12 +69,14 @@ export default function UserPage() {
   const [newUser, setNewUser] = useState<UserFormData>({
     name: '',
     email: '',
-    role: 'kasir'
+    role: 'kasir',
+    isActive: true
   })
   const [editUser, setEditUser] = useState<UserFormData>({
     name: '',
     email: '',
-    role: 'kasir'
+    role: 'kasir',
+    isActive: true
   })
   const [resetPasswordData, setResetPasswordData] = useState({
     password: '',
@@ -92,12 +110,25 @@ export default function UserPage() {
   })
 
   // Fetch available roles
-  const { data: rolesData } = useQuery({
+  const { data: rolesData, isLoading: rolesLoading, error: rolesError, refetch: refetchRoles } = useQuery({
     queryKey: ['roles'],
     queryFn: async () => {
+      console.log('🔍 Fetching roles...')
       const response = await api.get('/api/roles')
-      return response.data.data
+      console.log('📦 Roles API response:', response.data)
+      console.log('👤 Roles count:', response.data.data?.length || 0)
+      console.log('👥 Roles names:', response.data.data?.map((r: any) => r.name).join(', ') || 'none')
+      // Backend returns {data: [...]}, so access the data property directly
+      return response.data.data || []
     },
+    retry: 3,
+  })
+
+  console.log('🎭 Roles debug:', {
+    rolesData,
+    rolesLoading,
+    rolesError,
+    rolesCount: rolesData?.length || 0
   })
 
   // Create user mutation
@@ -121,7 +152,17 @@ export default function UserPage() {
   // Update user mutation
   const updateUserMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<UserFormData> }) => {
+      console.log('🔄 Sending edit user request:', { id, data })
+      console.log('📋 Payload details:', {
+        username: data.username,
+        fullName: data.fullName,
+        email: data.email,
+        roleIds: data.roleIds,
+        roleIdsType: typeof data.roleIds?.[0],
+        roleIdsValue: data.roleIds?.[0]
+      })
       const response = await api.put(`/api/users/${id}`, data)
+      console.log('✅ Edit user successful:', response.data)
       return response.data
     },
     onSuccess: () => {
@@ -131,7 +172,24 @@ export default function UserPage() {
       toast.success('User berhasil diperbarui')
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Gagal memperbarui user')
+      console.error('❌ Edit user error:', error.response?.data || error.message)
+      console.log('🔍 Detailed error:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        validationErrors: error.response?.data?.errors,
+        message: error.response?.data?.message,
+        rawData: error.response?.data
+      })
+      console.log('🚨 VALIDATION ERRORS DETAIL:', error.response?.data?.errors || 'NO ERRORS')
+      console.log('🚨 LARAVEL MESSAGE:', error.response?.data?.message || 'NO MESSAGE')
+
+      // Show specific validation error if available
+      if (error.response?.data?.errors) {
+        const firstError = Object.values(error.response.data.errors)[0] as string[]
+        toast.error(`Validation Error: ${firstError[0]}`)
+      } else {
+        toast.error(error.response?.data?.message || 'Gagal memperbarui user')
+      }
     }
   })
 
@@ -173,7 +231,7 @@ export default function UserPage() {
 
   // Note: Filtering is now handled by the API, but keeping client-side filter for additional filtering
   const filteredUsers = users.filter((user: User) => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = (user.name || user.fullName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesRole = filterRole === 'all' || user.role === filterRole
     const matchesStatus = filterStatus === 'all' || user.status === filterStatus
@@ -226,11 +284,19 @@ export default function UserPage() {
       return
     }
 
+    // Find selected role and use its ID
+    const selectedRole = roles.find(role => role.name === newUser.role)
+    if (!selectedRole) {
+      toast.error('Role tidak valid')
+      return
+    }
+
     // Add password for new user
     const userData = {
       ...newUser,
       password: 'password123', // Default password, user should change it
-      password_confirmation: 'password123'
+      password_confirmation: 'password123',
+      roleIds: [selectedRole.id] // Send role IDs instead of role name
     }
 
     createUserMutation.mutate(userData)
@@ -242,12 +308,39 @@ export default function UserPage() {
       return
     }
 
+    // DEBUG: Log role validation
+    console.log('🔍 Edit User Debug:', {
+      editUserRole: editUser.role,
+      availableRoles: roles.map((r: {name: string, id: number}) => ({name: r.name, id: r.id})),
+      rolesCount: roles.length,
+      rolesLoading,
+      rolesError
+    })
+
+    // Find selected role and use its ID (case-insensitive comparison)
+    const selectedRole = roles.find(role =>
+      role.name.toLowerCase() === editUser.role.toLowerCase()
+    )
+    console.log('🎯 Selected role from roles.find():', selectedRole)
+
+    if (!selectedRole) {
+      console.error('❌ Role tidak valid!', {
+        selectedRole,
+        editUserRole: editUser.role,
+        availableRoleNames: roles.map(r => r.name)
+      })
+      toast.error(`Role '${editUser.role}' tidak valid. Pastikan role tersedia.`)
+      return
+    }
+
     updateUserMutation.mutate({
       id: selectedUser.id,
       data: {
-        name: editUser.name,
+        fullName: editUser.name,  // ✅ FIX: Backend expects 'fullName'
         email: editUser.email,
-        role: editUser.role
+        username: editUser.username,  // ✅ FIX: Add required username field
+        roleIds: [selectedRole.id], // Send role IDs instead of role name
+        isActive: editUser.isActive
       }
     })
   }
@@ -270,16 +363,8 @@ export default function UserPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">
-            Manajemen Pengguna
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Kelola pengguna sistem SIRAMA
-          </p>
-        </div>
+      {/* Action Buttons */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center sm:justify-end gap-4">
         <div className="flex items-center gap-3">
           <button
             onClick={() => refetch()}
@@ -325,9 +410,23 @@ export default function UserPage() {
               aria-label="Filter by role"
             >
               <option value="all">Semua Role</option>
-              {roles.map((role: any) => (
-                <option key={role.name} value={role.name}>{role.label}</option>
+              {roles.map((role: { id: number; name: string; label?: string }) => (
+                <option key={role.name} value={role.name}>{role.label || role.name}</option>
               ))}
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div className="w-full lg:w-48">
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              aria-label="Filter by status"
+            >
+              <option value="all">Semua Status</option>
+              <option value="active">Aktif</option>
+              <option value="inactive">Nonaktif</option>
             </select>
           </div>
         </div>
@@ -374,7 +473,7 @@ export default function UserPage() {
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
-                            {user.name}
+                            {user.name || user.fullName || 'N/A'}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">
                             {user.email}
@@ -384,9 +483,9 @@ export default function UserPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        {getRoleIcon(user.role)}
+                        {getRoleIcon(user.roles?.[0]?.name || 'pengguna')}
                         <span className="text-sm text-gray-900 dark:text-white">
-                          {getRoleLabel(user.role)}
+                          {getRoleLabel(user.roles?.[0]?.name || 'pengguna')}
                         </span>
                       </div>
                     </td>
@@ -396,7 +495,13 @@ export default function UserPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {user.last_login}
+                      {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString('id-ID', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      }) : 'Belum pernah login'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">
@@ -404,9 +509,11 @@ export default function UserPage() {
                           onClick={() => {
                             setSelectedUser(user)
                             setEditUser({
-                              name: user.name,
+                              name: user.name || user.fullName || '',
+                              username: user.username || '',
                               email: user.email,
-                              role: user.role
+                              role: user.roles?.[0]?.name || user.role || 'kasir',
+                              isActive: user.isActive || false
                             })
                             setShowEditForm(true)
                           }}
@@ -491,9 +598,9 @@ export default function UserPage() {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   aria-label="Pilih role pengguna"
                 >
-                  {roles.map((role: any) => (
-                    <option key={role.name} value={role.name}>{role.label}</option>
-                  ))}
+              {roles.map((role: { id: number; name: string; label?: string }) => (
+                <option key={role.name} value={role.name}>{role.label || role.name}</option>
+              ))}
                 </select>
               </div>
             </div>
@@ -561,10 +668,25 @@ export default function UserPage() {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   aria-label="Pilih role pengguna"
                 >
-                  {roles.map((role: any) => (
-                    <option key={role.name} value={role.name}>{role.label}</option>
-                  ))}
+              {roles.map((role: { id: number; name: string; label: string }) => (
+                <option key={role.name} value={role.name}>{role.label || role.name}</option>
+              ))}
                 </select>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Status Akun Aktif
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Aktifkan/inaktifkan akun pengguna
+                  </p>
+                </div>
+                <Switch
+                  checked={editUser.isActive}
+                  onCheckedChange={(checked) => setEditUser(prev => ({ ...prev, isActive: checked }))}
+                />
               </div>
             </div>
 

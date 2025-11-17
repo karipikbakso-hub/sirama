@@ -21,6 +21,11 @@ use App\Http\Controllers\Api\Icd10DiagnosisController;
 use App\Http\Controllers\Api\MobileJknController;
 use App\Http\Controllers\Api\RolesController;
 use App\Http\Controllers\Api\DashboardHomeController;
+use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\AuditController;
+use App\Http\Controllers\Api\ErrorMonitoringController;
+use App\Http\Controllers\Api\BackupController;
+use App\Http\Controllers\Api\PengaturanSistemController;
 
 Route::get('/sanctum/csrf-cookie', [CsrfCookieController::class, 'show']);
 
@@ -108,7 +113,20 @@ Route::middleware(['web'])->group(function () {
     Route::patch('referrals/{referral}/reject', [ReferralController::class, 'reject']);
     Route::get('referrals/statistics', [ReferralController::class, 'statistics']);
 
-    // BPJS Integration routes
+    // API Integration routes for admin panel
+    Route::middleware(['permission:manage-integrations'])->group(function () {
+        Route::get('integrations/configurations', [App\Http\Controllers\Api\IntegrationController::class, 'getConfigurations']);
+        Route::put('integrations/bpjs', [App\Http\Controllers\Api\IntegrationController::class, 'updateBpjsConfiguration']);
+        Route::put('integrations/satusehat', [App\Http\Controllers\Api\IntegrationController::class, 'updateSatusehatConfiguration']);
+        Route::post('integrations/bpjs/test-connection', [App\Http\Controllers\Api\IntegrationController::class, 'testBpjsConnection']);
+        Route::post('integrations/satusehat/test-connection', [App\Http\Controllers\Api\IntegrationController::class, 'testSatusehatConnection']);
+        Route::post('integrations/bpjs/rotate-key', [App\Http\Controllers\Api\IntegrationController::class, 'rotateBpjsKey']);
+        Route::post('integrations/satusehat/rotate-key', [App\Http\Controllers\Api\IntegrationController::class, 'rotateSatusehatKey']);
+        Route::get('integrations/logs', [App\Http\Controllers\Api\IntegrationController::class, 'getLogs']);
+        Route::get('integrations/statistics', [App\Http\Controllers\Api\IntegrationController::class, 'getStatistics']);
+    });
+
+    // Legacy BPJS Integration routes
     Route::apiResource('bpjs-integrations', BpjsIntegrationController::class);
     Route::get('bpjs-integrations/successful', [BpjsIntegrationController::class, 'successful']);
     Route::get('bpjs-integrations/failed', [BpjsIntegrationController::class, 'failed']);
@@ -181,11 +199,130 @@ Route::middleware(['web'])->group(function () {
     Route::get('mobile-jkn/features', [MobileJknController::class, 'getFeatures']);
     Route::patch('mobile-jkn/update-contact', [MobileJknController::class, 'updateContact']);
 
-    // Roles routes
+    // Roles and Permissions routes
     Route::get('roles', [RolesController::class, 'index']);
+    Route::get('permissions', [RolesController::class, 'getPermissions']);
+    Route::get('role-permissions', [RolesController::class, 'index']);
+    Route::post('role-permissions', [RolesController::class, 'store']);
+    Route::get('role-permissions/{id}', [RolesController::class, 'show']);
+    Route::put('role-permissions/{id}', [RolesController::class, 'update']);
+    Route::delete('role-permissions/{id}', [RolesController::class, 'destroy']);
+    Route::put('role-permissions/{id}/permissions', [RolesController::class, 'updatePermissions']);
+    Route::post('role-permissions/{id}/clone', [RolesController::class, 'clone']);
+    Route::get('role-permissions/{id}/users', [RolesController::class, 'getUsers']);
+
+    // User management routes (SIRAMA Admin) - TEMP: Remove middleware for testing
+    // Route::middleware(['permission:manage-users'])->group(function () {
+        Route::get('users', [UserController::class, 'index']);
+        Route::post('users', [UserController::class, 'store']);
+        Route::get('users/{user}', [UserController::class, 'show']);
+        Route::put('users/{user}', [UserController::class, 'update']);
+        Route::delete('users/{user}', [UserController::class, 'destroy']);
+
+        // Special user operations
+        Route::post('users/{user}/reset-password', [UserController::class, 'resetPassword']);
+        Route::post('users/{user}/toggle-status', [UserController::class, 'toggleStatus']);
+
+        // Bulk operations
+        Route::post('users/bulk-action', [UserController::class, 'bulkAction']);
+    // });
+
+    // User read-only routes (for other roles) - TEMP: Remove middleware for testing
+    // Route::middleware(['permission:view-users'])->group(function () {
+    //     Route::get('users', [UserController::class, 'index']);
+    //     Route::get('users/{user}', [UserController::class, 'show']);
+    // });
+
+    // Public user routes
+    Route::get('user/roles', [UserController::class, 'getRoles']);
+    Route::get('users/statistics', [UserController::class, 'statistics']);
+    Route::get('users-statistics', [UserController::class, 'statistics']); // Alternative route format
 
     // Dashboard Home routes
     Route::get('dashboard/home', [DashboardHomeController::class, 'index']);
+
+    // Audit Logs routes - Admin only
+    // Route::middleware(['permission:view audit logs'])->group(function () {
+        Route::get('audit/logs', [AuditController::class, 'index']);
+        Route::get('audit/logs/{id}', [AuditController::class, 'show']);
+        Route::get('audit/statistics', [AuditController::class, 'getStatistics']);
+        Route::get('audit/users', [AuditController::class, 'getUsers']);
+        Route::get('audit/modules', [AuditController::class, 'getModules']);
+    // });
+
+    // Route::middleware(['permission:manage system'])->group(function () {
+        Route::delete('audit/logs/cleanup', [AuditController::class, 'deleteOldLogs']);
+        Route::get('audit/export', [AuditController::class, 'export']);
+    // });
+
+    // Error Monitoring routes - Admin only
+    // Route::middleware(['permission:manage system'])->group(function () {
+        // System Logs routes
+        Route::get('error-monitoring/system-logs', [ErrorMonitoringController::class, 'getSystemLogs']);
+        Route::get('error-monitoring/system-logs/{log}', [ErrorMonitoringController::class, 'getSystemLog']);
+        Route::put('error-monitoring/system-logs/{log}/resolve', [ErrorMonitoringController::class, 'resolveSystemLog']);
+        Route::post('error-monitoring/system-logs/bulk-resolve', [ErrorMonitoringController::class, 'bulkResolveSystemLogs']);
+        Route::delete('error-monitoring/system-logs/cleanup', [ErrorMonitoringController::class, 'cleanupSystemLogs']);
+        Route::get('error-monitoring/system-logs/export', [ErrorMonitoringController::class, 'exportSystemLogs']);
+
+        // Failed Jobs routes
+        Route::get('error-monitoring/failed-jobs', [ErrorMonitoringController::class, 'getFailedJobs']);
+        Route::post('error-monitoring/failed-jobs/{jobId}/retry', [ErrorMonitoringController::class, 'retryFailedJob']);
+        Route::delete('error-monitoring/failed-jobs/{jobId}', [ErrorMonitoringController::class, 'deleteFailedJob']);
+        Route::post('error-monitoring/failed-jobs/bulk-delete', [ErrorMonitoringController::class, 'bulkDeleteFailedJobs']);
+        Route::delete('error-monitoring/failed-jobs/clear', [ErrorMonitoringController::class, 'clearFailedJobs']);
+
+        // Statistics route
+        Route::get('error-monitoring/statistics', [ErrorMonitoringController::class, 'getStatistics']);
+    // });
+
+    // Backup & Recovery routes - Admin only
+    Route::middleware(['permission:manage-backups'])->group(function () {
+        // Schedule management
+        Route::get('backups/schedules', [BackupController::class, 'getSchedules']);
+        Route::post('backups/schedules', [BackupController::class, 'createSchedule']);
+        Route::put('backups/schedules/{schedule}', [BackupController::class, 'updateSchedule']);
+        Route::delete('backups/schedules/{schedule}', [BackupController::class, 'deleteSchedule']);
+
+        // Manual backup
+        Route::post('backups/manual', [BackupController::class, 'createManualBackup']);
+
+        // History and statistics
+        Route::get('backups/histories', [BackupController::class, 'getHistories']);
+        Route::get('backups/statistics', [BackupController::class, 'getStatistics']);
+
+        // Restore operations
+        Route::post('backups/restore/{history}', [BackupController::class, 'restoreBackup']);
+
+        // Download operations
+        Route::get('backups/download/{history}', [BackupController::class, 'downloadBackup']);
+        Route::delete('backups/{history}', [BackupController::class, 'deleteBackup']);
+    });
+
+    // System Configuration routes - Admin only
+    // Route::middleware(['permission:manage system'])->group(function () {
+        // Main configuration endpoints
+        Route::get('system-configurations', [PengaturanSistemController::class, 'index']);
+        Route::get('system-configurations/groups', [PengaturanSistemController::class, 'getKategori']);
+        Route::get('system-configurations/groups/{kategori}', [PengaturanSistemController::class, 'getByKategori']);
+        Route::put('system-configurations', [PengaturanSistemController::class, 'updateMultiple']);
+
+        // System management
+        Route::get('system-configurations/info', [PengaturanSistemController::class, 'getSystemInfo']);
+        Route::post('system-configurations/reload', [PengaturanSistemController::class, 'reloadSystem']);
+
+        // History and rollback
+        Route::get('system-configurations/history', [PengaturanSistemController::class, 'getHistory']);
+        Route::post('system-configurations/rollback/{historyId}', [PengaturanSistemController::class, 'rollback']);
+
+        // Import/Export
+        Route::get('system-configurations/export', [PengaturanSistemController::class, 'export']);
+        Route::post('system-configurations/import', [PengaturanSistemController::class, 'import']);
+
+        // Super admin only endpoints
+        Route::get('system-configurations/env', [PengaturanSistemController::class, 'getEnvValues']);
+        Route::put('system-configurations/env', [PengaturanSistemController::class, 'updateEnv']);
+    // });
 });
 
 // Public Mobile JKN routes moved to web.php for testing (no CSRF)

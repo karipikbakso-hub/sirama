@@ -22,8 +22,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'verified' => \App\Http\Middleware\EnsureEmailIsVerified::class,
             'no.csrf' => \App\Http\Middleware\NoCsrf::class,
-            'role' => \Spatie\Permission\Middlewares\RoleMiddleware::class,
-            'permission' => \Spatie\Permission\Middlewares\PermissionMiddleware::class,
+            // 'role' => \Spatie\Permission\Middlewares\RoleMiddleware::class,
+            // 'permission' => \Spatie\Permission\Middlewares\PermissionMiddleware::class,
         ]);
 
         // Exclude API routes and auth routes from CSRF verification for Sanctum token authentication

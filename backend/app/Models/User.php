@@ -8,11 +8,12 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasApiTokens, HasRoles, HasFactory, Notifiable;
+    use HasApiTokens, HasRoles, HasFactory, Notifiable, SoftDeletes;
 
     protected $guard_name = 'web';
 
@@ -34,7 +35,13 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'role',
+        'username',
+        'full_name',
+        'nip',
+        'phone',
+        'is_active',
+        'last_login_at',
+        'last_login_ip',
     ];
 
     /**
@@ -57,6 +64,48 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
+            'last_login_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Get the user's full name - backward compatibility with existing 'name' field.
+     */
+    public function getFullNameAttribute(): string
+    {
+        return $this->attributes['name'] ?? '';
+    }
+
+    /**
+     * Set the user's full name - backward compatibility.
+     */
+    public function setFullNameAttribute(string $value): void
+    {
+        $this->attributes['name'] = $value;
+    }
+
+    /**
+     * Check if user is active.
+     */
+    public function isActive(): bool
+    {
+        return $this->is_active;
+    }
+
+    /**
+     * Scope to get only active users.
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    /**
+     * Scope to get only inactive users.
+     */
+    public function scopeInactive($query)
+    {
+        return $query->where('is_active', false);
     }
 }

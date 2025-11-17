@@ -24,14 +24,6 @@ class AuditLog extends Model
     ];
 
     /**
-     * Scope for filtering by level
-     */
-    public function scopeLevel($query, $level)
-    {
-        return $query->where('level', $level);
-    }
-
-    /**
      * Scope for filtering by action
      */
     public function scopeAction($query, $action)
@@ -42,9 +34,9 @@ class AuditLog extends Model
     /**
      * Scope for filtering by resource type
      */
-    public function scopeResourceType($query, $resourceType)
+    public function scopeModule($query, $module)
     {
-        return $query->where('resource_type', $resourceType);
+        return $query->where('resource_type', $module);
     }
 
     /**
@@ -64,32 +56,11 @@ class AuditLog extends Model
     }
 
     /**
-     * Get the module name based on resource type
+     * Get the module name based on resource_type
      */
-    public function getModuleAttribute()
+    public function getModuleName()
     {
-        $resourceType = $this->resource_type;
-
-        $modules = [
-            'user' => 'User Management',
-            'patient' => 'Patient Management',
-            'registration' => 'Registration',
-            'appointment' => 'Appointments',
-            'prescription' => 'Prescriptions',
-            'lab_order' => 'Laboratory',
-            'radiology_order' => 'Radiology',
-            'billing' => 'Billing',
-            'payment' => 'Payments',
-            'system_config' => 'System Configuration',
-            'role' => 'Role Management',
-            'permission' => 'Permission Management',
-            'audit_log' => 'Audit System',
-            'api_log' => 'API Integration',
-            'backup' => 'System Backup',
-            'report' => 'Reports'
-        ];
-
-        return $modules[$resourceType] ?? 'System';
+        return self::getModuleNameFromResourceType($this->resource_type);
     }
 
     /**
@@ -103,5 +74,56 @@ class AuditLog extends Model
             'info' => 'info',
             default => 'success'
         };
+    }
+
+    /**
+     * Get user name
+     */
+    public function getUserName()
+    {
+        return $this->user_name ?? 'System';
+    }
+
+    /**
+     * Static method to get module name from resource type
+     */
+    public static function getModuleNameFromResourceType($resourceType)
+    {
+        $modules = [
+            'user' => 'User Management',
+            'patient' => 'Patient Management',
+            'registration' => 'Registration',
+            'appointment' => 'Appointments',
+            'prescription' => 'Prescription',
+            'lab_order' => 'Laboratory',
+            'radiology_order' => 'Radiology',
+            'billing' => 'Billing',
+            'payment' => 'Payments',
+            'system_config' => 'System Configuration',
+            'role' => 'Role Management',
+            'permission' => 'Permission Management',
+            'audit_log' => 'Audit System',
+            'api_log' => 'API Integration',
+            'backup' => 'System Backup',
+            'report' => 'Reports'
+        ];
+
+        return $modules[$resourceType] ?? ucfirst(str_replace('_', ' ', $resourceType ?? 'system'));
+    }
+
+    /**
+     * Static method to get module label from module value (alias for compat)
+     */
+    public static function getModuleLabel($module)
+    {
+        return self::getModuleNameFromResourceType($module);
+    }
+
+    /**
+     * Relationship with User model (if user_id exists)
+     */
+    public function user()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'user_id');
     }
 }

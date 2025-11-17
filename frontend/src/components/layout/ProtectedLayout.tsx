@@ -1,17 +1,26 @@
 'use client'
 
-import { useAuth } from '@/hooks/useAuth'
-import { useRouter } from 'next/navigation'
-import { ReactNode, useEffect } from 'react'
+import { useAuthStore } from '@/store/auth'
+import { useRouter, usePathname } from 'next/navigation'
+import { ReactNode, useEffect, useState } from 'react'
 
 export default function ProtectedLayout({ children }: { children: ReactNode }) {
-  const { user, isLoading } = useAuth()
+  const { user, isAuthenticated, isHydrated, isLoading } = useAuthStore()
   const router = useRouter()
+  const pathname = usePathname()
+  const [hasRedirected, setHasRedirected] = useState(false)
 
   useEffect(() => {
-    if (isLoading) return // ✅ Jangan redirect saat masih loading
-    if (!user) router.push('/login')
-  }, [isLoading, user, router])
+    // Wait until hydration is complete before checking auth
+    if (!isHydrated) return
+
+    // Only redirect if we're sure authentication is complete
+    if (!isAuthenticated && !hasRedirected) {
+      console.log('ProtectedLayout: User not authenticated, redirecting to login')
+      setHasRedirected(true)
+      router.push('/login')
+    }
+  }, [isAuthenticated, isHydrated, hasRedirected, router])
 
   if (isLoading) {
     return (

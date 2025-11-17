@@ -42,6 +42,8 @@ const components: ComponentMap = {
     audit: dynamic(() => import('../admin/audit/page')),
     backup: dynamic(() => import('../admin/backup/page')),
     settings: dynamic(() => import('../admin/settings/page')),
+    integration: dynamic(() => import('../admin/integration/page')),
+    'error-log': dynamic(() => import('../admin/error-log/page')),
   },
   perawat: {
     ttv: dynamic(() => import('../perawat/ttv/page')),

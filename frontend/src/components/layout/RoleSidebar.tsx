@@ -1,19 +1,18 @@
 'use client'
 
+import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { memo, useState } from 'react'
 import { menuByRole, MenuItem, MenuCategory } from '@/lib/menuByRole'
 import { RoleLabelMap, Role } from '@/types/role'
-import { MdHome, MdExpandMore, MdExpandLess, MdChevronRight } from 'react-icons/md'
-import { useState } from 'react'
+import { MdExpandMore, MdChevronRight, MdHome } from 'react-icons/md'
 
-export default function RoleSidebar({ role }: { role: string }) {
+function RoleSidebar({ role }: { role: string }) {
   const pathname = usePathname()
   const router = useRouter()
-  const searchParams = useSearchParams()
   const navItems = menuByRole[role] ?? []
   const roleLabel = RoleLabelMap[role as Role] || role
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['Pendaftaran Pasien']))
-  const [hoveredCategory, setHoveredCategory] = useState<string | null>(null)
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
 
   // Toggle category expansion
   const toggleCategory = (categoryLabel: string) => {
@@ -26,20 +25,14 @@ export default function RoleSidebar({ role }: { role: string }) {
     setExpandedCategories(newExpanded)
   }
 
-  // Modular navigation for all roles - use query parameters for content switching
-  const handleMenuClick = (href: string) => {
-    const moduleName = href?.split('/').pop() || 'dashboard';
-    const currentParams = searchParams ? new URLSearchParams(searchParams) : new URLSearchParams();
-    currentParams.set('module', moduleName);
-    router.replace(`/dashboard/${role}?${currentParams.toString()}`, { scroll: false });
+  // Check if menu item is active based on pathname
+  const isMenuActive = (href: string) => {
+    return pathname === href
   }
 
-  // Check if menu has mixed structure (standalone items + categories)
-  const hasMixedStructure = navItems.length > 0 && navItems.some(item => 'items' in item)
-
-  // Get consistent SIRAMA brand color for all categories
-  const getCategoryColor = () => {
-    return 'from-blue-600 via-blue-700 to-indigo-800'
+  // Handle menu clicks - use direct path routing
+  const handleMenuClick = (href: string) => {
+    router.push(href, { scroll: false })
   }
 
   return (
@@ -61,7 +54,7 @@ export default function RoleSidebar({ role }: { role: string }) {
       <div className="flex-1 overflow-y-auto">
         {navItems.length === 0 ? (
           <div className="p-6 text-center text-slate-500">
-            <Home className="text-3xl mx-auto mb-2 opacity-50" />
+            <MdHome className="text-3xl mx-auto mb-2 opacity-50" />
             <p className="text-sm">Menu belum tersedia</p>
           </div>
         ) : (
@@ -70,18 +63,15 @@ export default function RoleSidebar({ role }: { role: string }) {
               // Standalone menu item
               if ('href' in navItem) {
                 const item = navItem as MenuItem
-                // Check if current menu matches the module query parameter
-                const currentModule = searchParams?.get('module')
-                const menuModule = item.href?.split('/').pop()
-                const isActive = currentModule === menuModule || (pathname === item.href && !currentModule)
+                const isActive = isMenuActive(item.href)
 
                 return (
                   <Link
                     key={item.href}
-                    onClick={() => handleMenuClick(item.href)}
+                    href={item.href}
                     className={`w-full group relative flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-left transition-all duration-200 ${
                       isActive
-                        ? 'text-slate-800 dark:text-slate-200'
+                        ? 'text-slate-800 dark:text-slate-200 bg-blue-50 dark:bg-blue-900/20'
                         : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/50'
                     }`}
                   >
@@ -114,51 +104,49 @@ export default function RoleSidebar({ role }: { role: string }) {
                     }`}>
                       <MdChevronRight className="text-sm" />
                     </div>
-                  </button>
+                  </Link>
                 )
               } else {
-                // Category with submenu - always expanded
+                // Category with submenu
                 const category = navItem as MenuCategory
+                const isExpanded = expandedCategories.has(category.label)
 
                 return (
                   <div key={category.label}>
                     {/* Category Header */}
-                    <div className="px-3 py-2 mb-2">
+                    <button
+                      onClick={() => toggleCategory(category.label)}
+                      className="w-full flex items-center justify-between px-3 py-2 mb-2 group"
+                    >
                       <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
                         {category.label}
                       </h3>
-                    </div>
-
-                        <div className={`transition-transform duration-300 ${
+                      <MdExpandMore
+                        className={`text-lg transition-transform duration-300 ${
                           isExpanded ? 'rotate-180 text-blue-500' : 'text-slate-500 dark:text-slate-400'
-                        }`}>
-                          <MdExpandMore className="text-lg" />
-                        </div>
-                      </div>
+                        }`}
+                      />
                     </button>
 
-                    {/* Submenu with smooth animation */}
+                    {/* Submenu */}
                     <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
                       isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
                     }`}>
-                      <div className="ml-6 mt-2 space-y-1">
-                        {category.items.map((item, itemIndex) => {
-                          // Check if current menu matches the module query parameter for category items too
-                          const currentModule = searchParams?.get('module')
-                          const menuModule = item.href?.split('/').pop()
-                          const isActive = currentModule === menuModule || (pathname === item.href && !currentModule)
+                      <div className="ml-2 mt-1 space-y-1">
+                        {category.items.map((item) => {
+                          const isActive = isMenuActive(item.href)
 
                           return (
-                            <button
+                            <Link
                               key={item.href}
-                              onClick={() => handleMenuClick(item.href)}
+                              href={item.href}
                               className={`w-full group relative flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm text-left transition-all duration-200 ${
                                 isActive
                                   ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-slate-800 dark:text-slate-200'
                                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200'
                               }`}
                             >
-                              {/* Icon with hover effect */}
+                              {/* Icon */}
                               <div className={`relative flex-shrink-0 transition-all duration-200 ${
                                 isActive
                                   ? 'text-blue-600 dark:text-blue-400'
@@ -182,13 +170,13 @@ export default function RoleSidebar({ role }: { role: string }) {
                               }`}>
                                 <MdChevronRight className="text-sm" />
                               </div>
-                            </button>
+                            </Link>
                           )
                         })}
                       </div>
                     </div>
 
-                    {/* Floating Separator */}
+                    {/* Separator */}
                     <div className="mx-2 mb-4 h-px bg-gradient-to-r from-transparent via-slate-200 dark:via-slate-600 to-transparent shadow-sm"></div>
                   </div>
                 )

@@ -3,7 +3,7 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import useAuth from '@/hooks/useAuth'
+import { useAuth } from '@/hooks/useAuth'
 import RoleHeader from '@/components/layout/RoleHeader'
 import RoleSidebar from '@/components/layout/RoleSidebar'
 import * as React from 'react'
@@ -49,9 +49,8 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
-      <RoleSidebar role={requestedRole} />
-      <main className="flex-1">
-        <RoleHeader role={requestedRole} />
+      {/* Page Content - No duplicate sidebar/header */}
+      <main className="flex-1 w-full min-h-screen">
         <div className="p-4 md:p-6">{children}</div>
       </main>
     </div>

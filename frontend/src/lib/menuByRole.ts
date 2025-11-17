@@ -35,54 +35,33 @@ export const menuByRole: Record<string, (MenuItem | MenuCategory)[]> = {
 
   admin: [
     // 👨‍💼 Administrator/IT - System Management - Direct path routing for SPA navigation
-    { label: 'Dashboard', href: '/dashboard/admin', icon: MdComputer },
-    { label: 'Manajemen Pengguna', href: '/dashboard/admin/user', icon: MdPerson },
-    { label: 'Manajemen Peran', href: '/dashboard/admin/role', icon: MdGroupWork },
-    { label: 'Pengaturan Sistem', href: '/dashboard/admin/settings', icon: MdBusiness },
-    { label: 'Log Audit', href: '/dashboard/admin/audit', icon: MdReceiptLong },
+    { label: 'Dashboard Admin', href: '/dashboard/admin', icon: MdDashboard },
+    { label: 'User Management', href: '/dashboard/admin/user', icon: MdPerson },
+    { label: 'Role Management', href: '/dashboard/admin/role', icon: MdGroupWork },
+    { label: 'System Settings', href: '/dashboard/admin/settings', icon: MdBusiness },
+    { label: 'Audit Log', href: '/dashboard/admin/audit', icon: MdListAlt },
     { label: 'Backup & Recovery', href: '/dashboard/admin/backup', icon: MdBackup },
     { label: 'Error Log', href: '/dashboard/admin/error-log', icon: MdError },
-    { label: 'Integration', href: '/dashboard/admin/integration', icon: MdCloudUpload },
+    { label: 'System Integration', href: '/dashboard/admin/integration', icon: MdCloudUpload },
   ],
 
   pendaftaran: [
     // 📋 Registration - Patient Registration & Queue Management - Direct path routing
     { label: 'Beranda', href: '/dashboard/pendaftaran', icon: MdDashboard },
     { label: 'Dashboard KPI', href: '/dashboard/pendaftaran/kpi', icon: MdBarChart },
-
-    {
-      label: 'Pendaftaran Pasien',
-      items: [
-        { label: 'Pendaftaran Baru', href: '/dashboard/pendaftaran/registrasi', icon: MdPerson },
-        { label: 'Data Pasien', href: '/dashboard/pendaftaran/pasien', icon: MdPeople },
-        { label: 'Riwayat Medis', href: '/dashboard/pendaftaran/riwayat', icon: MdAssignment },
-        { label: 'Pendaftaran IGD', href: '/dashboard/pendaftaran/registrasi-igd', icon: MdLocalHospital },
-      ]
-    },
-    {
-      label: 'Manajemen Antrian',
-      items: [
-        { label: 'Monitor Antrian', href: '/dashboard/pendaftaran/antrian', icon: MdListAlt },
-        { label: 'Kontrol Antrian', href: '/dashboard/pendaftaran/antrian-management', icon: MdListAlt },
-      ]
-    },
-    {
-      label: 'Layanan Digital',
-      items: [
-        { label: 'SEP BPJS', href: '/dashboard/pendaftaran/sep', icon: MdShield },
-        { label: 'Mobile JKN', href: '/dashboard/pendaftaran/mobile-jkn', icon: MdCall },
-        { label: 'Janji Temu', href: '/dashboard/pendaftaran/appointment', icon: MdCalendarToday },
-        { label: 'Integrasi BPJS', href: '/dashboard/pendaftaran/bpjs-integration', icon: MdCloudUpload },
-      ]
-    },
+    { label: 'Pendaftaran Baru', href: '/dashboard/pendaftaran/registrasi', icon: MdPerson },
+    { label: 'Data Pasien', href: '/dashboard/pendaftaran/pasien', icon: MdPeople },
+    { label: 'Riwayat Medis', href: '/dashboard/pendaftaran/riwayat', icon: MdAssignment },
+    { label: 'Pendaftaran IGD', href: '/dashboard/pendaftaran/registrasi-igd', icon: MdLocalHospital },
+    { label: 'Monitor Antrian', href: '/dashboard/pendaftaran/antrian', icon: MdListAlt },
+    { label: 'Kontrol Antrian', href: '/dashboard/pendaftaran/antrian-management', icon: MdListAlt },
+    { label: 'SEP BPJS', href: '/dashboard/pendaftaran/sep', icon: MdShield },
+    { label: 'Mobile JKN', href: '/dashboard/pendaftaran/mobile-jkn', icon: MdCall },
+    { label: 'Janji Temu', href: '/dashboard/pendaftaran/appointment', icon: MdCalendarToday },
+    { label: 'Integrasi BPJS', href: '/dashboard/pendaftaran/bpjs-integration', icon: MdCloudUpload },
     { label: 'Sistem Rujukan', href: '/dashboard/pendaftaran/rujukan', icon: MdLocalHospital },
-    {
-      label: 'Administrasi',
-      items: [
-        { label: 'Data Master', href: '/dashboard/pendaftaran/master-data', icon: MdStorage },
-        { label: 'Komunikasi Pasien', href: '/dashboard/pendaftaran/notifications', icon: MdChat },
-      ]
-    }
+    { label: 'Data Master', href: '/dashboard/pendaftaran/master-data', icon: MdStorage },
+    { label: 'Komunikasi Pasien', href: '/dashboard/pendaftaran/notifications', icon: MdChat },
   ],
 
   dokter: [
