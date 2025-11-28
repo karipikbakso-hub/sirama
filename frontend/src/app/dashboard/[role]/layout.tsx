@@ -15,13 +15,13 @@ export default function DashboardLayout({
   children: React.ReactNode
   params: Promise<{ role: string }>
 }) {
-  const { user, loading } = useAuth()
+  const { user, isLoading } = useAuth()
   const router = useRouter()
   const resolvedParams = React.use(params)
   const requestedRole = resolvedParams.role
 
   useEffect(() => {
-    if (loading) return
+    if (isLoading) return
 
     // 🔐 Belum login → ke /login
     if (!user) {
@@ -30,13 +30,13 @@ export default function DashboardLayout({
     }
 
     // 🔐 Role tidak sesuai → redirect ke role yang benar
-    const userRole = user.role || (user.roles?.[0]?.name?.toLowerCase() || 'user')
+    const userRole = user.role || (user.roles?.[0]?.toLowerCase() || 'user')
     if (userRole !== requestedRole) {
       router.push(`/dashboard/${userRole}`)
     }
-  }, [user, loading, requestedRole, router])
+  }, [user, isLoading, requestedRole, router])
 
-  if (loading || !user) {
+  if (isLoading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

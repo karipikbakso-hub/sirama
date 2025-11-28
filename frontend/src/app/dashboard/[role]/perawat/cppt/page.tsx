@@ -204,8 +204,8 @@ export default function CPPTPage() {
         console.error('Failed to fetch CPPT entries')
         // Fallback to mock data
         const mockEntries: CPPTEntry[] = safePatients
-          .filter(p => p.lastCPPT)
-          .map(p => p.lastCPPT!)
+          .filter(p => p.last_cppt)
+          .map(p => p.last_cppt!)
           .sort((a, b) => new Date(`${b.date} ${b.time}`).getTime() - new Date(`${a.date} ${a.time}`).getTime())
         setCpptEntries(mockEntries)
       }
@@ -570,7 +570,7 @@ export default function CPPTPage() {
                   </p>
                 </div>
               </div>
-              {patient.lastCPPT && (
+              {patient.last_cppt && (
                 <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(patient.last_cppt.status)}`}>
                   {getStatusIcon(patient.last_cppt.status)}
                   {getStatusText(patient.last_cppt.status)}
@@ -583,18 +583,18 @@ export default function CPPTPage() {
                 <div className="flex items-center gap-2 text-sm">
                   <MdAccessTime className="text-gray-400 text-lg" />
                   <span className="text-gray-600 dark:text-gray-400">
-                    {patient.lastCPPT.date} {patient.lastCPPT.time}
+                    {patient.last_cppt.date} {patient.last_cppt.time}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <MdMedicalServices className="text-gray-400 text-lg" />
                   <span className="text-gray-600 dark:text-gray-400">
-                    Shift: {getShiftText(patient.lastCPPT.shift)}
+                    Shift: {getShiftText(patient.last_cppt.shift)}
                   </span>
                 </div>
                 <div className="text-sm">
                   <p className="text-gray-600 dark:text-gray-400 line-clamp-2">
-                    {patient.lastCPPT.assessment.subjective}
+                    {patient.last_cppt.assessment.subjective}
                   </p>
                 </div>
               </div>
@@ -630,7 +630,7 @@ export default function CPPTPage() {
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Dokumentasi CPPT
-                  {selectedPatient && ` - ${selectedPatient.name}`}
+                  {selectedPatient && ` - ${selectedPatient.nama_lengkap}`}
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   Clinical Progress Patient Tracking

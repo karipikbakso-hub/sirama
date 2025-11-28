@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Select } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from '@/lib/toast'
@@ -305,14 +305,19 @@ export default function MutasiStokPage() {
                 <Label htmlFor="type">Tipe Pergerakan</Label>
                 <Select
                   value={selectedType}
-                  onChange={(e) => setSelectedType(e.target.value)}
+                  onValueChange={setSelectedType}
                 >
-                  <option value="">Semua Tipe</option>
-                  <option value="in">Penerimaan</option>
-                  <option value="out">Pengeluaran</option>
-                  <option value="adjustment">Penyesuaian</option>
-                  <option value="expired">Kadaluarsa</option>
-                  <option value="damaged">Rusak</option>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Semua Tipe" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Semua Tipe</SelectItem>
+                    <SelectItem value="in">Penerimaan</SelectItem>
+                    <SelectItem value="out">Pengeluaran</SelectItem>
+                    <SelectItem value="adjustment">Penyesuaian</SelectItem>
+                    <SelectItem value="expired">Kadaluarsa</SelectItem>
+                    <SelectItem value="damaged">Rusak</SelectItem>
+                  </SelectContent>
                 </Select>
               </div>
 

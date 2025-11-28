@@ -10,7 +10,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { 
   Heart, 
   Thermometer, 
@@ -30,8 +29,37 @@ import {
   CheckCircle,
   User
 } from 'lucide-react'
-import { Examination, VitalSigns, Diagnosis, Treatment, Medication, useCreateExamination, useUpdateExamination, useCompleteExamination } from '@/hooks/useEmrExamination'
+import { Examination, useExaminationMutation } from '@/hooks/useEmrExamination'
 import toast from '@/lib/toast'
+
+interface VitalSigns {
+  blood_pressure?: string
+  heart_rate?: number
+  temperature?: number
+  respiration_rate?: number
+  oxygen_saturation?: number
+  weight?: number
+  height?: number
+  bmi?: number
+}
+
+interface Diagnosis {
+  code?: string
+  name?: string
+  type?: 'primary' | 'secondary' | 'differential'
+}
+
+interface Treatment {
+  name?: string
+  description?: string
+}
+
+interface Medication {
+  name?: string
+  dosage?: string
+  frequency?: string
+  duration?: string
+}
 
 interface ExaminationFormProps {
   examination?: Examination
@@ -51,7 +79,7 @@ interface FormData {
   riwayat_penyakit_keluarga?: string
   riwayat_alergi?: string
   riwayat_pengobatan?: string
-  
+
   // Physical Examination
   tanda_vital?: VitalSigns
   keadaan_umum?: string
@@ -70,22 +98,22 @@ interface FormData {
   neurologi?: string
   kulit?: string
   lain_lain?: string
-  
+
   // Diagnosis
-  diagnosis?: Diagnosis[]
+  diagnosis?: string
   diagnosis_utama?: string
   diagnosis_sekunder?: string
   diagnosis_banding?: string
-  
+
   // Treatment Planning
   tindakan?: Treatment[]
   terapi?: Medication[]
   rencana_tindak_lanjut?: string
   tanggal_kontrol?: string
   instruksi_pasien?: string
-  
+
   // Status
-  status?: 'draft' | 'completed' | 'cancelled'
+  status?: 'draft' | 'completed' | 'reviewed'
   catatan_dokter?: string
 }
 
@@ -103,31 +131,31 @@ export default function ExaminationForm({
       status: examination?.status || 'draft',
       tanda_vital: {
         blood_pressure: '',
-        heart_rate: '',
-        temperature: '',
-        respiration_rate: '',
-        oxygen_saturation: '',
-        weight: '',
-        height: '',
-        bmi: ''
+        heart_rate: 0,
+        temperature: 0,
+        respiration_rate: 0,
+        oxygen_saturation: 0,
+        weight: 0,
+        height: 0,
+        bmi: 0
       },
-      diagnosis: [],
+      diagnosis: '',
       tindakan: [],
       terapi: []
     }
   })
 
-  const createExamination = useCreateExamination()
-  const updateExamination = useUpdateExamination()
-  const completeExamination = useCompleteExamination()
+  const examinationMutation = useExaminationMutation()
+
+  const [activeTab, setActiveTab] = useState('anamnesis')
 
   const watchedVitalSigns = watch('tanda_vital')
 
   // Calculate BMI when weight or height changes
   useEffect(() => {
     if (watchedVitalSigns?.weight && watchedVitalSigns?.height) {
-      const weight = parseFloat(watchedVitalSigns.weight)
-      const height = parseFloat(watchedVitalSigns.height)
+      const weight = Number(watchedVitalSigns.weight)
+      const height = Number(watchedVitalSigns.height)
       if (weight > 0 && height > 0) {
         const heightInMeters = height / 100
         const bmi = weight / (heightInMeters * heightInMeters)
@@ -140,21 +168,49 @@ export default function ExaminationForm({
   useEffect(() => {
     if (examination) {
       reset({
-        ...examination,
-        status: examination.status || 'draft',
+        keluhan_utama: examination.chief_complaint || '',
+        riwayat_penyakit_sekarang: examination.present_illness || '',
+        riwayat_penyakit_dahulu: examination.past_medical_history || '',
+        riwayat_penyakit_keluarga: examination.family_history || '',
+        riwayat_alergi: examination.allergies || '',
+        riwayat_pengobatan: examination.social_history || '',
         tanda_vital: {
-          blood_pressure: examination.tanda_vital?.blood_pressure || '',
-          heart_rate: examination.tanda_vital?.heart_rate || '',
-          temperature: examination.tanda_vital?.temperature || '',
-          respiration_rate: examination.tanda_vital?.respiration_rate || '',
-          oxygen_saturation: examination.tanda_vital?.oxygen_saturation || '',
-          weight: examination.tanda_vital?.weight || '',
-          height: examination.tanda_vital?.height || '',
-          bmi: examination.tanda_vital?.bmi || ''
+          blood_pressure: examination.vital_signs?.blood_pressure || '',
+          heart_rate: examination.vital_signs?.heart_rate || 0,
+          temperature: examination.vital_signs?.temperature || 0,
+          respiration_rate: examination.vital_signs?.respiratory_rate || 0,
+          oxygen_saturation: examination.vital_signs?.oxygen_saturation || 0,
+          weight: examination.vital_signs?.weight || 0,
+          height: examination.vital_signs?.height || 0,
+          bmi: examination.vital_signs?.bmi || 0
         },
-        diagnosis: examination.diagnosis || [],
-        tindakan: examination.tindakan || [],
-        terapi: examination.terapi || []
+        keadaan_umum: examination.physical_examination?.general || '',
+        kesadaran: '',
+        kepala: examination.physical_examination?.head_neck || '',
+        mata: '',
+        telinga: '',
+        hidung: '',
+        tenggorokan: '',
+        leher: '',
+        thorax: '',
+        jantung: examination.physical_examination?.cardiovascular || '',
+        paru: examination.physical_examination?.respiratory || '',
+        abdomen: examination.physical_examination?.gastrointestinal || '',
+        ekstremitas: examination.physical_examination?.musculoskeletal || '',
+        neurologi: examination.physical_examination?.neurological || '',
+        kulit: '',
+        lain_lain: examination.physical_examination?.psychiatric || '',
+        diagnosis: examination.diagnosis || '',
+        diagnosis_utama: '',
+        diagnosis_sekunder: '',
+        diagnosis_banding: '',
+        tindakan: [],
+        terapi: [],
+        rencana_tindak_lanjut: examination.follow_up_instructions || '',
+        tanggal_kontrol: '',
+        instruksi_pasien: '',
+        status: examination.status || 'draft',
+        catatan_dokter: ''
       })
     }
   }, [examination, reset])
@@ -162,26 +218,40 @@ export default function ExaminationForm({
   const onSubmit = async (data: FormData) => {
     try {
       const examinationData = {
-        ...data,
+        chief_complaint: data.keluhan_utama || '',
+        present_illness: data.riwayat_penyakit_sekarang || '',
+        past_medical_history: data.riwayat_penyakit_dahulu || '',
+        family_history: data.riwayat_penyakit_keluarga || '',
+        allergies: data.riwayat_alergi || '',
+        social_history: data.riwayat_pengobatan || '',
+        vital_signs: data.tanda_vital,
+        physical_examination: {
+          general: data.keadaan_umum || '',
+          head_neck: data.kepala || '',
+          cardiovascular: data.jantung || '',
+          respiratory: data.paru || '',
+          gastrointestinal: data.abdomen || '',
+          genitourinary: '',
+          musculoskeletal: data.ekstremitas || '',
+          neurological: data.neurologi || '',
+          psychiatric: data.lain_lain || ''
+        },
+        diagnosis: data.diagnosis || '',
+        icd10_code: '',
+        treatment_plan: data.tindakan?.map(t => t.name).join(', ') || '',
+        prescriptions: data.terapi?.map(t => `${t.name} ${t.dosage} ${t.frequency} ${t.duration}`).join(', ') || '',
+        follow_up_instructions: data.rencana_tindak_lanjut || '',
+        status: data.status || 'draft',
         patient_id: patientId,
         registration_id: registrationId,
         doctor_id: doctorId,
-        tanggal_pemeriksaan: new Date().toISOString(),
-        // Ensure empty arrays are properly handled
-        diagnosis: data.diagnosis?.filter(d => d.name) || [],
-        tindakan: data.tindakan?.filter(t => t.name) || [],
-        terapi: data.terapi?.filter(t => t.name) || []
+        examination_date: new Date().toISOString()
       }
 
-      let result
-      if (examination?.id) {
-        result = await updateExamination.mutateAsync({ 
-          id: examination.id, 
-          data: examinationData 
-        })
-      } else {
-        result = await createExamination.mutateAsync(examinationData)
-      }
+      const result = await examinationMutation.mutateAsync({
+        id: examination?.id,
+        data: examinationData
+      })
 
       onSave?.(result)
     } catch (error) {
@@ -189,26 +259,7 @@ export default function ExaminationForm({
     }
   }
 
-  const handleComplete = async () => {
-    if (examination?.id) {
-      try {
-        const result = await completeExamination.mutateAsync(examination.id)
-        onSave?.(result)
-      } catch (error) {
-        // Error is handled by the mutation hook
-      }
-    }
-  }
 
-  const addDiagnosis = () => {
-    const currentDiagnosis = watch('diagnosis') || []
-    setValue('diagnosis', [...currentDiagnosis, { code: '', name: '', type: 'primary' }])
-  }
-
-  const removeDiagnosis = (index: number) => {
-    const currentDiagnosis = watch('diagnosis') || []
-    setValue('diagnosis', currentDiagnosis.filter((_, i) => i !== index))
-  }
 
   const addTreatment = () => {
     const currentTreatments = watch('tindakan') || []
@@ -230,7 +281,7 @@ export default function ExaminationForm({
     setValue('terapi', currentMedications.filter((_, i) => i !== index))
   }
 
-  const isLoading = createExamination.isPending || updateExamination.isPending
+  const isLoading = examinationMutation.isPending
 
   return (
     <div className="space-y-6">
@@ -258,7 +309,7 @@ export default function ExaminationForm({
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <Tabs defaultValue="anamnesis" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="anamnesis">Anamnesis</TabsTrigger>
             <TabsTrigger value="physical">Pemeriksaan Fisik</TabsTrigger>
@@ -573,7 +624,7 @@ export default function ExaminationForm({
                   </div>
                 </div>
 
-                <Separator />
+                <div className="border-t my-4" />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -667,7 +718,7 @@ export default function ExaminationForm({
                   </div>
                 </div>
 
-                <Separator />
+                <div className="border-t my-4" />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -803,12 +854,6 @@ export default function ExaminationForm({
                     <Brain className="w-5 h-5" />
                     Diagnosis
                   </span>
-                  {!isReadOnly && (
-                    <Button type="button" onClick={addDiagnosis} size="sm">
-                      <Plus className="w-4 h-4 mr-1" />
-                      Tambah Diagnosis
-                    </Button>
-                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -860,85 +905,6 @@ export default function ExaminationForm({
                   </div>
                 </div>
 
-                <Separator />
-
-                {/* Structured Diagnosis List */}
-                <div className="space-y-4">
-                  <Label>Diagnosis Terstruktur</Label>
-                  {(watch('diagnosis') || []).map((diagnosis, index) => (
-                    <div key={index} className="p-4 border rounded-lg space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium">Diagnosis {index + 1}</h4>
-                        {!isReadOnly && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeDiagnosis(index)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div className="space-y-2">
-                          <Label>Kode ICD-10</Label>
-                          <Controller
-                            name={`diagnosis.${index}.code`}
-                            control={control}
-                            render={({ field }) => (
-                              <Input
-                                {...field}
-                                placeholder="Contoh: A09.9"
-                                disabled={isReadOnly}
-                              />
-                            )}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Nama Diagnosis</Label>
-                          <Controller
-                            name={`diagnosis.${index}.name`}
-                            control={control}
-                            render={({ field }) => (
-                              <Input
-                                {...field}
-                                placeholder="Nama diagnosis..."
-                                disabled={isReadOnly}
-                              />
-                            )}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Jenis</Label>
-                          <Controller
-                            name={`diagnosis.${index}.type`}
-                            control={control}
-                            render={({ field }) => (
-                              <Select 
-                                value={field.value} 
-                                onValueChange={field.onChange}
-                                disabled={isReadOnly}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="primary">Utama</SelectItem>
-                                  <SelectItem value="secondary">Sekunder</SelectItem>
-                                  <SelectItem value="differential">Banding</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            )}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1200,17 +1166,6 @@ export default function ExaminationForm({
                   {isLoading ? 'Menyimpan...' : 'Simpan Draft'}
                 </Button>
 
-                {examination?.id && (
-                  <Button
-                    type="button"
-                    onClick={handleComplete}
-                    disabled={isLoading || completeExamination.isPending}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    {completeExamination.isPending ? 'Menyelesaikan...' : 'Selesai'}
-                  </Button>
-                )}
               </>
             )}
           </div>

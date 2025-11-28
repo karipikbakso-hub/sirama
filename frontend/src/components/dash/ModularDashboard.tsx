@@ -25,16 +25,16 @@ const RegistrasiPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/reg
 const PasienPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/pasien/page'))
 const AntrianPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/antrian/page'))
 const SEPPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/sep/page'))
-const KPIPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/kpi/page'))
+// const KPIPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/kpi/page')) // File tidak ada
 const RiwayatPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/kpi-laporan/page'))
 const RegistrasiIGDPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/registrasi-igd/page'))
-const AntrianManagementPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/antrian-management/page'))
+// const AntrianManagementPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/antrian-management/page')) // File tidak ada
 const RujukanPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/rujukan/page'))
 const MasterDataPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/master-data/page'))
-const NotificationsPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/notifications/page'))
+// const NotificationsPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/notifications/page')) // File tidak ada
 const MobileJKNPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/mobile-jkn/page'))
 const AppointmentPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/appointment/page'))
-const BPJSIntegrationPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/bpjs-integration/page'))
+// const BPJSIntegrationPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/bpjs-integration/page')) // File tidak ada
 
 // Lazy load doctor modules
 const EMRPage = lazy(() => import('@/app/dashboard/[role]/dokter/emr/page'))
@@ -80,26 +80,18 @@ export default function ModularDashboard({ role, module }: ModularDashboardProps
           return <AntrianPage />
         case 'sep':
           return <SEPPage />
-        case 'kpi':
-          return <KPIPage />
         case 'riwayat':
           return <RiwayatPage />
         case 'registrasi-igd':
           return <RegistrasiIGDPage />
-        case 'antrian-management':
-          return <AntrianManagementPage />
         case 'rujukan':
           return <RujukanPage />
         case 'master-data':
           return <MasterDataPage />
-        case 'notifications':
-          return <NotificationsPage />
         case 'mobile-jkn':
           return <MobileJKNPage />
         case 'appointment':
           return <AppointmentPage />
-        case 'bpjs-integration':
-          return <BPJSIntegrationPage />
         default:
           return <PendaftaranDashboard />
       }

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { apiAuth } from '@/lib/apiAuth';
+import apiAuth from '@/lib/apiAuth';
 
 export interface DashboardStat {
   title: string;

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { toast } from '@/lib/toast'
@@ -284,52 +284,64 @@ export default function RiwayatResepPage() {
             <div>
               <Label htmlFor="status">Status</Label>
               <Select
-                label="Status"
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onValueChange={setStatusFilter}
               >
-                <option value="">Semua Status</option>
-                <option value="pending">Menunggu Validasi</option>
-                <option value="validated">Sudah Divalidasi</option>
-                <option value="dispensed">Sudah Dispensing</option>
-                <option value="completed">Selesai</option>
-                <option value="rejected">Ditolak</option>
+                <SelectTrigger>
+                  <SelectValue placeholder="Semua Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Semua Status</SelectItem>
+                  <SelectItem value="pending">Menunggu Validasi</SelectItem>
+                  <SelectItem value="validated">Sudah Divalidasi</SelectItem>
+                  <SelectItem value="dispensed">Sudah Dispensing</SelectItem>
+                  <SelectItem value="completed">Selesai</SelectItem>
+                  <SelectItem value="rejected">Ditolak</SelectItem>
+                </SelectContent>
               </Select>
             </div>
 
             <div>
               <Label htmlFor="insurance">Jenis Asuransi</Label>
               <Select
-                label="Jenis Asuransi"
                 value={insuranceFilter}
-                onChange={(e) => setInsuranceFilter(e.target.value)}
+                onValueChange={setInsuranceFilter}
               >
-                <option value="">Semua Jenis</option>
-                <option value="cash">Tunai</option>
-                <option value="bpjs">BPJS</option>
-                <option value="insurance">Asuransi</option>
+                <SelectTrigger>
+                  <SelectValue placeholder="Semua Jenis" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Semua Jenis</SelectItem>
+                  <SelectItem value="cash">Tunai</SelectItem>
+                  <SelectItem value="bpjs">BPJS</SelectItem>
+                  <SelectItem value="insurance">Asuransi</SelectItem>
+                </SelectContent>
               </Select>
             </div>
 
             <div>
               <Label htmlFor="sort">Urutkan</Label>
               <Select
-                label="Urutkan"
                 value={`${sortBy}_${sortOrder}`}
-                onChange={(e) => {
-                  const [field, order] = e.target.value.split('_')
+                onValueChange={(value) => {
+                  const [field, order] = value.split('_')
                   setSortBy(field)
                   setSortOrder(order)
                 }}
               >
-                <option value="created_at_desc">Tanggal Dibuat (Terbaru)</option>
-                <option value="created_at_asc">Tanggal Dibuat (Terlama)</option>
-                <option value="patient_name_asc">Nama Pasien (A-Z)</option>
-                <option value="patient_name_desc">Nama Pasien (Z-A)</option>
-                <option value="doctor_name_asc">Dokter (A-Z)</option>
-                <option value="doctor_name_desc">Dokter (Z-A)</option>
-                <option value="status_asc">Status (A-Z)</option>
-                <option value="status_desc">Status (Z-A)</option>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tanggal Dibuat (Terbaru)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="created_at_desc">Tanggal Dibuat (Terbaru)</SelectItem>
+                  <SelectItem value="created_at_asc">Tanggal Dibuat (Terlama)</SelectItem>
+                  <SelectItem value="patient_name_asc">Nama Pasien (A-Z)</SelectItem>
+                  <SelectItem value="patient_name_desc">Nama Pasien (Z-A)</SelectItem>
+                  <SelectItem value="doctor_name_asc">Dokter (A-Z)</SelectItem>
+                  <SelectItem value="doctor_name_desc">Dokter (Z-A)</SelectItem>
+                  <SelectItem value="status_asc">Status (A-Z)</SelectItem>
+                  <SelectItem value="status_desc">Status (Z-A)</SelectItem>
+                </SelectContent>
               </Select>
             </div>
           </div>

@@ -29,8 +29,17 @@ export interface AppointmentData {
   updatedAt: string
 }
 
-export const getAppointmentColumns = (): ColumnDef<AppointmentData>[] => [
-  {
+interface AppointmentColumnHandlers {
+  onConfirm?: (appointment: AppointmentData) => void
+  onEdit?: (appointment: AppointmentData) => void
+  onCancel?: (appointment: AppointmentData) => void
+  onDelete?: (appointment: AppointmentData) => void
+  onView?: (appointment: AppointmentData) => void
+}
+
+export const getAppointmentColumns = (handlers?: AppointmentColumnHandlers): ColumnDef<AppointmentData>[] => {
+  return [
+    {
     accessorKey: 'patientName',
     header: 'Pasien',
     cell: ({ row }) => {
@@ -205,6 +214,7 @@ export const getAppointmentColumns = (): ColumnDef<AppointmentData>[] => [
     },
   },
 ]
+}
 
 // Mock data for development
 export const mockAppointmentData: AppointmentData[] = [

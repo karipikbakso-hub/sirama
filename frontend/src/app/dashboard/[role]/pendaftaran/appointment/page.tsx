@@ -356,7 +356,7 @@ export default function AppointmentPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
           </div>
         ) : (
-          <TableByRole role="pendaftaran" data={appointments} />
+          <TableByRole role="rekammedis" data={appointments} />
         )}
       </div>
 
@@ -383,18 +383,12 @@ export default function AppointmentPage() {
                     Pasien *
                   </label>
                   <SearchableSelect
-                    onChange={(selected) => {
-                      if (selected) {
-                        setCreateForm(prev => ({
-                          ...prev,
-                          patient_id: selected.value
-                        }))
-                      } else {
-                        setCreateForm(prev => ({
-                          ...prev,
-                          patient_id: ''
-                        }))
-                      }
+                    options={[]} // TODO: Add patient options from API
+                    onChange={(value) => {
+                      setCreateForm(prev => ({
+                        ...prev,
+                        patient_id: value
+                      }))
                     }}
                     placeholder="Cari dan pilih pasien..."
                     className="w-full"

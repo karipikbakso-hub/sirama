@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Select } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -430,14 +430,19 @@ export default function PenyerahanObatPage() {
                   <Label htmlFor="receiver_relation">Hubungan dengan Pasien *</Label>
                   <Select
                     value={handoverForm.receiver_relation}
-                    onChange={(e) => setHandoverForm(prev => ({ ...prev, receiver_relation: e.target.value }))}
+                    onValueChange={(value) => setHandoverForm(prev => ({ ...prev, receiver_relation: value }))}
                   >
-                    <option value="pasien">Pasien Sendiri</option>
-                    <option value="suami">Suami</option>
-                    <option value="istri">Istri</option>
-                    <option value="anak">Anak</option>
-                    <option value="orangtua">Orang Tua</option>
-                    <option value="lainnya">Lainnya</option>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih hubungan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pasien">Pasien Sendiri</SelectItem>
+                      <SelectItem value="suami">Suami</SelectItem>
+                      <SelectItem value="istri">Istri</SelectItem>
+                      <SelectItem value="anak">Anak</SelectItem>
+                      <SelectItem value="orangtua">Orang Tua</SelectItem>
+                      <SelectItem value="lainnya">Lainnya</SelectItem>
+                    </SelectContent>
                   </Select>
                 </div>
               </div>

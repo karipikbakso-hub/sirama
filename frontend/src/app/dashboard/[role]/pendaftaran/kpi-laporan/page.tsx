@@ -237,7 +237,7 @@ export default function KPIPendaftaranPage() {
         <div className="flex flex-wrap gap-4 items-end">
           <div className="flex-1 min-w-[200px]">
             <label className="block text-sm font-medium mb-2">Periode Tanggal</label>
-            <Select value="30_days" onChange={() => {}}>
+            <Select value="30_days" onValueChange={() => {}}>
               <option value="today">Hari Ini</option>
               <option value="7_days">7 Hari Terakhir</option>
               <option value="30_days">30 Hari Terakhir</option>
@@ -247,7 +247,7 @@ export default function KPIPendaftaranPage() {
 
           <div className="flex-1 min-w-[200px]">
             <label className="block text-sm font-medium mb-2">Bandingkan Dengan</label>
-            <Select value={compareWith} onChange={(e) => setCompareWith(e.target.value as 'previous_period' | 'last_year' | 'custom')}>
+            <Select value={compareWith} onValueChange={(value) => setCompareWith(value as 'previous_period' | 'last_year' | 'custom')}>
               <option value="previous_period">Periode Sebelumnya</option>
               <option value="last_year">Tahun Lalu</option>
               <option value="custom">Custom</option>
@@ -256,7 +256,7 @@ export default function KPIPendaftaranPage() {
 
           <div className="flex-1 min-w-[200px]">
             <label className="block text-sm font-medium mb-2">Filter Poli</label>
-            <Select value={poliFilter} onChange={(e) => setPoliFilter(e.target.value)}>
+            <Select value={poliFilter} onValueChange={(value) => setPoliFilter(value)}>
               <option value="all">Semua Poli</option>
               <option value="umum">Poli Umum</option>
               <option value="anak">Poli Anak</option>
@@ -266,7 +266,7 @@ export default function KPIPendaftaranPage() {
 
           <div className="flex-1 min-w-[200px]">
             <label className="block text-sm font-medium mb-2">Filter Staff</label>
-            <Select value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)}>
+            <Select value={staffFilter} onValueChange={(value) => setStaffFilter(value)}>
               <option value="all">Semua Staff</option>
               <option value="petugas_a">Petugas A</option>
               <option value="petugas_b">Petugas B</option>

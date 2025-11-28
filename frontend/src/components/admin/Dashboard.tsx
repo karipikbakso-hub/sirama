@@ -21,34 +21,34 @@ export function Dashboard() {
   const stats = data ? [
     {
       title: 'Total Pengguna',
-      value: data.data.totalUsers.value.toString(),
+      value: data.stats.totalUsers.toString(),
       icon: Users,
-      change: data.data.totalUsers.trend,
-      trend: data.data.totalUsers.isPositive ? ('up' as const) : ('down' as const),
+      change: 0,
+      trend: 'up' as const,
       description: 'pengguna aktif'
     },
     {
       title: 'Active Users Today',
-      value: data.data.activeUsersToday.value.toString(),
+      value: data.stats.activeUsers.toString(),
       icon: Activity,
-      change: data.data.activeUsersToday.trend,
-      trend: data.data.activeUsersToday.isPositive ? ('up' as const) : ('down' as const),
+      change: 0,
+      trend: 'up' as const,
       description: 'pengguna aktif hari ini'
     },
     {
       title: 'Audit Logs Today',
-      value: data.data.auditLogsToday.value.toString(),
+      value: data.stats.totalAuditLogs.toString(),
       icon: Database,
-      change: data.data.auditLogsToday.trend,
-      trend: data.data.auditLogsToday.isPositive ? ('up' as const) : ('down' as const),
+      change: 0,
+      trend: 'up' as const,
       description: 'aktivitas tercatat hari ini'
     },
     {
       title: 'API Calls Today',
-      value: data.data.apiCallsToday.value.toString(),
+      value: '0',
       icon: Server,
-      change: data.data.apiCallsToday.trend,
-      trend: data.data.apiCallsToday.isPositive ? ('up' as const) : ('down' as const),
+      change: 0,
+      trend: 'up' as const,
       description: 'panggilan API hari ini'
     }
   ] : []

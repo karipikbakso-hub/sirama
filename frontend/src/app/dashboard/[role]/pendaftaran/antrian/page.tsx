@@ -56,15 +56,16 @@ export default function AntrianPage() {
 
     return Object.values(queueData.by_poli).map((poli) => ({
       ...poli,
-      next_3: poli.waiting_list.slice(0, 3)
+      next_3: poli.waiting_list.slice(0, 3),
+      avg_wait_time: poli.stats.avg_wait_time
     }))
   }, [queueData])
 
   // Stats for overview
   const stats = useMemo(() => ({
-    total: queueData?.stats?.total_waiting + queueData?.stats?.total_called + queueData?.stats?.total_in_progress || 0,
+    total: (queueData?.stats?.total_waiting || 0) + (queueData?.stats?.total_called || 0) + (queueData?.stats?.total_in_progress || 0),
     waiting: queueData?.stats?.total_waiting || 0,
-    inProgress: queueData?.stats?.total_called + queueData?.stats?.total_in_progress || 0,
+    inProgress: (queueData?.stats?.total_called || 0) + (queueData?.stats?.total_in_progress || 0),
     completed: queueData?.stats?.total_completed || 0,
     avgWaitTime: queueData?.stats?.avg_wait_time || null
   }), [queueData])

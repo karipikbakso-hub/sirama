@@ -49,7 +49,7 @@ interface RoleFormData {
 export default function RolePage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<'all' | 'core' | 'custom'>('all')
-  const [viewMode, setViewMode] = useState<'table' | 'matrix'>('table')
+  const [viewMode, setViewMode] = useState<'table' | 'matrix'>('table' as 'table' | 'matrix')
   const [showAddForm, setShowAddForm] = useState(false)
   const [showEditForm, setShowEditForm] = useState(false)
   const [showPermissionModal, setShowPermissionModal] = useState(false)
@@ -478,13 +478,13 @@ export default function RolePage() {
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => setViewMode('table')}
-                            className={`px-3 py-1 text-xs rounded-full ${viewMode === 'table' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-400'}`}
+                            className={`px-3 py-1 text-xs rounded-full ${(viewMode as 'table' | 'matrix') === 'table' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-400'}`}
                           >
                             Table
                           </button>
                           <button
                             onClick={() => setViewMode('matrix')}
-                            className={`px-3 py-1 text-xs rounded-full ${viewMode === 'matrix' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-400'}`}
+                            className={`px-3 py-1 text-xs rounded-full ${(viewMode as 'table' | 'matrix') === 'matrix' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-400'}`}
                           >
                             Matrix
                           </button>
@@ -587,7 +587,7 @@ export default function RolePage() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setViewMode('table')}
-                    className={`px-3 py-1 text-xs rounded-full ${viewMode === 'table' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-400'}`}
+                    className={`px-3 py-1 text-xs rounded-full ${(viewMode as 'table' | 'matrix') === 'table' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-400'}`}
                   >
                     Table
                   </button>

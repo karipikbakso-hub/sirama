@@ -285,7 +285,7 @@ export default function ExaminationFormSimple({
                   id="heart_rate"
                   type="number"
                   value={formData.vital_signs.heart_rate || ''}
-                  onChange={(e) => updateVitalSigns('heart_rate', parseInt(e.target.value) || undefined)}
+                  onChange={(e) => updateVitalSigns('heart_rate', parseInt(e.target.value) || 0)}
                   placeholder="bpm"
                 />
               </div>
@@ -297,7 +297,7 @@ export default function ExaminationFormSimple({
                   type="number"
                   step="0.1"
                   value={formData.vital_signs.temperature || ''}
-                  onChange={(e) => updateVitalSigns('temperature', parseFloat(e.target.value) || undefined)}
+                  onChange={(e) => updateVitalSigns('temperature', parseFloat(e.target.value) || 0)}
                   placeholder="°C"
                 />
               </div>
@@ -308,7 +308,7 @@ export default function ExaminationFormSimple({
                   id="respiratory_rate"
                   type="number"
                   value={formData.vital_signs.respiratory_rate || ''}
-                  onChange={(e) => updateVitalSigns('respiratory_rate', parseInt(e.target.value) || undefined)}
+                  onChange={(e) => updateVitalSigns('respiratory_rate', parseInt(e.target.value) || 0)}
                   placeholder="/menit"
                 />
               </div>
@@ -319,7 +319,7 @@ export default function ExaminationFormSimple({
                   id="oxygen_saturation"
                   type="number"
                   value={formData.vital_signs.oxygen_saturation || ''}
-                  onChange={(e) => updateVitalSigns('oxygen_saturation', parseInt(e.target.value) || undefined)}
+                  onChange={(e) => updateVitalSigns('oxygen_saturation', parseInt(e.target.value) || 0)}
                   placeholder="%"
                 />
               </div>
@@ -331,7 +331,7 @@ export default function ExaminationFormSimple({
                   type="number"
                   step="0.1"
                   value={formData.vital_signs.weight || ''}
-                  onChange={(e) => updateVitalSigns('weight', parseFloat(e.target.value) || undefined)}
+                  onChange={(e) => updateVitalSigns('weight', parseFloat(e.target.value) || 0)}
                   placeholder="kg"
                   onBlur={calculateBMI}
                 />
@@ -344,7 +344,7 @@ export default function ExaminationFormSimple({
                   type="number"
                   step="0.1"
                   value={formData.vital_signs.height || ''}
-                  onChange={(e) => updateVitalSigns('height', parseFloat(e.target.value) || undefined)}
+                  onChange={(e) => updateVitalSigns('height', parseFloat(e.target.value) || 0)}
                   placeholder="cm"
                   onBlur={calculateBMI}
                 />

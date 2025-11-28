@@ -1,6 +1,6 @@
 // Role-specific dashboard hooks
 export { useAdminDashboard, useUserManagement, useSystemMonitoring } from './useAdminDashboard'
-export { usePendaftaranDashboard, usePatientSearch, useQueueManagement } from './usePendaftaranDashboard'
+export { usePendaftaranDashboard } from './usePendaftaranDashboard'
 export { useDokterDashboard } from './useDokterDashboard'
 export { usePerawatDashboard } from './usePerawatDashboard'
 export { useApotekerDashboard } from './useApotekerDashboard'
@@ -16,11 +16,11 @@ export type {
 } from './useAdminDashboard'
 
 export type {
-  PatientStats,
-  QueueStats,
-  DashboardStats,
-  Activity,
-  Alert
+  StatsData,
+  ChartData,
+  QueueRealtimeData,
+  PatientTodayData,
+  DashboardStats
 } from './usePendaftaranDashboard'
 
 export type {
@@ -41,8 +41,10 @@ export type {
 } from './useApotekerDashboard'
 
 export type {
-  BillingStats,
-  PendingPayment
+  KasirDashboardStats,
+  RecentPayment,
+  BillingAlert,
+  RevenueChartData
 } from './useKasirDashboard'
 
 export type {

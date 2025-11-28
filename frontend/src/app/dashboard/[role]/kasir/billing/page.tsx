@@ -296,7 +296,7 @@ export default function BillingPage() {
                   </td>
                 </tr>
               ) : (
-                billings.map((bill) => (
+                billings.map((bill: Billing) => (
                   <tr
                     key={bill.id}
                     className="border-b border-gray-200 dark:border-zinc-800 hover:bg-indigo-500/10 dark:hover:bg-indigo-400/10 transition"
@@ -400,7 +400,7 @@ export default function BillingPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              {billings.filter(b => b.status === 'pending').length}
+              {billings.filter((b: Billing) => b.status === 'pending').length}
             </div>
           </CardContent>
         </Card>
@@ -410,7 +410,7 @@ export default function BillingPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {billings.filter(b => b.status === 'paid').length}
+              {billings.filter((b: Billing) => b.status === 'paid').length}
             </div>
           </CardContent>
         </Card>
@@ -420,7 +420,7 @@ export default function BillingPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(billings.reduce((sum, b) => sum + b.total_bayar, 0))}
+              {formatCurrency(billings.reduce((sum: number, b: Billing) => sum + b.total_bayar, 0))}
             </div>
           </CardContent>
         </Card>

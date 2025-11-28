@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Select } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -582,13 +582,18 @@ export default function StokApotekerPage() {
                 <Label htmlFor="type">Tipe Penyesuaian</Label>
                 <Select
                   value={adjustmentForm.type}
-                  onChange={(e) => setAdjustmentForm(prev => ({ ...prev, type: e.target.value }))}
+                  onValueChange={(value) => setAdjustmentForm(prev => ({ ...prev, type: value }))}
                 >
-                  <option value="adjustment">Koreksi Stok</option>
-                  <option value="in">Pembelian/Penerimaan</option>
-                  <option value="out">Penjualan/Dispensing</option>
-                  <option value="expired">Kadaluarsa</option>
-                  <option value="damaged">Rusak</option>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih tipe penyesuaian" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="adjustment">Koreksi Stok</SelectItem>
+                    <SelectItem value="in">Pembelian/Penerimaan</SelectItem>
+                    <SelectItem value="out">Penjualan/Dispensing</SelectItem>
+                    <SelectItem value="expired">Kadaluarsa</SelectItem>
+                    <SelectItem value="damaged">Rusak</SelectItem>
+                  </SelectContent>
                 </Select>
               </div>
 

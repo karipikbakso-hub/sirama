@@ -165,7 +165,7 @@ function PersistentSidebar() {
   useEffect(() => {
     globalSetRole = setRoleState
     if (!globalRole && user) {
-      const userRole = user.role || (user.roles?.[0]?.name?.toLowerCase() || 'user')
+      const userRole = user.role || (user.roles?.[0]?.toLowerCase() || 'user')
       setGlobalRole(userRole)
     }
   }, [user])
