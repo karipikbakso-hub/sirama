@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useFetch } from '@/hooks/useApi'
 
 export interface PharmacyStats {
-  totalPrescriptions: number
-  pendingValidations: number
-  dispensedToday: number
-  lowStockAlerts: number
-  totalMedicines: number
+  order_masuk: number
+  validasi_pending: number
+  stok_menipis: number
+  expired_soon: number
 }
 
 export interface PrescriptionQueue {
@@ -20,54 +20,88 @@ export interface PrescriptionQueue {
   createdAt: string
 }
 
+export interface LowStockMedicine {
+  id: number
+  name: string
+  stock: number
+  unit: string
+  expired_date: string
+}
+
+export interface ExpiringSoonMedicine {
+  id: number
+  name: string
+  stock: number
+  unit: string
+  expired_date: string
+}
+
 export function useApotekerDashboard() {
   const [stats, setStats] = useState<PharmacyStats | null>(null)
   const [prescriptionQueue, setPrescriptionQueue] = useState<PrescriptionQueue[]>([])
+  const [lowStockMedicines, setLowStockMedicines] = useState<LowStockMedicine[]>([])
+  const [expiringSoonMedicines, setExpiringSoonMedicines] = useState<ExpiringSoonMedicine[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const { data: dashboardData, isLoading: dashboardLoading, error: dashboardError } = useFetch('/api/dashboard/apoteker')
+  const { data: recentOrdersData, isLoading: prescriptionsLoading } = useFetch('/api/prescriptions/recent')
+  const { data: alertsData, isLoading: alertsLoading } = useFetch('/api/medicines/alerts')
 
   useEffect(() => {
-    fetchDashboardData()
-  }, [])
-
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true)
-      // Mock data
-      const mockStats: PharmacyStats = {
-        totalPrescriptions: 156,
-        pendingValidations: 12,
-        dispensedToday: 89,
-        lowStockAlerts: 5,
-        totalMedicines: 1247
-      }
-
-      const mockQueue: PrescriptionQueue[] = [
-        {
-          id: 1,
-          prescriptionNumber: 'RX-2025-001',
-          patientName: 'Ahmad Surya',
-          doctorName: 'Dr. Smith',
-          status: 'pending',
-          priority: 'normal',
-          createdAt: '2025-11-15T10:30:00Z'
-        }
-      ]
-
-      setTimeout(() => {
-        setStats(mockStats)
-        setPrescriptionQueue(mockQueue)
-        setLoading(false)
-      }, 1000)
-
-    } catch (error) {
-      setLoading(false)
+    if (dashboardData) {
+      setStats(dashboardData as PharmacyStats)
     }
+  }, [dashboardData])
+
+  useEffect(() => {
+    if (recentOrdersData) {
+      // Transform prescription data to match interface
+      const prescriptionsArray = Array.isArray(recentOrdersData) ? recentOrdersData : []
+      const transformedQueue: PrescriptionQueue[] = prescriptionsArray.map((prescription: any) => ({
+        id: prescription.id,
+        prescriptionNumber: `RX-${prescription.id.toString().padStart(6, '0')}`,
+        patientName: prescription.patient_name || 'Unknown Patient',
+        doctorName: prescription.doctor_name || 'Unknown Doctor',
+        status: prescription.status,
+        priority: 'normal', // Default priority
+        createdAt: prescription.created_at
+      }))
+      setPrescriptionQueue(transformedQueue)
+    }
+  }, [recentOrdersData])
+
+  useEffect(() => {
+    if (alertsData) {
+      const data = alertsData as any
+      const lowStockArray = Array.isArray(data.low_stock) ? data.low_stock : []
+      const expiringArray = Array.isArray(data.expiring) ? data.expiring : []
+      setLowStockMedicines(lowStockArray as LowStockMedicine[])
+      setExpiringSoonMedicines(expiringArray as ExpiringSoonMedicine[])
+    }
+  }, [alertsData])
+
+  useEffect(() => {
+    const isLoading = dashboardLoading || prescriptionsLoading || alertsLoading
+    setLoading(isLoading)
+
+    if (dashboardError) {
+      setError((dashboardError as Error)?.message || 'Failed to load dashboard data')
+    }
+  }, [dashboardLoading, prescriptionsLoading, alertsLoading, dashboardError])
+
+  const refreshData = () => {
+    // Trigger refetch by updating state or calling fetch functions
+    window.location.reload()
   }
 
   return {
     stats,
     prescriptionQueue,
+    lowStockMedicines,
+    expiringSoonMedicines,
     loading,
-    refreshData: fetchDashboardData
+    error,
+    refreshData
   }
 }

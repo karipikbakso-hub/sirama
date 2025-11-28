@@ -43,10 +43,21 @@ interface ActivePatient {
 }
 
 interface DashboardStats {
-  total_active: number
-  outpatient_count: number
-  inpatient_count: number
-  emergency_count: number
+  total_pasien_aktif: number
+  butuh_ttv: number
+  cppt_pending: number
+  triase_igd: number
+}
+
+interface Notification {
+  id: string
+  type: 'abnormal_vitals' | 'new_patient'
+  title: string
+  message: string
+  patient_name?: string
+  registration_no?: string
+  severity: 'high' | 'medium' | 'low'
+  created_at: string
 }
 
 interface ApiResponse {
@@ -60,11 +71,12 @@ interface ApiResponse {
 
 export default function PerawatDashboard() {
   const [activePatients, setActivePatients] = useState<ActivePatient[]>([])
+  const [notifications, setNotifications] = useState<Notification[]>([])
   const [stats, setStats] = useState<DashboardStats>({
-    total_active: 0,
-    outpatient_count: 0,
-    inpatient_count: 0,
-    emergency_count: 0
+    total_pasien_aktif: 0,
+    butuh_ttv: 0,
+    cppt_pending: 0,
+    triase_igd: 0
   })
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -77,116 +89,89 @@ export default function PerawatDashboard() {
     try {
       setLoading(true)
 
-      // Fetch data from actual API endpoint
-      const response = await fetch('/api/dashboard/nursing/active-patients')
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+      // Fetch stats from API
+      const statsResponse = await fetch('/api/dashboard/perawat/stats')
+      if (!statsResponse.ok) {
+        throw new Error(`HTTP error! status: ${statsResponse.status}`)
+      }
+      const statsData = await statsResponse.json()
+      if (statsData.success) {
+        setStats(statsData.data)
       }
 
-      const data: ApiResponse = await response.json()
-
-      if (data.success) {
-        setActivePatients(data.data.active_patients)
-        setStats(data.data.summary)
-      } else {
-        throw new Error(data.message || 'Failed to fetch dashboard data')
+      // Fetch active patients from API
+      const patientsResponse = await fetch('/api/dashboard/perawat/active-patients')
+      if (!patientsResponse.ok) {
+        throw new Error(`HTTP error! status: ${patientsResponse.status}`)
       }
+      const patientsData = await patientsResponse.json()
+      if (patientsData.success) {
+        setActivePatients(patientsData.data.active_patients || [])
+      }
+
+      // Fetch notifications from API
+      const notificationsResponse = await fetch('/api/dashboard/perawat/notifications')
+      if (!notificationsResponse.ok) {
+        throw new Error(`HTTP error! status: ${notificationsResponse.status}`)
+      }
+      const notificationsData = await notificationsResponse.json()
+      if (notificationsData.success) {
+        setNotifications(notificationsData.data || [])
+      }
+
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
-
       // Fallback to mock data if API fails
       console.warn('API failed, using mock data...')
-      const mockResponse: ApiResponse = {
-        success: true,
-        message: 'Data pasien aktif berhasil diambil (fallback)',
-        data: {
-          active_patients: [
-            {
-              id: '1',
-              patient_id: 'P001',
-              patient_name: 'Ahmad Surya',
-              mrn: 'MRN001',
-              age: 35,
-              gender: 'L',
-              registration_number: 'REG001',
-              status: 'dipanggil',
-              visit_type: 'baru',
-              complaints: 'Demam tinggi, batuk kering',
-              payment_type: 'tunai',
-              is_emergency: false,
-              department: 'Poli Umum',
-              doctor: 'Dr. Budi Santoso',
-              registration_date: '2025-11-14 08:30:00',
-              latest_vitals: {
-                source: 'examination',
-                timestamp: '2025-11-14 10:00:00',
-                data: {
-                  blood_pressure: '120/80',
-                  heart_rate: 72,
-                  temperature: 37.2,
-                  respiration_rate: 16,
-                  oxygen_saturation: 98
-                }
-              },
-              type: 'outpatient'
-            },
-            {
-              id: '2',
-              patient_id: 'P002',
-              patient_name: 'Maya Sari',
-              mrn: 'MRN002',
-              age: 28,
-              gender: 'P',
-              admission_number: 'ADM001',
-              status: 'dirawat',
-              diagnosis: 'Pneumonia lobaris inferior',
-              payment_type: 'bpjs',
-              room: 'Ruang Melati 301',
-              admission_date: '2025-11-13 14:00:00',
-              latest_vitals: {
-                source: 'examination',
-                timestamp: '2025-11-14 06:30:00',
-                data: {
-                  blood_pressure: '140/90',
-                  heart_rate: 85,
-                  temperature: 38.2,
-                  respiration_rate: 20,
-                  oxygen_saturation: 95
-                }
-              },
-              type: 'inpatient'
-            },
-            {
-              id: '3',
-              patient_id: 'P003',
-              patient_name: 'Budi Santoso',
-              mrn: 'MRN003',
-              age: 42,
-              gender: 'L',
-              registration_number: 'REG002',
-              status: 'sedang_diperiksa',
-              visit_type: 'kontrol',
-              complaints: 'Hipertensi tidak terkontrol',
-              payment_type: 'asuransi',
-              is_emergency: true,
-              department: 'Poli Kardiovaskular',
-              doctor: 'Dr. Rini Wijaya',
-              registration_date: '2025-11-14 09:15:00',
-              type: 'outpatient'
+      setStats({
+        total_pasien_aktif: 3,
+        butuh_ttv: 2,
+        cppt_pending: 1,
+        triase_igd: 1
+      })
+      setActivePatients([
+        {
+          id: '1',
+          patient_id: 'P001',
+          patient_name: 'Ahmad Surya',
+          mrn: 'MRN001',
+          age: 35,
+          gender: 'L',
+          registration_number: 'REG001',
+          status: 'dipanggil',
+          visit_type: 'baru',
+          complaints: 'Demam tinggi, batuk kering',
+          payment_type: 'tunai',
+          is_emergency: false,
+          department: 'Poli Umum',
+          doctor: 'Dr. Budi Santoso',
+          registration_date: '2025-11-14 08:30:00',
+          latest_vitals: {
+            source: 'examination',
+            timestamp: '2025-11-14 10:00:00',
+            data: {
+              blood_pressure: '120/80',
+              heart_rate: 72,
+              temperature: 37.2,
+              respiration_rate: 16,
+              oxygen_saturation: 98
             }
-          ],
-          summary: {
-            total_active: 3,
-            outpatient_count: 2,
-            inpatient_count: 1,
-            emergency_count: 1
-          }
+          },
+          type: 'outpatient'
         }
-      }
-
-      setActivePatients(mockResponse.data.active_patients)
-      setStats(mockResponse.data.summary)
+      ])
+      setNotifications([
+        {
+          id: 'sample_1',
+          type: 'abnormal_vitals',
+          title: 'Tanda Vital Abnormal',
+          message: 'Pasien Ahmad Surya memiliki tekanan darah tinggi: 160/95 mmHg',
+          patient_name: 'Ahmad Surya',
+          registration_no: 'REG001',
+          severity: 'high',
+          created_at: new Date().toISOString()
+        }
+      ])
     } finally {
       setLoading(false)
     }
@@ -236,6 +221,48 @@ export default function PerawatDashboard() {
     return parts.length > 0 ? parts.join(', ') : null
   }
 
+  const isAbnormalVitals = (vitals: any) => {
+    if (!vitals) return false
+
+    // Blood Pressure
+    if (vitals.blood_pressure) {
+      const bp = vitals.blood_pressure.split('/')
+      if (bp.length === 2) {
+        const systolic = parseInt(bp[0])
+        const diastolic = parseInt(bp[1])
+        if (systolic >= 140 || diastolic >= 90 || systolic < 90 || diastolic < 60) {
+          return true
+        }
+      }
+    }
+
+    // Heart Rate
+    if (vitals.heart_rate) {
+      const hr = parseInt(vitals.heart_rate)
+      if (hr > 100 || hr < 60) {
+        return true
+      }
+    }
+
+    // Temperature
+    if (vitals.temperature) {
+      const temp = parseFloat(vitals.temperature)
+      if (temp > 38.0 || temp < 36.0) {
+        return true
+      }
+    }
+
+    // SPO2
+    if (vitals.oxygen_saturation) {
+      const spo2 = parseInt(vitals.oxygen_saturation)
+      if (spo2 < 95) {
+        return true
+      }
+    }
+
+    return false
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -248,15 +275,64 @@ export default function PerawatDashboard() {
         </p>
       </div>
 
+      {/* Notifications Alert */}
+      {notifications.length > 0 && (
+        <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex items-start">
+            <MdEmergency className="text-red-600 dark:text-red-400 text-xl mr-3 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-red-800 dark:text-red-400 mb-2">
+                ⚠️ Peringatan Penting ({notifications.length})
+              </h3>
+              <div className="space-y-2">
+                {notifications.slice(0, 3).map((notification) => (
+                  <div key={notification.id} className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-red-200 dark:border-red-700">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-medium text-red-700 dark:text-red-400">
+                            {notification.title}
+                          </span>
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            notification.severity === 'high'
+                              ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
+                              : notification.severity === 'medium'
+                              ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400'
+                              : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
+                          }`}>
+                            {notification.severity === 'high' ? 'Tinggi' : notification.severity === 'medium' ? 'Sedang' : 'Rendah'}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">
+                          {notification.message}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          {new Date(notification.created_at).toLocaleString('id-ID')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {notifications.length > 3 && (
+                  <p className="text-sm text-red-600 dark:text-red-400 text-center">
+                    +{notifications.length - 3} notifikasi lainnya
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* KPI Cards - Dynamic */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center">
             <MdPeople className="text-2xl text-blue-600 dark:text-blue-400 mr-3" />
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Pasien Aktif Hari Ini</p>
-              <p className="text-2xl font-bold text-gray-800 dark:text-white">{stats.total_active}</p>
-              <p className="text-xs text-green-600">Rawat Jalan: {stats.outpatient_count}, Inap: {stats.inpatient_count}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Total Pasien Aktif</p>
+              <p className="text-2xl font-bold text-gray-800 dark:text-white">{stats.total_pasien_aktif}</p>
+              <p className="text-xs text-green-600">Pasien yang sedang ditangani</p>
             </div>
           </div>
         </div>
@@ -264,21 +340,19 @@ export default function PerawatDashboard() {
           <div className="flex items-center">
             <MdFavorite className="text-2xl text-red-600 dark:text-red-400 mr-3" />
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Diperiksa Hari Ini</p>
-              <p className="text-2xl font-bold text-gray-800 dark:text-white">
-                {activePatients.filter(p => p.type === 'outpatient').length}
-              </p>
-              <p className="text-xs text-green-600">Pasien rawat jalan aktif</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Butuh TTV</p>
+              <p className="text-2xl font-bold text-gray-800 dark:text-white">{stats.butuh_ttv}</p>
+              <p className="text-xs text-red-600">Belum input TTV lebih dari 4 jam</p>
             </div>
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center">
-            <MdBusiness className="text-2xl text-purple-600 dark:text-purple-400 mr-3" />
+            <MdNoteAlt className="text-2xl text-purple-600 dark:text-purple-400 mr-3" />
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Pasien Rawat Inap</p>
-              <p className="text-2xl font-bold text-gray-800 dark:text-white">{stats.inpatient_count}</p>
-              <p className="text-xs text-blue-600">Sedang dirawat</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">CPPT Pending</p>
+              <p className="text-2xl font-bold text-gray-800 dark:text-white">{stats.cppt_pending}</p>
+              <p className="text-xs text-orange-600">Perlu dokumentasi CPPT</p>
             </div>
           </div>
         </div>
@@ -286,9 +360,9 @@ export default function PerawatDashboard() {
           <div className="flex items-center">
             <MdEmergency className="text-2xl text-orange-600 dark:text-orange-400 mr-3" />
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Kasus Emergency</p>
-              <p className="text-2xl font-bold text-gray-800 dark:text-white">{stats.emergency_count}</p>
-              <p className="text-xs text-red-600">Perlu perhatian khusus</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Triase IGD</p>
+              <p className="text-2xl font-bold text-gray-800 dark:text-white">{stats.triase_igd}</p>
+              <p className="text-xs text-red-600">Kasus prioritas tinggi</p>
             </div>
           </div>
         </div>
@@ -303,21 +377,33 @@ export default function PerawatDashboard() {
               🔍 Aksi Cepat
             </h3>
             <div className="space-y-3">
-              <button className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors text-sm">
+              <button
+                onClick={() => window.location.href = '/dashboard/perawat/ttv'}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+              >
                 <MdFavorite className="inline mr-2" />
-                Catat TTV
+                Input TTV
               </button>
-              <button className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors text-sm">
+              <button
+                onClick={() => window.location.href = '/dashboard/perawat/cppt'}
+                className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+              >
                 <MdNoteAlt className="inline mr-2" />
-                Tambah CPPT
+                Buat CPPT Keperawatan
               </button>
-              <button className="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors text-sm">
-                <MdListAlt className="inline mr-2" />
-                Triase
+              <button
+                onClick={() => window.location.href = '/dashboard/perawat/triase'}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+              >
+                <MdEmergency className="inline mr-2" />
+                Triase IGD
               </button>
-              <button className="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition-colors text-sm">
+              <button
+                onClick={() => window.location.href = '/dashboard/perawat/distribusi-obat'}
+                className="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+              >
                 <MdAssignment className="inline mr-2" />
-                Obat
+                Distribusi Obat
               </button>
               <hr className="my-4" />
               <button
@@ -483,14 +569,38 @@ export default function PerawatDashboard() {
 
                           {/* Vital Signs */}
                           {patient.latest_vitals && getVitalSignsSummary(patient.latest_vitals) && (
-                            <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-3 mb-3">
-                              <p className="text-sm font-medium text-blue-800 dark:text-blue-400 mb-1">
-                                📊 Tanda Vital Terakhir ({patient.latest_vitals.source})
-                              </p>
-                              <p className="text-sm text-blue-700 dark:text-blue-300">
+                            <div className={`rounded-lg p-3 mb-3 ${
+                              isAbnormalVitals(patient.latest_vitals.data)
+                                ? 'bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800'
+                                : 'bg-blue-50 dark:bg-blue-900/10'
+                            }`}>
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className={`text-sm font-medium ${
+                                  isAbnormalVitals(patient.latest_vitals.data)
+                                    ? 'text-red-800 dark:text-red-400'
+                                    : 'text-blue-800 dark:text-blue-400'
+                                }`}>
+                                  📊 Tanda Vital Terakhir ({patient.latest_vitals.source})
+                                </p>
+                                {isAbnormalVitals(patient.latest_vitals.data) && (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400">
+                                    <MdEmergency className="mr-1 text-sm" />
+                                    Abnormal
+                                  </span>
+                                )}
+                              </div>
+                              <p className={`text-sm ${
+                                isAbnormalVitals(patient.latest_vitals.data)
+                                  ? 'text-red-700 dark:text-red-300'
+                                  : 'text-blue-700 dark:text-blue-300'
+                              }`}>
                                 {getVitalSignsSummary(patient.latest_vitals)}
                               </p>
-                              <p className="text-xs text-blue-600 dark:text-blue-500 mt-1">
+                              <p className={`text-xs mt-1 ${
+                                isAbnormalVitals(patient.latest_vitals.data)
+                                  ? 'text-red-600 dark:text-red-500'
+                                  : 'text-blue-600 dark:text-blue-500'
+                              }`}>
                                 {new Date(patient.latest_vitals.timestamp).toLocaleString('id-ID')}
                               </p>
                             </div>

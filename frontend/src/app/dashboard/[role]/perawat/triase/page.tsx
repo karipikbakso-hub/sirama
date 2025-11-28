@@ -15,8 +15,12 @@ import {
   MdMedicalServices,
   MdPriorityHigh,
   MdTimer,
-  MdAssignment
+  MdAssignment,
+  MdHistory,
+  MdDashboard
 } from 'react-icons/md'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useFetch, usePost } from '@/hooks/useApi'
 
 interface Patient {
   id: string
@@ -26,7 +30,7 @@ interface Patient {
   gender: 'male' | 'female'
   arrivalTime: string
   chiefComplaint: string
-  triageLevel: 1 | 2 | 3 | 4 | 5
+  kategoriTriase: 'merah' | 'kuning' | 'hijau' | 'hitam'
   triageTime: string
   triageNurse: string
   vitalSigns: {
@@ -38,6 +42,15 @@ interface Patient {
     painScale: number
     consciousness: string
   }
+  abcde: {
+    airway: 'patent' | 'obstruksi' | 'bebas'
+    breathing: 'normal' | 'sesak' | 'tidak_ada'
+    circulation: 'stabil' | 'syok' | 'tidak_teraba'
+    disability: 'composmentis' | 'penurunan_kesadaran' | 'koma'
+    exposure: 'cedera_tampak' | 'tidak_ada'
+  }
+  mekanismeCedera: string
+  responseTime: number // in minutes
   status: 'waiting' | 'being_assessed' | 'awaiting_treatment' | 'treated' | 'discharged'
   priority: 'immediate' | 'urgent' | 'standard' | 'non_urgent'
   estimatedWaitTime: string
@@ -58,17 +71,39 @@ interface UntriagedPatient {
 }
 
 export default function TriagePage() {
-  const [patients, setPatients] = useState<Patient[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedPatient, setSelectedPatient] = useState<UntriagedPatient | null>(null)
   const [showTriageForm, setShowTriageForm] = useState(false)
-  const [untriagedPatients, setUntriagedPatients] = useState<UntriagedPatient[]>([])
   const [patientSearchTerm, setPatientSearchTerm] = useState('')
-  const [filterLevel, setFilterLevel] = useState<'all' | 1 | 2 | 3 | 4 | 5>('all')
+  const [filterLevel, setFilterLevel] = useState<'all' | 'merah' | 'kuning' | 'hijau' | 'hitam'>('all')
+  const [activeTab, setActiveTab] = useState('dashboard')
+
+  // Use API hooks
+  const { data: triagesData, isLoading: triagesLoading, refetch: refetchTriages } = useFetch<any>('/api/t-triase')
+  const { data: untriagedData, isLoading: untriagedLoading, refetch: refetchUntriaged } = useFetch<any>('/api/registrations/igd')
+  const saveTriageMutation = usePost('/api/t-triase', {
+    onSuccess: () => {
+      refetchTriages()
+      refetchUntriaged()
+      setShowTriageForm(false)
+      setSelectedPatient(null)
+    }
+  })
+
+  const patients: Patient[] = triagesData?.data?.data || []
+  const untriagedPatients: UntriagedPatient[] = untriagedData || []
+  const loading = triagesLoading || untriagedLoading
 
   const [currentTriage, setCurrentTriage] = useState({
     chiefComplaint: '',
+    mekanismeCedera: '',
+    abcde: {
+      airway: 'patent' as 'patent' | 'obstruksi' | 'bebas',
+      breathing: 'normal' as 'normal' | 'sesak' | 'tidak_ada',
+      circulation: 'stabil' as 'stabil' | 'syok' | 'tidak_teraba',
+      disability: 'composmentis' as 'composmentis' | 'penurunan_kesadaran' | 'koma',
+      exposure: 'tidak_ada' as 'cedera_tampak' | 'tidak_ada'
+    },
     vitalSigns: {
       bloodPressure: '',
       heartRate: '',
@@ -78,92 +113,11 @@ export default function TriagePage() {
       painScale: 0,
       consciousness: 'Compos mentis'
     },
-    notes: ''
+    responseTime: 0,
+    notes: '',
+    arrivalTime: null as Date | null
   })
 
-  useEffect(() => {
-    fetchPatients()
-    loadUntriagedPatients()
-  }, [])
-
-  const loadUntriagedPatients = async () => {
-    const patients = await fetchUntriagedPatients()
-    setUntriagedPatients(patients)
-  }
-
-  const fetchPatients = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch('/api/triases')
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          // Transform API data to match frontend interface
-          const transformedPatients: Patient[] = data.data.data.map((triase: any) => ({
-            id: triase.id.toString(),
-            name: triase.patient?.name || 'Unknown',
-            medicalRecordNumber: triase.patient?.mrn || 'Unknown',
-            age: triase.patient?.birth_date ? new Date().getFullYear() - new Date(triase.patient.birth_date).getFullYear() : 0,
-            gender: triase.patient?.gender || 'male',
-            arrivalTime: triase.registration?.created_at || triase.created_at,
-            chiefComplaint: triase.chief_complaint,
-            triageLevel: triase.triage_level,
-            triageTime: triase.triage_time,
-            triageNurse: triase.nurse?.name || 'Unknown',
-            vitalSigns: triase.vital_signs || {
-              bloodPressure: '',
-              heartRate: '',
-              temperature: '',
-              respirationRate: '',
-              oxygenSaturation: '',
-              painScale: 0,
-              consciousness: 'Compos mentis'
-            },
-            status: 'waiting', // Default status
-            priority: triase.priority,
-            estimatedWaitTime: triase.estimated_wait_time,
-            notes: triase.notes
-          }))
-          setPatients(transformedPatients)
-        }
-      } else {
-        console.error('Failed to fetch triases')
-        setPatients([])
-      }
-    } catch (error) {
-      console.error('Error fetching patients:', error)
-      setPatients([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchUntriagedPatients = async () => {
-    try {
-      const response = await fetch('/api/triases/untriaged-patients')
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          return data.data.map((patient: any) => ({
-            id: patient.registration_id.toString(),
-            patient_id: patient.patient_id,
-            registration_id: patient.registration_id,
-            name: patient.name,
-            medicalRecordNumber: patient.medical_record_number,
-            age: patient.age,
-            gender: patient.gender,
-            arrivalTime: patient.arrival_time,
-            chiefComplaint: patient.chief_complaint,
-            status: patient.status
-          }))
-        }
-      }
-      return []
-    } catch (error) {
-      console.error('Error fetching untriaged patients:', error)
-      return []
-    }
-  }
 
   const filteredPatients = patients
     .filter(patient =>
@@ -171,57 +125,56 @@ export default function TriagePage() {
       patient.medicalRecordNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       patient.chiefComplaint.toLowerCase().includes(searchTerm.toLowerCase())
     )
-    .filter(patient => filterLevel === 'all' || patient.triageLevel === filterLevel)
+    .filter(patient => filterLevel === 'all' || patient.kategoriTriase === filterLevel)
     .sort((a, b) => {
-      // Sort by triage level (1 = highest priority)
-      if (a.triageLevel !== b.triageLevel) {
-        return a.triageLevel - b.triageLevel
+      // Sort by triage priority (merah = highest priority)
+      const priorityOrder = { 'merah': 1, 'kuning': 2, 'hijau': 3, 'hitam': 4 }
+      const aPriority = priorityOrder[a.kategoriTriase] || 5
+      const bPriority = priorityOrder[b.kategoriTriase] || 5
+      if (aPriority !== bPriority) {
+        return aPriority - bPriority
       }
       // Then by arrival time
       return new Date(a.arrivalTime).getTime() - new Date(b.arrivalTime).getTime()
     })
 
-  const getTriageLevelInfo = (level: number) => {
-    switch (level) {
-      case 1:
+  const getTriageLevelInfo = (kategori: string) => {
+    switch (kategori) {
+      case 'merah':
         return {
           color: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800',
           bgColor: 'bg-red-500',
-          text: 'Level 1 - Resusitasi',
-          description: 'Kegawatan yang mengancam jiwa',
-          waitTime: 'Immediate'
+          text: 'MERAH - Resusitasi',
+          description: 'Life-threatening, immediate',
+          waitTime: '0 menit',
+          priority: 'immediate'
         }
-      case 2:
-        return {
-          color: 'bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800',
-          bgColor: 'bg-orange-500',
-          text: 'Level 2 - Emergensi',
-          description: 'Kegawatan tinggi',
-          waitTime: '< 10 menit'
-        }
-      case 3:
+      case 'kuning':
         return {
           color: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800',
           bgColor: 'bg-yellow-500',
-          text: 'Level 3 - Urgent',
-          description: 'Kegawatan sedang',
-          waitTime: '30-60 menit'
+          text: 'KUNING - Emergent',
+          description: 'Severe, <10 menit',
+          waitTime: '< 10 menit',
+          priority: 'urgent'
         }
-      case 4:
+      case 'hijau':
         return {
           color: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800',
           bgColor: 'bg-green-500',
-          text: 'Level 4 - Semi Urgent',
-          description: 'Kegawatan rendah',
-          waitTime: '2-4 jam'
+          text: 'HIJAU - Urgent',
+          description: 'Moderate, <30 menit',
+          waitTime: '< 30 menit',
+          priority: 'standard'
         }
-      case 5:
+      case 'hitam':
         return {
-          color: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800',
-          bgColor: 'bg-blue-500',
-          text: 'Level 5 - Non Urgent',
-          description: 'Kegawatan minimal',
-          waitTime: '4-6 jam'
+          color: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/20 dark:text-gray-400 dark:border-gray-800',
+          bgColor: 'bg-gray-700',
+          text: 'HITAM - Non-urgent/Death',
+          description: 'Dapat ditunda / DOA',
+          waitTime: 'Ditunda',
+          priority: 'non_urgent'
         }
       default:
         return {
@@ -229,7 +182,8 @@ export default function TriagePage() {
           bgColor: 'bg-gray-500',
           text: 'Unknown',
           description: '',
-          waitTime: ''
+          waitTime: '',
+          priority: 'non_urgent'
         }
     }
   }
@@ -262,98 +216,107 @@ export default function TriagePage() {
     }
   }
 
-  const calculateTriageLevel = (vitals: any, complaint: string) => {
-    // Level 1: Immediate - Life threatening
+  const calculateTriageCategory = (vitals: any, complaint: string): 'merah' | 'kuning' | 'hijau' | 'hitam' => {
+    // MERAH: Life-threatening, immediate (0 menit)
     if (vitals.respirationRate > 30 || vitals.respirationRate < 8 ||
         vitals.oxygenSaturation < 90 || vitals.heartRate > 130 ||
         vitals.heartRate < 40 || vitals.bloodPressure.split('/')[0] > 200 ||
         vitals.bloodPressure.split('/')[0] < 80 || vitals.painScale >= 9 ||
         complaint.toLowerCase().includes('sesak napas') ||
-        complaint.toLowerCase().includes('nyeri dada hebat')) {
-      return 1
+        complaint.toLowerCase().includes('nyeri dada hebat') ||
+        complaint.toLowerCase().includes('tidak sadar') ||
+        complaint.toLowerCase().includes('pendarahan hebat')) {
+      return 'merah'
     }
 
-    // Level 2: Urgent - High priority
+    // KUNING: Severe, <10 menit
     if (vitals.respirationRate > 25 || vitals.oxygenSaturation < 93 ||
         vitals.heartRate > 110 || vitals.temperature > 39 ||
-        vitals.painScale >= 7 || complaint.toLowerCase().includes('pendarahan')) {
-      return 2
+        vitals.painScale >= 7 || complaint.toLowerCase().includes('pendarahan') ||
+        complaint.toLowerCase().includes('muntah darah') ||
+        complaint.toLowerCase().includes('nyeri perut hebat')) {
+      return 'kuning'
     }
 
-    // Level 3: Standard - Moderate priority
+    // HIJAU: Moderate, <30 menit
     if (vitals.temperature > 38.5 || vitals.painScale >= 5 ||
-        complaint.toLowerCase().includes('demam tinggi')) {
-      return 3
+        complaint.toLowerCase().includes('demam') ||
+        complaint.toLowerCase().includes('mual muntah') ||
+        complaint.toLowerCase().includes('diare')) {
+      return 'hijau'
     }
 
-    // Level 4: Low priority
-    if (vitals.painScale >= 3 || complaint.toLowerCase().includes('cedera')) {
-      return 4
+    // HITAM: Non-urgent/Death - Dapat ditunda / DOA
+    if (complaint.toLowerCase().includes('doa') ||
+        complaint.toLowerCase().includes('meninggal')) {
+      return 'hitam'
     }
 
-    // Level 5: Minimal priority
-    return 5
+    // Default to HIJAU
+    return 'hijau'
   }
 
-  const handleSaveTriage = async () => {
+  const handleSaveTriage = () => {
     if (!selectedPatient) return
 
-    try {
-      const triageLevel = calculateTriageLevel(currentTriage.vitalSigns, currentTriage.chiefComplaint)
-      const priority = triageLevel === 1 ? 'immediate' : triageLevel === 2 ? 'urgent' : triageLevel === 3 ? 'urgent' : triageLevel === 4 ? 'standard' : 'non_urgent'
-      const estimatedWaitTime = getTriageLevelInfo(triageLevel).waitTime
+    const kategoriTriase = calculateTriageCategory(currentTriage.vitalSigns, currentTriage.chiefComplaint)
+    const priority = getTriageLevelInfo(kategoriTriase).priority
+    const estimatedWaitTime = getTriageLevelInfo(kategoriTriase).waitTime
 
-      const triageData = {
-        registration_id: parseInt(selectedPatient.registration_id), // Use actual registration_id
-        patient_id: parseInt(selectedPatient.patient_id), // Use actual patient_id
-        chief_complaint: currentTriage.chiefComplaint,
-        vital_signs: currentTriage.vitalSigns,
-        priority: priority,
-        estimated_wait_time: estimatedWaitTime,
-        notes: currentTriage.notes,
-        triage_time: new Date().toISOString()
-      }
+    // Calculate response time in minutes
+    const arrivalTime = new Date(selectedPatient.arrivalTime)
+    const triageTime = new Date()
+    const responseTimeMinutes = Math.floor((triageTime.getTime() - arrivalTime.getTime()) / (1000 * 60))
 
-      const response = await fetch('/api/triases', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(triageData)
-      })
-
-      if (response.ok) {
-        const result = await response.json()
-        if (result.success) {
-          // Refresh data
-          fetchPatients()
-          loadUntriagedPatients() // Also refresh untriaged patients list
-
-          // Reset form
-          setCurrentTriage({
-            chiefComplaint: '',
-            vitalSigns: {
-              bloodPressure: '',
-              heartRate: '',
-              temperature: '',
-              respirationRate: '',
-              oxygenSaturation: '',
-              painScale: 0,
-              consciousness: 'Compos mentis'
-            },
-            notes: ''
-          })
-          setShowTriageForm(false)
-          setSelectedPatient(null)
-        } else {
-          console.error('Failed to save triage:', result.message)
-        }
-      } else {
-        console.error('Failed to save triage')
-      }
-    } catch (error) {
-      console.error('Error saving triage:', error)
+    const triageData = {
+      registration_id: parseInt(selectedPatient.registration_id), // Use actual registration_id
+      patient_id: parseInt(selectedPatient.patient_id), // Use actual patient_id
+      kategori_triase: kategoriTriase,
+      chief_complaint: currentTriage.chiefComplaint,
+      mekanisme_cedera: currentTriage.mekanismeCedera,
+      airway: currentTriage.abcde.airway,
+      breathing: currentTriage.abcde.breathing,
+      circulation: currentTriage.abcde.circulation,
+      disability: currentTriage.abcde.disability,
+      exposure: currentTriage.abcde.exposure,
+      vital_signs: currentTriage.vitalSigns,
+      response_time: responseTimeMinutes,
+      priority: priority,
+      estimated_wait_time: estimatedWaitTime,
+      notes: currentTriage.notes,
+      triage_time: triageTime.toISOString()
     }
+
+    saveTriageMutation.mutate(triageData, {
+      onSuccess: () => {
+        // Reset form
+        setCurrentTriage({
+          chiefComplaint: '',
+          mekanismeCedera: '',
+          abcde: {
+            airway: 'patent',
+            breathing: 'normal',
+            circulation: 'stabil',
+            disability: 'composmentis',
+            exposure: 'tidak_ada'
+          },
+          vitalSigns: {
+            bloodPressure: '',
+            heartRate: '',
+            temperature: '',
+            respirationRate: '',
+            oxygenSaturation: '',
+            painScale: 0,
+            consciousness: 'Compos mentis'
+          },
+          responseTime: 0,
+          notes: '',
+          arrivalTime: null
+        })
+        setShowTriageForm(false)
+        setSelectedPatient(null)
+      }
+    })
   }
 
   return (
@@ -370,7 +333,7 @@ export default function TriagePage() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={fetchPatients}
+            onClick={() => refetchTriages()}
             disabled={loading}
             className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg text-sm font-medium transition-colors"
           >
@@ -387,14 +350,28 @@ export default function TriagePage() {
         </div>
       </div>
 
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="dashboard" className="flex items-center gap-2">
+            <MdDashboard className="text-lg" />
+            Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="history" className="flex items-center gap-2">
+            <MdHistory className="text-lg" />
+            History Triase
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="dashboard" className="space-y-6">
+
       {/* Triage Level Legend */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Level Triase</h3>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          {[1, 2, 3, 4, 5].map(level => {
-            const info = getTriageLevelInfo(level)
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Kategori Triase IGD</h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {['merah', 'kuning', 'hijau', 'hitam'].map(kategori => {
+            const info = getTriageLevelInfo(kategori)
             return (
-              <div key={level} className={`p-4 rounded-lg border ${info.color}`}>
+              <div key={kategori} className={`p-4 rounded-lg border ${info.color}`}>
                 <div className="flex items-center gap-2 mb-2">
                   <div className={`w-4 h-4 rounded-full ${info.bgColor}`}></div>
                   <span className="font-medium">{info.text}</span>
@@ -428,12 +405,11 @@ export default function TriagePage() {
               onChange={(e) => setFilterLevel(e.target.value as any)}
               className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              <option value="all">Semua Level</option>
-              <option value={1}>Level 1 - Resusitasi</option>
-              <option value={2}>Level 2 - Emergensi</option>
-              <option value={3}>Level 3 - Urgent</option>
-              <option value={4}>Level 4 - Semi Urgent</option>
-              <option value={5}>Level 5 - Non Urgent</option>
+              <option value="all">Semua Kategori</option>
+              <option value="merah">MERAH - Resusitasi</option>
+              <option value="kuning">KUNING - Emergent</option>
+              <option value="hijau">HIJAU - Urgent</option>
+              <option value="hitam">HITAM - Non-urgent/Death</option>
             </select>
           </div>
         </div>
@@ -442,13 +418,13 @@ export default function TriagePage() {
       {/* Patient Queue */}
       <div className="space-y-4">
         {filteredPatients.map((patient) => {
-          const triageInfo = getTriageLevelInfo(patient.triageLevel)
+          const triageInfo = getTriageLevelInfo(patient.kategoriTriase)
           return (
             <div key={patient.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4">
                   <div className={`w-12 h-12 rounded-full ${triageInfo.bgColor} flex items-center justify-center text-white font-bold text-lg`}>
-                    {patient.triageLevel}
+                    {patient.kategoriTriase.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
@@ -781,6 +757,111 @@ export default function TriagePage() {
                     </div>
                   </div>
 
+                  {/* Mekanisme Cedera */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Mekanisme Cedera
+                    </label>
+                    <textarea
+                      value={currentTriage.mekanismeCedera}
+                      onChange={(e) => setCurrentTriage(prev => ({ ...prev, mekanismeCedera: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      rows={2}
+                      placeholder="Jelaskan mekanisme cedera..."
+                    />
+                  </div>
+
+                  {/* ABCDE Assessment */}
+                  <div>
+                    <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Penilaian ABCDE</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Airway (Jalan Nafas)
+                        </label>
+                        <select
+                          value={currentTriage.abcde.airway}
+                          onChange={(e) => setCurrentTriage(prev => ({
+                            ...prev,
+                            abcde: { ...prev.abcde, airway: e.target.value as any }
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="patent">Patent</option>
+                          <option value="obstruksi">Obstruksi</option>
+                          <option value="bebas">Bebas</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Breathing (Pernafasan)
+                        </label>
+                        <select
+                          value={currentTriage.abcde.breathing}
+                          onChange={(e) => setCurrentTriage(prev => ({
+                            ...prev,
+                            abcde: { ...prev.abcde, breathing: e.target.value as any }
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="normal">Normal</option>
+                          <option value="sesak">Sesak</option>
+                          <option value="tidak_ada">Tidak Ada</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Circulation (Sirkulasi)
+                        </label>
+                        <select
+                          value={currentTriage.abcde.circulation}
+                          onChange={(e) => setCurrentTriage(prev => ({
+                            ...prev,
+                            abcde: { ...prev.abcde, circulation: e.target.value as any }
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="stabil">Stabil</option>
+                          <option value="syok">Syok</option>
+                          <option value="tidak_teraba">Tidak Teraba</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Disability (Disabilitas)
+                        </label>
+                        <select
+                          value={currentTriage.abcde.disability}
+                          onChange={(e) => setCurrentTriage(prev => ({
+                            ...prev,
+                            abcde: { ...prev.abcde, disability: e.target.value as any }
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="composmentis">Compos Mentis</option>
+                          <option value="penurunan_kesadaran">Penurunan Kesadaran</option>
+                          <option value="koma">Koma</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Exposure (Eksposur)
+                        </label>
+                        <select
+                          value={currentTriage.abcde.exposure}
+                          onChange={(e) => setCurrentTriage(prev => ({
+                            ...prev,
+                            abcde: { ...prev.abcde, exposure: e.target.value as any }
+                          }))}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="tidak_ada">Tidak Ada</option>
+                          <option value="cedera_tampak">Cedera Tampak</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Notes */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -798,14 +879,14 @@ export default function TriagePage() {
                   {/* Triage Level Preview */}
                   {currentTriage.chiefComplaint && currentTriage.vitalSigns.bloodPressure && (
                     <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
-                      <h4 className="font-medium text-gray-900 dark:text-white mb-2">Level Triase yang Direkomendasikan</h4>
+                      <h4 className="font-medium text-gray-900 dark:text-white mb-2">Kategori Triase yang Direkomendasikan</h4>
                       {(() => {
-                        const level = calculateTriageLevel(currentTriage.vitalSigns, currentTriage.chiefComplaint)
-                        const info = getTriageLevelInfo(level)
+                        const kategori = calculateTriageCategory(currentTriage.vitalSigns, currentTriage.chiefComplaint)
+                        const info = getTriageLevelInfo(kategori)
                         return (
                           <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg border ${info.color}`}>
                             <div className={`w-6 h-6 rounded-full ${info.bgColor} flex items-center justify-center text-white font-bold`}>
-                              {level}
+                              {kategori.charAt(0).toUpperCase()}
                             </div>
                             <div>
                               <div className="font-medium">{info.text}</div>
@@ -839,28 +920,198 @@ export default function TriagePage() {
         </div>
       )}
 
-      {/* Statistics */}
-      <div className="grid grid-cols-1 sm:grid-cols-5 gap-6">
-        {[1, 2, 3, 4, 5].map(level => {
-          const count = patients.filter(p => p.triageLevel === level).length
-          const info = getTriageLevelInfo(level)
-          return (
-            <div key={level} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-              <div className="flex items-center gap-3">
-                <div className={`w-12 h-12 rounded-full ${info.bgColor} flex items-center justify-center text-white font-bold text-xl`}>
-                  {level}
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Level {level}</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {count}
-                  </p>
+      {/* Dashboard Triase */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Dashboard Triase IGD</h3>
+
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-6 mb-8">
+          {['merah', 'kuning', 'hijau', 'hitam'].map(kategori => {
+            const count = patients.filter(p => p.kategoriTriase === kategori).length
+            const info = getTriageLevelInfo(kategori)
+            return (
+              <div key={kategori} className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-full ${info.bgColor} flex items-center justify-center text-white font-bold`}>
+                    {kategori.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{info.text}</p>
+                    <p className="text-xl font-bold text-gray-900 dark:text-white">
+                      {count}
+                    </p>
+                  </div>
                 </div>
               </div>
+            )
+          })}
+        </div>
+
+        {/* Response Time Summary */}
+        <div className="mb-6">
+          <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Ringkasan Response Time</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+              <p className="text-sm text-blue-600 dark:text-blue-400">Rata-rata Response Time</p>
+              <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                {patients.length > 0 ? Math.round(patients.reduce((sum, p) => sum + p.responseTime, 0) / patients.length) : 0} menit
+              </p>
             </div>
-          )
-        })}
+            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+              <p className="text-sm text-green-600 dark:text-green-400">Response Time Tercepat</p>
+              <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+                {patients.length > 0 ? Math.min(...patients.map(p => p.responseTime)) : 0} menit
+              </p>
+            </div>
+            <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
+              <p className="text-sm text-red-600 dark:text-red-400">Response Time Terlama</p>
+              <p className="text-2xl font-bold text-red-900 dark:text-red-100">
+                {patients.length > 0 ? Math.max(...patients.map(p => p.responseTime)) : 0} menit
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Recent Triages */}
+        <div>
+          <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Triase Terbaru</h4>
+          <div className="space-y-3">
+            {patients.slice(0, 5).map((patient) => {
+              const info = getTriageLevelInfo(patient.kategoriTriase)
+              return (
+                <div key={patient.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full ${info.bgColor} flex items-center justify-center text-white font-bold text-sm`}>
+                      {patient.kategoriTriase.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white">{patient.name}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{patient.chiefComplaint}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{patient.responseTime} menit</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {new Date(patient.triageTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+            {patients.length === 0 && (
+              <p className="text-center text-gray-500 dark:text-gray-400 py-4">Belum ada data triase</p>
+            )}
+          </div>
+        </div>
       </div>
+
+        </TabsContent>
+
+        <TabsContent value="history" className="space-y-6">
+          {/* History Triase */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">History Triase</h3>
+
+            {/* Search and Filter */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  placeholder="Cari nama pasien atau nomor rekam medis..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <select
+                value={filterLevel}
+                onChange={(e) => setFilterLevel(e.target.value as any)}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">Semua Kategori</option>
+                <option value="merah">Merah</option>
+                <option value="kuning">Kuning</option>
+                <option value="hijau">Hijau</option>
+                <option value="hitam">Hitam</option>
+              </select>
+            </div>
+
+            {/* Patient List */}
+            <div className="space-y-4">
+              {filteredPatients.map((patient) => {
+                const triageInfo = getTriageLevelInfo(patient.kategoriTriase)
+                return (
+                  <div key={patient.id} className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-4">
+                        <div className={`w-12 h-12 rounded-full ${triageInfo.bgColor} flex items-center justify-center text-white font-bold text-lg`}>
+                          {patient.kategoriTriase.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-gray-900 dark:text-white">{patient.name}</h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">RM: {patient.medicalRecordNumber}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Umur: {patient.age} tahun</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Keluhan: {patient.chiefComplaint}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${triageInfo.color}`}>
+                              {triageInfo.text}
+                            </span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              Response Time: {patient.responseTime} menit
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          {new Date(patient.triageTime).toLocaleDateString('id-ID', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Oleh: {patient.triageNurse}</p>
+                        <button
+                          onClick={() => {
+                            setSelectedPatient({
+                              id: patient.id,
+                              patient_id: patient.id,
+                              registration_id: patient.id,
+                              name: patient.name,
+                              medicalRecordNumber: patient.medicalRecordNumber,
+                              age: patient.age,
+                              gender: patient.gender,
+                              arrivalTime: patient.arrivalTime,
+                              chiefComplaint: patient.chiefComplaint,
+                              status: 'waiting'
+                            })
+                            setShowTriageForm(true)
+                          }}
+                          className="mt-2 inline-flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium transition-colors"
+                        >
+                          <MdEdit className="text-sm" />
+                          Edit
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+              {filteredPatients.length === 0 && (
+                <div className="text-center py-8">
+                  <MdMedicalServices className="mx-auto h-12 w-12 text-gray-400" />
+                  <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">Tidak ada data triase</h3>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Belum ada pasien yang ditriase dengan kriteria tersebut.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

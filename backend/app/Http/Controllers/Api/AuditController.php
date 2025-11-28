@@ -323,6 +323,7 @@ class AuditController extends Controller
         ]);
 
         try {
+            $format = $request->input('format');
             $query = AuditLog::query();
 
             if ($request->date_from) {
@@ -354,7 +355,7 @@ class AuditController extends Controller
 
             $logs = $query->orderBy('created_at', 'desc')->get();
 
-            if ($request->format === 'csv') {
+            if ($format === 'csv') {
                 // Generate CSV content
                 $csvContent = "ID,Timestamp,Action,User,Module,Status,Description,IP Address\n";
 
@@ -419,18 +420,100 @@ class AuditController extends Controller
     }
 
     /**
-     * Mask sensitive data in old/new values
+     * Get recent audit logs (last 10 entries) for dashboard
      */
-    private function maskSensitiveData($values)
+    public function recent(): JsonResponse
     {
-        if (!is_array($values)) return $values;
+        try {
+            $activities = AuditLog::orderBy('created_at', 'desc')
+                ->limit(10)
+                ->get()
+                ->map(function ($log) {
+                    // Map action to icon
+                    $icon = $this->actionToIcon($log->action);
 
-        $sensitiveKeys = ['password', 'token', 'secret', 'key', 'api_key', 'email', 'phone'];
-        foreach ($sensitiveKeys as $key) {
-            if (isset($values[$key])) {
-                $values[$key] = '***MASKED***';
-            }
+                    return [
+                        'id' => $log->id,
+                        'user' => $log->user_name ?: 'System',
+                        'action' => $this->formatAction($log->action, $log->resource_type),
+                        'timestamp' => $log->created_at->toISOString(),
+                        'icon' => $icon
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'data' => $activities
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error fetching recent audit logs', [
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch recent audit logs',
+                'error' => config('app.debug') ? $e->getMessage() : null
+            ], 500);
         }
-        return $values;
+    }
+
+    /**
+     * Mask sensitive data in audit logs
+     */
+    private function maskSensitiveData($data)
+    {
+        if (!$data) return $data;
+
+        if (is_array($data)) {
+            $masked = [];
+            foreach ($data as $key => $value) {
+                // Mask sensitive fields
+                if (in_array(strtolower($key), ['password', 'token', 'secret', 'key', 'api_key', 'access_token'])) {
+                    $masked[$key] = '***MASKED***';
+                } else {
+                    $masked[$key] = is_array($value) ? $this->maskSensitiveData($value) : $value;
+                }
+            }
+            return $masked;
+        }
+
+        return $data;
+    }
+
+    /**
+     * Map action to icon
+     */
+    private function actionToIcon(string $action): string
+    {
+        $actionLower = strtolower($action);
+
+        if (in_array($actionLower, ['login', 'create', 'insert'])) {
+            return 'login';
+        }
+
+        if (in_array($actionLower, ['logout', 'delete', 'remove'])) {
+            return 'logout';
+        }
+
+        if (in_array($actionLower, ['update', 'edit', 'modify'])) {
+            return 'edit';
+        }
+
+        if (in_array($actionLower, ['view', 'read', 'access'])) {
+            return 'view';
+        }
+
+        return 'activity';
+    }
+
+    /**
+     * Format action description
+     */
+    private function formatAction(string $action, ?string $resourceType): string
+    {
+        $resource = $resourceType ? ucfirst(str_replace('_', ' ', $resourceType)) : 'System';
+        return ucfirst(strtolower($action)) . ' ' . $resource;
     }
 }

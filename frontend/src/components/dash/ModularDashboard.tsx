@@ -26,7 +26,7 @@ const PasienPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/pasien/
 const AntrianPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/antrian/page'))
 const SEPPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/sep/page'))
 const KPIPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/kpi/page'))
-const RiwayatPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/riwayat/page'))
+const RiwayatPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/kpi-laporan/page'))
 const RegistrasiIGDPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/registrasi-igd/page'))
 const AntrianManagementPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/antrian-management/page'))
 const RujukanPage = lazy(() => import('@/app/dashboard/[role]/pendaftaran/rujukan/page'))

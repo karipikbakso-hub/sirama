@@ -35,6 +35,14 @@ class Doctor extends Model
     }
 
     /**
+     * Relationship with doctor schedules
+     */
+    public function schedules(): HasMany
+    {
+        return $this->hasMany(\App\Models\DoctorSchedule::class, 'doctor_id');
+    }
+
+    /**
      * Scope for active doctors
      */
     public function scopeActive($query)

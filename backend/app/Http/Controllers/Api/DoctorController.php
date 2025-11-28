@@ -205,6 +205,68 @@ class DoctorController extends Controller
     }
 
     /**
+     * Get doctors by poli for registration form.
+     */
+    public function getByPoli(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'poli_id' => 'required|integer|exists:m_poli,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        // Get doctors who have schedules for this poli today
+        $doctors = Doctor::where('status', 'active')
+            ->whereHas('schedules', function ($query) use ($request) {
+                $query->where('poli_id', $request->poli_id)
+                       ->where('hari', strtolower(now()->format('l')))
+                       ->where('is_active', true);
+            })
+            ->with(['schedules' => function ($query) use ($request) {
+                $query->where('poli_id', $request->poli_id)
+                       ->where('hari', strtolower(now()->format('l')))
+                       ->where('is_active', true);
+            }])
+            ->orderBy('nama_dokter')
+            ->get()
+            ->map(function ($doctor) use ($request) {
+                $schedule = $doctor->schedules->first();
+
+                // Calculate remaining quota for today
+                $today = now()->toDateString();
+                $usedQuota = \DB::table('t_registrasi')
+                    ->where('doctor_id', $doctor->id)
+                    ->where('service_unit', \DB::table('m_poli')->where('id', $request->poli_id)->value('nama_poli'))
+                    ->whereDate('created_at', $today)
+                    ->whereIn('status', ['registered', 'checked-in'])
+                    ->count();
+
+                $remainingQuota = $schedule ? max(0, $schedule->quota_pasien - $usedQuota) : 0;
+
+                return [
+                    'id' => $doctor->id,
+                    'name' => $doctor->nama_dokter,
+                    'specialization' => $doctor->spesialisasi,
+                    'schedule' => $schedule,
+                    'quota_remaining' => $remainingQuota,
+                    'quota_total' => $schedule ? $schedule->quota_pasien : 0,
+                    'quota_used' => $usedQuota,
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => $doctors
+        ]);
+    }
+
+    /**
      * Get doctor statistics.
      */
     public function statistics(): JsonResponse

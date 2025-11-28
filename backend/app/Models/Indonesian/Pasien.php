@@ -15,17 +15,40 @@ class Pasien extends Model implements HasMedia
     protected $table = 'm_pasien';
 
     protected $fillable = [
-        'nomor_rm',
+        'no_rm',
         'nama_lengkap',
         'nik',
         'tanggal_lahir',
         'jenis_kelamin',
-        'alamat',
-        'nomor_telepon',
-        'nomor_bpjs',
-        'kontak_darurat',
         'golongan_darah',
-        'status'
+        'rhesus',
+        'alamat',
+        'provinsi',
+        'kota',
+        'kecamatan',
+        'kelurahan',
+        'rt',
+        'rw',
+        'kode_pos',
+        'telepon',
+        'telepon_alternatif',
+        'email',
+        'pekerjaan',
+        'status_pernikahan',
+        'agama',
+        'nama_penanggung_jawab',
+        'hubungan_penanggung_jawab',
+        'telepon_penanggung_jawab',
+        'kontak_darurat',
+        'jenis_asuransi',
+        'kelas_bpjs',
+        'provider_asuransi',
+        'nomor_asuransi',
+        'no_bpjs',
+        'alergi',
+        'penyakit_kronis',
+        'status_aktif',
+        'created_by'
     ];
 
     protected $casts = [
@@ -40,12 +63,12 @@ class Pasien extends Model implements HasMedia
     public static function generateMRN(): string
     {
         $year = date('Y');
-        $lastPatient = self::where('nomor_rm', 'like', "MR-{$year}-%")
+        $lastPatient = self::where('no_rm', 'like', "MR-{$year}-%")
                           ->orderBy('id', 'desc')
                           ->first();
 
         if ($lastPatient) {
-            $lastNumber = (int) substr($lastPatient->nomor_rm, -3);
+            $lastNumber = (int) substr($lastPatient->no_rm, -3);
             $newNumber = $lastNumber + 1;
         } else {
             $newNumber = 1;
@@ -75,7 +98,7 @@ class Pasien extends Model implements HasMedia
      */
     public function registrasi(): HasMany
     {
-        return $this->hasMany(RegistrasiPasien::class, 'pasien_id');
+        return $this->hasMany(\App\Models\Registration::class, 'patient_id');
     }
 
     /**
@@ -107,7 +130,7 @@ class Pasien extends Model implements HasMedia
      */
     public function scopeAktif($query)
     {
-        return $query->where('status', 'aktif');
+        return $query->where('status_aktif', 'aktif');
     }
 
     /**
@@ -117,9 +140,9 @@ class Pasien extends Model implements HasMedia
     {
         return $query->where(function ($q) use ($search) {
             $q->where('nama_lengkap', 'like', "%{$search}%")
-              ->orWhere('nomor_rm', 'like', "%{$search}%")
+              ->orWhere('no_rm', 'like', "%{$search}%")
               ->orWhere('nik', 'like', "%{$search}%")
-              ->orWhere('nomor_telepon', 'like', "%{$search}%");
+              ->orWhere('telepon', 'like', "%{$search}%");
         });
     }
 

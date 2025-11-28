@@ -1,241 +1,438 @@
 'use client'
 
-import { useState } from 'react'
-import { FaExchangeAlt, FaSearch, FaPlus, FaEye } from 'react-icons/fa'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { ArrowUp, ArrowDown, Settings, FileText, Search, RefreshCw, Calendar, Download, Filter } from 'lucide-react'
+import { PageHeader } from '@/components/ui/page-header'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Select } from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from '@/lib/toast'
+import api from '@/lib/api'
 
-type StockMutation = {
+interface StockMovement {
   id: number
-  medicineName: string
-  mutationDate: string
-  fromLocation: string
-  toLocation: string
+  medicine_id: number
+  batch_id?: number
+  type: 'in' | 'out' | 'adjustment' | 'expired' | 'damaged'
   quantity: number
-  unit: string
-  status: 'completed' | 'pending' | 'cancelled'
+  reference_type?: string
+  reference_id?: number
+  created_at: string
+  medicine: {
+    id: number
+    nama_obat: string
+    satuan: string
+  }
+  batch?: {
+    batch_number: string
+  }
 }
 
-const initialData: StockMutation[] = [
-  {
-    id: 1,
-    medicineName: 'Paracetamol 500mg',
-    mutationDate: '2025-11-05',
-    fromLocation: 'Gudang Obat',
-    toLocation: 'Apotek Rawat Jalan',
-    quantity: 50,
-    unit: 'Tablet',
-    status: 'completed'
-  },
-  {
-    id: 2,
-    medicineName: 'Amoxicillin 250mg',
-    mutationDate: '2025-11-04',
-    fromLocation: 'Gudang Obat',
-    toLocation: 'Apotek IGD',
-    quantity: 30,
-    unit: 'Kapsul',
-    status: 'completed'
-  },
-  {
-    id: 3,
-    medicineName: 'Metformin 500mg',
-    mutationDate: '2025-11-03',
-    fromLocation: 'Apotek Rawat Jalan',
-    toLocation: 'Apotek IGD',
-    quantity: 20,
-    unit: 'Tablet',
-    status: 'pending'
-  },
-  {
-    id: 4,
-    medicineName: 'Losartan 50mg',
-    mutationDate: '2025-11-02',
-    fromLocation: 'Apotek IGD',
-    toLocation: 'Gudang Obat',
-    quantity: 15,
-    unit: 'Tablet',
-    status: 'completed'
-  }
-]
-
 export default function MutasiStokPage() {
-  const [mutations] = useState(initialData)
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedType, setSelectedType] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
 
-  const filteredMutations = mutations.filter(mutation =>
-    mutation.medicineName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    mutation.fromLocation.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    mutation.toLocation.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const queryClient = useQueryClient()
+  const loadMoreRef = useRef<HTMLDivElement>(null)
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      case 'pending': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+  // Build filters object
+  const filters = {
+    ...(searchTerm && { medicine_name: searchTerm }),
+    ...(selectedType && { type: selectedType }),
+    ...(dateFrom && { date_from: dateFrom }),
+    ...(dateTo && { date_to: dateTo }),
+  }
+
+  // Infinite query for stock movements
+  const {
+    data: movementsData,
+    isLoading: movementsLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch: refetchMovements
+  } = useInfiniteQuery({
+    queryKey: ['stock-movements', filters],
+    queryFn: async ({ pageParam = 1 }) => {
+      const response = await api.get('/api/stock-movements', {
+        params: {
+          page: pageParam,
+          per_page: 50, // As per requirement
+          ...filters
+        }
+      })
+      return response.data
+    },
+    getNextPageParam: (lastPage) => {
+      const currentPage = lastPage.data?.current_page || 1
+      const totalPages = lastPage.data?.last_page || 1
+      return currentPage < totalPages ? currentPage + 1 : undefined
+    },
+    initialPageParam: 1
+  })
+
+  // Statistics query
+  const { data: statsData } = useQuery({
+    queryKey: ['stock-movements-stats', filters],
+    queryFn: async () => {
+      // Calculate stats from movements data
+      const movements = movementsData?.pages.flatMap(page => page.data?.data || []) || []
+
+      const stats = {
+        total_movements: movements.length,
+        in_count: movements.filter(m => m.type === 'in').length,
+        out_count: movements.filter(m => m.type === 'out').length,
+        adjustment_count: movements.filter(m => m.type === 'adjustment').length,
+        expired_count: movements.filter(m => m.type === 'expired').length,
+        damaged_count: movements.filter(m => m.type === 'damaged').length,
+        total_quantity_in: movements.filter(m => m.type === 'in').reduce((sum, m) => sum + m.quantity, 0),
+        total_quantity_out: movements.filter(m => m.type === 'out').reduce((sum, m) => sum + m.quantity, 0),
+      }
+
+      return stats
+    },
+    enabled: !!movementsData
+  })
+
+  // Intersection Observer for auto-pagination
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage()
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current)
+    }
+
+    return () => observer.disconnect()
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  // Flatten movements data from infinite query
+  const movements = movementsData?.pages.flatMap(page => page.data?.data || []) || []
+
+  const getTypeBadge = (type: string) => {
+    const badges: Record<string, { color: string; label: string; icon: any }> = {
+      'in': { color: 'bg-green-100 text-green-800 border-green-200', label: 'Penerimaan', icon: ArrowUp },
+      'out': { color: 'bg-red-100 text-red-800 border-red-200', label: 'Pengeluaran', icon: ArrowDown },
+      'adjustment': { color: 'bg-blue-100 text-blue-800 border-blue-200', label: 'Penyesuaian', icon: Settings },
+      'expired': { color: 'bg-orange-100 text-orange-800 border-orange-200', label: 'Kadaluarsa', icon: Calendar },
+      'damaged': { color: 'bg-gray-100 text-gray-800 border-gray-200', label: 'Rusak', icon: Settings }
+    }
+    const badge = badges[type] || { color: 'bg-gray-100 text-gray-800 border-gray-200', label: type, icon: Settings }
+    const IconComponent = badge.icon
+
+    return (
+      <Badge className={`${badge.color} flex items-center gap-1`}>
+        <IconComponent className="h-3 w-3" />
+        {badge.label}
+      </Badge>
+    )
+  }
+
+  const getReferenceLink = (movement: StockMovement) => {
+    if (movement.reference_type === 'prescription') {
+      return `/apoteker/prescription/${movement.reference_id}`
+    }
+    if (movement.reference_type === 'adjustment') {
+      return `/apoteker/adjustment/${movement.reference_id}`
+    }
+    return null
+  }
+
+  const getReferenceText = (movement: StockMovement) => {
+    if (movement.reference_type === 'prescription') {
+      return `Resep #${movement.reference_id}`
+    }
+    if (movement.reference_type === 'adjustment') {
+      return `Penyesuaian #${movement.reference_id}`
+    }
+    return '-'
+  }
+
+  const handleExport = async () => {
+    try {
+      const response = await api.get('/api/stock-movements/export', {
+        params: filters,
+        responseType: 'blob'
+      })
+
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.ms-excel'
+      })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+      link.download = `mutasi_stok_${timestamp}.csv`
+      document.body.appendChild(link)
+      link.click()
+
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      toast.success('Laporan mutasi stok berhasil diunduh')
+    } catch (error) {
+      console.error('Export error:', error)
+      toast.error('Gagal mengunduh laporan mutasi stok')
     }
   }
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'completed': return 'Selesai'
-      case 'pending': return 'Menunggu'
-      case 'cancelled': return 'Dibatalkan'
-      default: return status
-    }
+  const handleResetFilters = () => {
+    setSearchTerm('')
+    setSelectedType('')
+    setDateFrom('')
+    setDateTo('')
+    refetchMovements()
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('id-ID', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
   }
 
   return (
     <div className="space-y-6">
-      <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white flex items-center gap-3">
-          <FaExchangeAlt className="text-blue-500" />
-          <span>Mutasi Stok</span>
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">
-          Kelola perpindahan stok obat antar lokasi
-        </p>
+      <PageHeader
+        title="🔄 Mutasi Stok Obat"
+        description="Riwayat lengkap pergerakan stok obat dengan filter & export untuk audit trail"
+      />
+
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="p-4 border-green-200 bg-green-50">
+          <div className="flex items-center gap-3">
+            <ArrowUp className="h-8 w-8 text-green-600" />
+            <div>
+              <h3 className="font-semibold text-green-800">Penerimaan</h3>
+              <p className="text-sm text-green-700">
+                {statsData?.in_count || 0} transaksi • {statsData?.total_quantity_in || 0} unit
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-4 border-red-200 bg-red-50">
+          <div className="flex items-center gap-3">
+            <ArrowDown className="h-8 w-8 text-red-600" />
+            <div>
+              <h3 className="font-semibold text-red-800">Pengeluaran</h3>
+              <p className="text-sm text-red-700">
+                {statsData?.out_count || 0} transaksi • {statsData?.total_quantity_out || 0} unit
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-4 border-blue-200 bg-blue-50">
+          <div className="flex items-center gap-3">
+            <Settings className="h-8 w-8 text-blue-600" />
+            <div>
+              <h3 className="font-semibold text-blue-800">Penyesuaian</h3>
+              <p className="text-sm text-blue-700">{statsData?.adjustment_count || 0} transaksi</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-4 border-orange-200 bg-orange-50">
+          <div className="flex items-center gap-3">
+            <FileText className="h-8 w-8 text-orange-600" />
+            <div>
+              <h3 className="font-semibold text-orange-800">Total Mutasi</h3>
+              <p className="text-sm text-orange-700">{statsData?.total_movements || 0} transaksi</p>
+            </div>
+          </div>
+        </Card>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 md:p-6 border border-gray-200 dark:border-gray-700">
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <FaSearch className="text-gray-400" />
+      {/* Search and Filters */}
+      <Card className="p-4">
+        <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Cari nama obat..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
             </div>
-            <input
-              type="text"
-              placeholder="Cari mutasi stok..."
-              className="w-full pl-10 px-4 py-2 rounded-lg border border-gray-300 dark:border-zinc-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
           </div>
-          <button className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold transition flex items-center justify-center gap-2">
-            <FaPlus />
-            <span className="hidden sm:inline">Tambah Mutasi</span>
-            <span className="sm:hidden">Mutasi</span>
-          </button>
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center gap-2"
+            >
+              <Filter className="h-4 w-4" />
+              Filter
+            </Button>
+            <Button onClick={() => refetchMovements()} variant="outline">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+            <Button onClick={handleExport} variant="outline">
+              <Download className="h-4 w-4 mr-2" />
+              Export Excel
+            </Button>
+          </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 dark:border-zinc-700 text-left">
-                <th className="py-3 px-2">Nama Obat</th>
-                <th className="px-2 hidden sm:table-cell">Tanggal Mutasi</th>
-                <th className="px-2">Dari</th>
-                <th className="px-2">Ke</th>
-                <th className="px-2">Jumlah</th>
-                <th className="px-2">Status</th>
-                <th className="text-right px-2">Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredMutations.map((mutation) => (
-                <tr
-                  key={mutation.id}
-                  className="border-b border-gray-200 dark:border-zinc-800 hover:bg-indigo-500/10 dark:hover:bg-indigo-400/10 transition"
+        {/* Advanced Filters */}
+        {showFilters && (
+          <div className="mt-4 pt-4 border-t">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <Label htmlFor="type">Tipe Pergerakan</Label>
+                <Select
+                  value={selectedType}
+                  onChange={(e) => setSelectedType(e.target.value)}
                 >
-                  <td className="py-3 px-2 font-medium">
-                    <div className="flex flex-col">
-                      <span>{mutation.medicineName}</span>
-                      <span className="text-xs text-gray-500 sm:hidden">{mutation.mutationDate}</span>
-                    </div>
-                  </td>
-                  <td className="px-2 hidden sm:table-cell">{mutation.mutationDate}</td>
-                  <td className="px-2">
-                    <div className="max-w-[100px] truncate">{mutation.fromLocation}</div>
-                  </td>
-                  <td className="px-2">
-                    <div className="max-w-[100px] truncate">{mutation.toLocation}</div>
-                  </td>
-                  <td className="px-2 font-medium">{mutation.quantity} {mutation.unit}</td>
-                  <td className="px-2">
-                    <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(mutation.status)}`}>
-                      {getStatusText(mutation.status)}
-                    </span>
-                  </td>
-                  <td className="text-right px-2">
-                    <div className="flex justify-end gap-1">
-                      <button className="p-2 border border-gray-300 dark:border-zinc-700 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-800 transition">
-                        <FaEye />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  <option value="">Semua Tipe</option>
+                  <option value="in">Penerimaan</option>
+                  <option value="out">Pengeluaran</option>
+                  <option value="adjustment">Penyesuaian</option>
+                  <option value="expired">Kadaluarsa</option>
+                  <option value="damaged">Rusak</option>
+                </Select>
+              </div>
 
-        {filteredMutations.length === 0 && (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            <FaExchangeAlt className="mx-auto text-4xl mb-2" />
-            <p>Tidak ada mutasi stok yang ditemukan</p>
+              <div>
+                <Label htmlFor="date_from">Tanggal Mulai</Label>
+                <Input
+                  id="date_from"
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="date_to">Tanggal Akhir</Label>
+                <Input
+                  id="date_to"
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-end">
+                <Button onClick={handleResetFilters} variant="outline" className="w-full">
+                  Reset Filter
+                </Button>
+              </div>
+            </div>
           </div>
         )}
-      </div>
+      </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">
-            Statistik Mutasi Stok
-          </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
-              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-300">Selesai</p>
-              <p className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white">
-                {mutations.filter(m => m.status === 'completed').length}
-              </p>
-            </div>
-            <div className="bg-yellow-50 dark:bg-yellow-900/30 p-3 rounded-lg">
-              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-300">Menunggu</p>
-              <p className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white">
-                {mutations.filter(m => m.status === 'pending').length}
-              </p>
-            </div>
-            <div className="bg-red-50 dark:bg-red-900/30 p-3 rounded-lg">
-              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-300">Dibatalkan</p>
-              <p className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white">
-                {mutations.filter(m => m.status === 'cancelled').length}
-              </p>
-            </div>
-            <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
-              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-300">Total Mutasi</p>
-              <p className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white">{mutations.length}</p>
+      {/* Movements List */}
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Riwayat Pergerakan Stok</h3>
+
+        {movementsLoading && movements.length === 0 ? (
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-center justify-between p-4 border rounded-lg animate-pulse">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                      <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                    </div>
+                    <div className="h-6 bg-gray-200 rounded w-20"></div>
+                  </div>
+                  <div className="mt-2 flex items-center gap-4">
+                    <div className="h-3 bg-gray-200 rounded w-24"></div>
+                    <div className="h-3 bg-gray-200 rounded w-32"></div>
+                    <div className="h-3 bg-gray-200 rounded w-28"></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {movements.map((movement, index) => (
+              <div key={`movement-${movement.id}-${index}`} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <h4 className="font-medium">{movement.medicine.nama_obat}</h4>
+                      <p className="text-sm text-gray-600">
+                        {movement.batch?.batch_number && `Batch: ${movement.batch.batch_number}`}
+                      </p>
+                    </div>
+                    {getTypeBadge(movement.type)}
+                  </div>
+                  <div className="mt-2 flex items-center gap-4 text-sm">
+                    <span>Jumlah: {movement.quantity} {movement.medicine.satuan}</span>
+                    <span>Referensi: {
+                      getReferenceLink(movement) ? (
+                        <a
+                          href={getReferenceLink(movement)!}
+                          className="text-blue-600 hover:text-blue-800 underline"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {getReferenceText(movement)}
+                        </a>
+                      ) : (
+                        getReferenceText(movement)
+                      )
+                    }</span>
+                    <span>Waktu: {formatDate(movement.created_at)}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Infinite Scroll Trigger */}
+            <div ref={loadMoreRef} className="flex justify-center py-4">
+              {isFetchingNextPage ? (
+                <div className="flex items-center gap-2 text-gray-600">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <span>Memuat lebih banyak...</span>
+                </div>
+              ) : hasNextPage ? (
+                <div className="text-gray-500 text-sm">
+                  Gulir ke bawah untuk memuat lebih banyak data
+                </div>
+              ) : movements.length > 0 ? (
+                <div className="text-gray-500 text-sm">
+                  Semua data telah dimuat ({movements.length} total)
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>Tidak ada data pergerakan stok ditemukan</p>
+                  <p className="text-sm mt-1">Coba ubah filter pencarian</p>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">
-            Lokasi Mutasi
-          </h3>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-800 dark:text-white">Gudang → Apotek</span>
-              <span className="font-bold text-gray-800 dark:text-white">12</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-800 dark:text-white">Apotek Rawat Jalan → IGD</span>
-              <span className="font-bold text-gray-800 dark:text-white">8</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-800 dark:text-white">IGD → Gudang</span>
-              <span className="font-bold text-gray-800 dark:text-white">5</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-800 dark:text-white">Apotek → Laboratorium</span>
-              <span className="font-bold text-gray-800 dark:text-white">3</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-800 dark:text-white">Lainnya</span>
-              <span className="font-bold text-gray-800 dark:text-white">4</span>
-            </div>
-          </div>
-        </div>
-      </div>
+        )}
+      </Card>
     </div>
   )
 }

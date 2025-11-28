@@ -1,228 +1,441 @@
 'use client'
 
-import { useState } from 'react'
-import { FaClipboardCheck, FaSearch, FaCheckCircle, FaTimesCircle } from 'react-icons/fa'
+import { useState, useEffect } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Textarea } from '@/components/ui/textarea'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { toast } from '@/lib/toast'
+import api from '@/lib/api'
+import {
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  User,
+  Pill,
+  Eye,
+  FileText,
+  Shield,
+} from 'lucide-react'
 
-type PrescriptionValidation = {
+interface Prescription {
   id: number
-  patientName: string
-  medicalRecordNumber: string
-  orderDate: string
-  doctor: string
-  medications: string
-  status: 'pending' | 'approved' | 'rejected'
+  status: string
+  created_at: string
+  notes: string
+  doctor: {
+    name: string
+  }
+  registration: {
+    patient_id: number
+  }
+  items: PrescriptionItem[]
 }
 
-const initialData: PrescriptionValidation[] = [
-  {
-    id: 1,
-    patientName: 'Budi Santoso',
-    medicalRecordNumber: 'MR-2025-001',
-    orderDate: '2025-11-05',
-    doctor: 'dr. Andi Prasetyo',
-    medications: 'Paracetamol, Amoxicillin',
-    status: 'pending'
-  },
-  {
-    id: 2,
-    patientName: 'Dewi Lestari',
-    medicalRecordNumber: 'MR-2025-002',
-    orderDate: '2025-11-04',
-    doctor: 'dr. Andi Prasetyo',
-    medications: 'Metformin, Gliclazide',
-    status: 'approved'
-  },
-  {
-    id: 3,
-    patientName: 'Andi Prasetyo',
-    medicalRecordNumber: 'MR-2025-003',
-    orderDate: '2025-11-03',
-    doctor: 'dr. Andi Prasetyo',
-    medications: 'Sumatriptan, Propranolol',
-    status: 'rejected'
+interface PrescriptionItem {
+  id: number
+  medicine_name: string
+  dosage: string
+  frequency: string
+  duration: string
+  instruction: string
+  medicine_id: number
+}
+
+interface PrescriptionDetail {
+  prescription: Prescription
+  patient: {
+    id: number
+    nama_lengkap: string
+    no_rm: string
+    tanggal_lahir: string
+    jenis_kelamin: string
+    alergi: string
+    penyakit_kronis: string
   }
-]
+  doctor: {
+    name: string
+  }
+  warnings: DrugWarning[]
+}
+
+interface DrugWarning {
+  type: 'allergy' | 'interaction'
+  severity: 'high' | 'moderate' | 'low'
+  message: string
+  medicine_id?: number
+}
 
 export default function ValidasiResepPage() {
-  const [validations] = useState(initialData)
-  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedPrescription, setSelectedPrescription] = useState<PrescriptionDetail | null>(null)
+  const [showDetailDialog, setShowDetailDialog] = useState(false)
+  const [showVerifyDialog, setShowVerifyDialog] = useState(false)
+  const [showRejectDialog, setShowRejectDialog] = useState(false)
+  const [verificationNotes, setVerificationNotes] = useState('')
+  const [rejectionReason, setRejectionReason] = useState('')
+  const [editingItems, setEditingItems] = useState<any[]>([])
 
-  const filteredValidations = validations.filter(validation =>
-    validation.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    validation.medicalRecordNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    validation.medications.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const [prescriptions, setPrescriptions] = useState<Prescription[]>([])
+  const [prescriptionsLoading, setPrescriptionsLoading] = useState(true)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [verifyLoading, setVerifyLoading] = useState(false)
+  const [rejectLoading, setRejectLoading] = useState(false)
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-      case 'approved': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      case 'rejected': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+  useEffect(() => {
+    loadPrescriptions()
+  }, [])
+
+  const loadPrescriptions = async () => {
+    try {
+      setPrescriptionsLoading(true)
+      const response = await api.get('/api/prescriptions/pending')
+      setPrescriptions(response.data.data || [])
+    } catch (error) {
+      toast.error('Gagal memuat data resep')
+    } finally {
+      setPrescriptionsLoading(false)
     }
   }
 
-  const getStatusText = (status: string) => {
+  const handleViewDetail = async (prescriptionId: number) => {
+    try {
+      setDetailLoading(true)
+      const response = await api.get(`/api/prescriptions/${prescriptionId}/detail`)
+      setSelectedPrescription(response.data.data)
+      setShowDetailDialog(true)
+      setVerificationNotes('')
+      setRejectionReason('')
+      setEditingItems([])
+    } catch (error) {
+      toast.error('Gagal memuat detail resep')
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
+  const handleVerify = async () => {
+    if (!selectedPrescription) return
+
+    try {
+      setVerifyLoading(true)
+      await api.post(`/api/prescriptions/${selectedPrescription.prescription.id}/validate`, {
+        verification_notes: verificationNotes,
+        edited_items: editingItems
+      })
+      toast.success('Resep berhasil divalidasi')
+      setShowVerifyDialog(false)
+      setShowDetailDialog(false)
+      loadPrescriptions()
+    } catch (error) {
+      toast.error('Gagal memvalidasi resep')
+    } finally {
+      setVerifyLoading(false)
+    }
+  }
+
+  const handleReject = async () => {
+    if (!selectedPrescription) return
+
+    try {
+      setRejectLoading(true)
+      await api.post(`/api/prescriptions/${selectedPrescription.prescription.id}/reject`, {
+        rejection_reason: rejectionReason
+      })
+      toast.success('Resep berhasil ditolak')
+      setShowRejectDialog(false)
+      setShowDetailDialog(false)
+      loadPrescriptions()
+    } catch (error) {
+      toast.error('Gagal menolak resep')
+    } finally {
+      setRejectLoading(false)
+    }
+  }
+
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case 'high': return 'destructive'
+      case 'moderate': return 'default'
+      case 'low': return 'secondary'
+      default: return 'secondary'
+    }
+  }
+
+  const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'pending': return 'Menunggu'
-      case 'approved': return 'Disetujui'
-      case 'rejected': return 'Ditolak'
-      default: return status
+      case 'pending': return <Badge variant="outline">Menunggu Validasi</Badge>
+      case 'validated': return <Badge variant="default">Sudah Divalidasi</Badge>
+      case 'rejected': return <Badge variant="destructive">Ditolak</Badge>
+      default: return <Badge variant="secondary">{status}</Badge>
     }
   }
 
   return (
     <div className="space-y-6">
-      <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white flex items-center gap-3">
-          <FaClipboardCheck className="text-blue-500" />
-          <span>Validasi Resep</span>
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">
-          Validasi dan approve resep obat dari dokter
-        </p>
+      <div className="flex items-center gap-4">
+        <Shield className="w-8 h-8 text-blue-600" />
+        <div>
+          <h1 className="text-2xl font-bold">Validasi Resep</h1>
+          <p className="text-gray-600">Verifikasi resep dari dokter sebelum distribusi obat</p>
+        </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 md:p-6 border border-gray-200 dark:border-gray-700">
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <FaSearch className="text-gray-400" />
+      {/* Pending Prescriptions Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            Resep Menunggu Validasi
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {prescriptionsLoading ? (
+            <div className="text-center py-4">Loading...</div>
+          ) : prescriptions.length === 0 ? (
+            <div className="text-center py-4 text-gray-500">Tidak ada resep yang menunggu validasi</div>
+          ) : (
+            <div className="space-y-4">
+              {prescriptions.map((prescription) => (
+                <div key={prescription.id} className="border rounded-lg p-4">
+                  <div className="grid grid-cols-4 gap-4">
+                    <div>
+                      <div className="text-sm text-gray-500">No. Resep</div>
+                      <div className="font-medium">#{prescription.id}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Tanggal</div>
+                      <div className="font-medium">
+                        {new Date(prescription.created_at).toLocaleDateString('id-ID')}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Dokter</div>
+                      <div className="font-medium">{prescription.doctor.name}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Jumlah Obat</div>
+                      <div className="font-medium">{prescription.items.length}</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex justify-between items-center">
+                    {getStatusBadge(prescription.status)}
+                    <Button
+                      size="sm"
+                      onClick={() => handleViewDetail(prescription.id)}
+                      disabled={detailLoading}
+                    >
+                      <Eye className="w-4 h-4 mr-1" />
+                      Detail
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
-            <input
-              type="text"
-              placeholder="Cari validasi resep..."
-              className="w-full pl-10 px-4 py-2 rounded-lg border border-gray-300 dark:border-zinc-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Detail Dialog */}
+      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Detail Resep #{selectedPrescription?.prescription.id}
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedPrescription && (
+            <div className="space-y-6">
+              {/* Patient Info */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="w-5 h-5" />
+                    Informasi Pasien
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Nama</Label>
+                    <p className="font-medium">{selectedPrescription.patient.nama_lengkap}</p>
+                  </div>
+                  <div>
+                    <Label>No. RM</Label>
+                    <p className="font-medium">{selectedPrescription.patient.no_rm}</p>
+                  </div>
+                  <div>
+                    <Label>Tanggal Lahir</Label>
+                    <p className="font-medium">
+                      {new Date(selectedPrescription.patient.tanggal_lahir).toLocaleDateString('id-ID')}
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Jenis Kelamin</Label>
+                    <p className="font-medium">{selectedPrescription.patient.jenis_kelamin}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <Label>Alergi</Label>
+                    <p className="font-medium text-red-600">
+                      {selectedPrescription.patient.alergi || 'Tidak ada alergi tercatat'}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Drug Warnings */}
+              {selectedPrescription.warnings.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-red-600">
+                      <AlertTriangle className="w-5 h-5" />
+                      Peringatan Obat
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {selectedPrescription.warnings.map((warning, index) => (
+                      <Alert key={index} variant={warning.severity === 'high' ? 'destructive' : 'default'}>
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription>{warning.message}</AlertDescription>
+                      </Alert>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Prescription Items */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Pill className="w-5 h-5" />
+                    Daftar Obat
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {selectedPrescription.prescription.items.length > 0 ? (
+                    <div className="space-y-4">
+                      {selectedPrescription.prescription.items.map((item) => (
+                        <div key={item.id} className="border rounded-lg p-4">
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                              <Label>Nama Obat</Label>
+                              <p className="font-medium">{item.medicine_name}</p>
+                            </div>
+                            <div>
+                              <Label>Dosis</Label>
+                              <p className="text-sm text-gray-600">{item.dosage}</p>
+                            </div>
+                            <div>
+                              <Label>Frekuensi</Label>
+                              <p className="text-sm text-gray-600">{item.frequency}</p>
+                            </div>
+                            <div>
+                              <Label>Durasi</Label>
+                              <p className="text-sm text-gray-600">{item.duration}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-center py-4">Tidak ada item obat</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Verification Notes */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Catatan Validasi</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Textarea
+                    placeholder="Tambahkan catatan validasi (opsional)"
+                    value={verificationNotes}
+                    onChange={(e) => setVerificationNotes(e.target.value)}
+                    rows={3}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowDetailDialog(false)}
+            >
+              Tutup
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => setShowRejectDialog(true)}
+            >
+              <XCircle className="w-4 h-4 mr-1" />
+              Tolak
+            </Button>
+            <Button
+              onClick={() => setShowVerifyDialog(true)}
+            >
+              <CheckCircle className="w-4 h-4 mr-1" />
+              Validasi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Verify Confirmation Dialog */}
+      <Dialog open={showVerifyDialog} onOpenChange={setShowVerifyDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Konfirmasi Validasi</DialogTitle>
+          </DialogHeader>
+          <p>Apakah Anda yakin ingin memvalidasi resep ini?</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowVerifyDialog(false)}>
+              Batal
+            </Button>
+            <Button onClick={handleVerify} disabled={verifyLoading}>
+              {verifyLoading ? 'Memvalidasi...' : 'Ya, Validasi'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Dialog */}
+      <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tolak Resep</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Label>Alasan Penolakan *</Label>
+            <Textarea
+              placeholder="Jelaskan alasan penolakan resep"
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              rows={4}
+              required
             />
           </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 dark:border-zinc-700 text-left">
-                <th className="py-3 px-2">Nama Pasien</th>
-                <th className="px-2 hidden md:table-cell">No. Rekam Medis</th>
-                <th className="px-2 hidden sm:table-cell">Tanggal Order</th>
-                <th className="px-2">Obat</th>
-                <th className="px-2">Status</th>
-                <th className="text-right px-2">Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredValidations.map((validation) => (
-                <tr
-                  key={validation.id}
-                  className="border-b border-gray-200 dark:border-zinc-800 hover:bg-indigo-500/10 dark:hover:bg-indigo-400/10 transition"
-                >
-                  <td className="py-3 px-2 font-medium">
-                    <div className="flex flex-col">
-                      <span>{validation.patientName}</span>
-                      <span className="text-xs text-gray-500 md:hidden">{validation.medicalRecordNumber}</span>
-                    </div>
-                  </td>
-                  <td className="px-2 hidden md:table-cell">{validation.medicalRecordNumber}</td>
-                  <td className="px-2 hidden sm:table-cell">{validation.orderDate}</td>
-                  <td className="px-2">
-                    <div className="max-w-xs truncate">{validation.medications}</div>
-                  </td>
-                  <td className="px-2">
-                    <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(validation.status)}`}>
-                      {getStatusText(validation.status)}
-                    </span>
-                  </td>
-                  <td className="text-right px-2">
-                    <div className="flex justify-end gap-1">
-                      <button className="p-2 rounded-lg bg-green-500 hover:bg-green-600 text-white transition">
-                        <FaCheckCircle />
-                      </button>
-                      <button className="p-2 rounded-lg bg-red-500 hover:bg-red-600 text-white transition">
-                        <FaTimesCircle />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {filteredValidations.length === 0 && (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            <FaClipboardCheck className="mx-auto text-4xl mb-2" />
-            <p>Tidak ada validasi resep yang ditemukan</p>
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">
-            Statistik Validasi Resep
-          </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-yellow-50 dark:bg-yellow-900/30 p-3 rounded-lg">
-              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-300">Menunggu Validasi</p>
-              <p className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white">
-                {validations.filter(v => v.status === 'pending').length}
-              </p>
-            </div>
-            <div className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
-              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-300">Disetujui</p>
-              <p className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white">
-                {validations.filter(v => v.status === 'approved').length}
-              </p>
-            </div>
-            <div className="bg-red-50 dark:bg-red-900/30 p-3 rounded-lg">
-              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-300">Ditolak</p>
-              <p className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white">
-                {validations.filter(v => v.status === 'rejected').length}
-              </p>
-            </div>
-            <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
-              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-300">Total Validasi</p>
-              <p className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white">{validations.length}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">
-            Akurasi Validasi
-          </h3>
-          <div className="space-y-4">
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-sm text-gray-800 dark:text-white">Akurasi Minggu Ini</span>
-                <span className="text-sm font-medium text-gray-800 dark:text-white">94%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
-                <div className="bg-green-600 h-2 rounded-full" style={{ width: '94%' }}></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-sm text-gray-800 dark:text-white">Akurasi Bulan Ini</span>
-                <span className="text-sm font-medium text-gray-800 dark:text-white">91%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
-                <div className="bg-blue-600 h-2 rounded-full" style={{ width: '91%' }}></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-sm text-gray-800 dark:text-white">Akurasi Tahun Ini</span>
-                <span className="text-sm font-medium text-gray-800 dark:text-white">93%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
-                <div className="bg-purple-600 h-2 rounded-full" style={{ width: '93%' }}></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRejectDialog(false)}>
+              Batal
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleReject}
+              disabled={rejectLoading || !rejectionReason.trim()}
+            >
+              {rejectLoading ? 'Menolak...' : 'Tolak Resep'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

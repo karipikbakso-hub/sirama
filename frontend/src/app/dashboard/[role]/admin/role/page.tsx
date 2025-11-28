@@ -69,7 +69,7 @@ export default function RolePage() {
   const [cloneRole, setCloneRole] = useState<{name: string}>({name: ''})
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
   const [bulkPermissions, setBulkPermissions] = useState<string[]>([])
-  const [matrixPermissions, setMatrixPermissions] = useState<any>({})
+  const [matrixPermissions, setMatrixPermissions] = useState<{[key: string]: boolean}>({})
 
   const queryClient = useQueryClient()
 
@@ -295,6 +295,69 @@ export default function RolePage() {
     })
   }
 
+  const toggleMatrixPermission = (role: Role, permission: Permission) => {
+    if (role.name === 'admin') {
+      toast.error('Tidak dapat mengubah permissions untuk role admin')
+      return
+    }
+
+    const matrixKey = `${role.id}-${permission.name}`
+    const currentValue = role.permissions.includes(permission.name)
+    const newValue = matrixPermissions[matrixKey] !== undefined ? matrixPermissions[matrixKey] : currentValue
+
+    setMatrixPermissions(prev => ({
+      ...prev,
+      [matrixKey]: !newValue
+    }))
+  }
+
+  const handleBulkUpdatePermissions = async () => {
+    if (Object.keys(matrixPermissions).length === 0) return
+
+    try {
+      // Group changes by role
+      const roleChanges: {[roleId: number]: string[]} = {}
+
+      Object.entries(matrixPermissions).forEach(([key, newValue]) => {
+        const [roleIdStr, permissionName] = key.split('-')
+        const roleId = parseInt(roleIdStr)
+
+        if (!roleChanges[roleId]) {
+          roleChanges[roleId] = []
+        }
+
+        if (newValue) {
+          roleChanges[roleId].push(permissionName)
+        }
+      })
+
+      // Apply changes for each role
+      const promises = Object.entries(roleChanges).map(async ([roleId, permissions]) => {
+        const role = roles.find((r: Role) => r.id === parseInt(roleId))
+        if (!role) return
+
+        // For admin role, ensure all permissions are included
+        if (role.name === 'admin') {
+          const allPermissionNames = Object.values(permissions).flat().map((p: any) => typeof p === 'string' ? p : p.name)
+          permissions = [...new Set([...permissions, ...allPermissionNames])]
+        }
+
+        return api.put(`/api/role-permissions/${roleId}/permissions`, {
+          permissions: permissions
+        })
+      })
+
+      await Promise.all(promises)
+
+      // Reset matrix permissions and refresh data
+      setMatrixPermissions({})
+      queryClient.invalidateQueries({ queryKey: ['roles-permissions'] })
+      toast.success('Permissions berhasil diperbarui')
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Gagal memperbarui permissions')
+    }
+  }
+
   const openPermissionModal = (role: Role) => {
     setSelectedRole(role)
     setSelectedPermissions([...role.permissions])
@@ -380,14 +443,14 @@ export default function RolePage() {
         </div>
       </div>
 
-      {/* Roles Table */}
+      {/* Roles Table/Matrix View */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         {isLoading ? (
           <div className="p-8 text-center">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-4"></div>
             <p className="text-gray-600 dark:text-gray-400">Loading roles...</p>
           </div>
-        ) : (
+        ) : viewMode === 'table' ? (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-gray-900">
@@ -497,7 +560,7 @@ export default function RolePage() {
                         >
                           <MdEdit className="text-lg" />
                         </button>
-                        {!['admin', 'pendaftaran', 'dokter', 'perawat', 'apoteker', 'kasir', 'manajemenrs'].includes(role.name) && (
+                        {!['admin', 'pendaftaran', 'dokter', 'perawat', 'apoteker', 'kasir', 'laboratorium', 'radiologi', 'manajemenrs'].includes(role.name) && (
                           <button
                             onClick={() => handleDeleteRole(role)}
                             className="inline-flex items-center gap-1 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors"
@@ -512,6 +575,118 @@ export default function RolePage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        ) : (
+          /* Matrix View */
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                  {filteredRoles.length} roles × {Object.values(permissions).flat().length} permissions
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setViewMode('table')}
+                    className={`px-3 py-1 text-xs rounded-full ${viewMode === 'table' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-400'}`}
+                  >
+                    Table
+                  </button>
+                  <button
+                    onClick={() => setViewMode('matrix')}
+                    className={`px-3 py-1 text-xs rounded-full ${viewMode === 'matrix' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-400'}`}
+                  >
+                    Matrix
+                  </button>
+                </div>
+              </div>
+              <button
+                onClick={handleBulkUpdatePermissions}
+                disabled={Object.keys(matrixPermissions).length === 0}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                Simpan Perubahan
+              </button>
+            </div>
+
+            <div className="overflow-x-auto overflow-y-auto max-h-96">
+              <table className="w-full border-collapse">
+                <thead className="sticky top-0 bg-gray-50 dark:bg-gray-900 z-10">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
+                      Peran
+                    </th>
+                    {Object.values(permissions).flat().map((permission: any) => (
+                      <th
+                        key={permission.id}
+                        className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700 min-w-[80px] max-w-[100px]"
+                        title={permission.label}
+                      >
+                        <div className="transform -rotate-90 whitespace-nowrap text-xs">
+                          {permission.name.replace('manage_', '').replace('view_', '')}
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {filteredRoles.map((role: Role) => (
+                    <tr key={role.id} className="hover:bg-gray-50 dark:hover:bg-gray-900">
+                      <td className="px-4 py-3 whitespace-nowrap border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 sticky left-0 z-10">
+                        <div className="flex items-center gap-2">
+                          {getRoleIcon(role.name)}
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                              {role.label}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {role.name}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      {Object.values(permissions).flat().map((permission: any) => {
+                        const isAssigned = role.permissions.includes(permission.name)
+                        const isReadOnly = role.name === 'admin'
+                        const matrixKey = `${role.id}-${permission.name}`
+                        const isChanged = matrixPermissions[matrixKey] !== undefined
+                        const newValue = matrixPermissions[matrixKey] ?? isAssigned
+
+                        return (
+                          <td
+                            key={permission.id}
+                            className={`px-2 py-3 text-center border-r border-gray-200 dark:border-gray-700 ${
+                              isChanged ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
+                            }`}
+                          >
+                            <button
+                              onClick={() => toggleMatrixPermission(role, permission)}
+                              disabled={isReadOnly}
+                              className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
+                                newValue
+                                  ? 'bg-blue-500 border-blue-500 text-white'
+                                  : 'border-gray-300 dark:border-gray-600 hover:border-blue-400'
+                              } ${isReadOnly ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900'}`}
+                              title={`${role.label} - ${permission.label}${isReadOnly ? ' (Read-only)' : ''}`}
+                            >
+                              {newValue && <MdCheckBox className="text-xs" />}
+                            </button>
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {Object.keys(matrixPermissions).length > 0 && (
+              <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <div className="flex items-center gap-2 text-sm text-yellow-800 dark:text-yellow-200">
+                  <MdWarning className="text-lg" />
+                  <span>Ada {Object.keys(matrixPermissions).length} perubahan yang belum disimpan</span>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

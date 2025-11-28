@@ -1,5 +1,6 @@
 import axios from 'axios'
 import toast from 'react-hot-toast'
+import { useAuthStore } from '@/store/auth'
 
 // Helper function to get CSRF token from cookies
 const getCookieValue = (name: string): string | null => {
@@ -8,6 +9,39 @@ const getCookieValue = (name: string): string | null => {
   const parts = value.split(`; ${name}=`)
   if (parts.length === 2) return parts.pop()?.split(';').shift() || null
   return null
+}
+
+// Helper function to extract role from API URL
+const extractRoleFromApiUrl = (url: string): string | null => {
+  // Pattern: /api/{role}/* or /api/dashboard/{role}/*
+  const patterns = [
+    /^\/api\/(\w+)\//,
+    /^\/api\/dashboard\/(\w+)\//,
+  ]
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern)
+    if (match) {
+      return match[1]
+    }
+  }
+  return null
+}
+
+// Helper function to check if user has access to API role
+const hasApiAccess = (userRole: string, requestedRole: string): boolean => {
+  // Admin can access all roles
+  if (userRole === 'admin') return true
+
+  // Allow access to master data APIs for all roles
+  const masterDataRoles = ['wilayah', 'polis', 'doctors', 'queue', 'pendaftaran']
+  if (masterDataRoles.includes(requestedRole)) return true
+
+  // Allow pendaftaran role to access registrations API
+  if (userRole === 'pendaftaran' && requestedRole === 'registrations') return true
+
+  // User can only access their own role
+  return userRole === requestedRole
 }
 
 // Axios instance untuk session-based authentication dengan Sanctum
@@ -21,8 +55,43 @@ const api = axios.create({
   },
 })
 
-// Request interceptor with CSRF token and bearer token
+// Request interceptor with CSRF token, bearer token, and role validation
 api.interceptors.request.use(async (config) => {
+  // 🔐 ROLE VALIDATION - Prevent API calls to wrong role
+  if (config.url?.startsWith('/api/') && !config.url?.includes('/auth/')) {
+    try {
+      const requestedRole = extractRoleFromApiUrl(config.url)
+      
+      if (requestedRole) {
+        // Get current user from auth store
+        const { user } = useAuthStore.getState()
+        const userRole = (user?.role as string) || 'user'
+        
+        console.log('🔐 API Role validation:', {
+          url: config.url,
+          requestedRole,
+          userRole,
+          hasAccess: hasApiAccess(userRole, requestedRole)
+        })
+        
+        if (!hasApiAccess(userRole, requestedRole)) {
+          console.log(`🚫 Blocking API call: User role '${userRole}' trying to access '${requestedRole}' API`)
+          
+          // Create a custom error that won't make it to the server
+          const roleError = new Error(`ROLE_MISMATCH: User role '${userRole}' cannot access '${requestedRole}' API`)
+          roleError.name = 'RoleMismatchError'
+          throw roleError
+        }
+      }
+    } catch (error) {
+      if ((error as any).name === 'RoleMismatchError') {
+        throw error
+      }
+      console.error('Role validation error:', error)
+      // Continue with request if role validation fails
+    }
+  }
+
   // Untuk POST/PUT/PATCH/DELETE, ambil CSRF token
   if (['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase() || '')) {
     try {

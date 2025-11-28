@@ -15,14 +15,14 @@ class UsersSeeder extends Seeder
     public function run(): void
     {
         // Ensure roles exist first
-        $this->command->info('Creating realistic SIRAMA Hospital users...');
+        $this->command->info('Creating SIRAMA Hospital users with role-based emails...');
 
         // Admin users
         $admin1 = User::create([
             'username' => 'admin.sirama',
             'name' => 'Ahmad Rahman',
-            'email' => 'admin@sirama.go.id',
-            'password' => Hash::make('AdminSirama2024'),
+            'email' => 'admin@sirama.com',
+            'password' => Hash::make('password'),
             'nip' => '198501012010011001',
             'phone' => '081234567890',
             'is_active' => true,
@@ -33,8 +33,8 @@ class UsersSeeder extends Seeder
         $admin2 = User::create([
             'username' => 'superadmin',
             'name' => 'Siti Nurhaliza',
-            'email' => 'superadmin@sirama.go.id',
-            'password' => Hash::make('SuperAdmin2024'),
+            'email' => 'superadmin@sirama.com',
+            'password' => Hash::make('password'),
             'nip' => '198302152010012001',
             'phone' => '081345678901',
             'is_active' => true,
@@ -46,8 +46,8 @@ class UsersSeeder extends Seeder
         $doctor1 = User::create([
             'username' => 'dr.sumarno',
             'name' => 'Dr. Sumarno SpPD',
-            'email' => 'sumarno.dokter@sirama.go.id',
-            'password' => Hash::make('DokterSumarno2024'),
+            'email' => 'dokter@sirama.com',
+            'password' => Hash::make('password'),
             'nip' => '198008151995121001',
             'phone' => '081456789012',
             'is_active' => true,
@@ -58,8 +58,8 @@ class UsersSeeder extends Seeder
         $doctor2 = User::create([
             'username' => 'dr.lia',
             'name' => 'Dr. Lia Kartika SpOG',
-            'email' => 'lia.dokter@sirama.go.id',
-            'password' => Hash::make('DokterLia2024'),
+            'email' => 'spog@sirama.com',
+            'password' => Hash::make('password'),
             'nip' => '198105201997022001',
             'phone' => '081567890123',
             'is_active' => true,
@@ -71,8 +71,8 @@ class UsersSeeder extends Seeder
         $nurse1 = User::create([
             'username' => 'perawat.ayu',
             'name' => 'Ayu Lestari',
-            'email' => 'ayu.perawat@sirama.go.id',
-            'password' => Hash::make('PerawatAyu2024'),
+            'email' => 'perawat@sirama.com',
+            'password' => Hash::make('password'),
             'nip' => '199012251998032002',
             'phone' => '081678901234',
             'is_active' => true,
@@ -83,8 +83,8 @@ class UsersSeeder extends Seeder
         $nurse2 = User::create([
             'username' => 'perawat.budi',
             'name' => 'Budi Santoso',
-            'email' => 'budi.perawat@sirama.go.id',
-            'password' => Hash::make('PerawatBudi2024'),
+            'email' => 'perawat2@sirama.com',
+            'password' => Hash::make('password'),
             'nip' => '198803121999051001',
             'phone' => '081789012345',
             'is_active' => true,
@@ -96,8 +96,8 @@ class UsersSeeder extends Seeder
         $apoteker1 = User::create([
             'username' => 'apt.dewi',
             'name' => 'Dewi Sartika',
-            'email' => 'dewi.apoteker@sirama.go.id',
-            'password' => Hash::make('ApotekerDewi2024'),
+            'email' => 'apoteker@sirama.com',
+            'password' => Hash::make('password'),
             'nip' => '198709101996081002',
             'phone' => '081890123456',
             'is_active' => true,
@@ -109,8 +109,8 @@ class UsersSeeder extends Seeder
         $kasir1 = User::create([
             'username' => 'kasir.rudi',
             'name' => 'Rudi Hartono',
-            'email' => 'rudi.kasir@sirama.go.id',
-            'password' => Hash::make('KasirRudi2024'),
+            'email' => 'kasir@sirama.com',
+            'password' => Hash::make('password'),
             'nip' => '199001152000062001',
             'phone' => '081901234567',
             'is_active' => true,
@@ -121,8 +121,8 @@ class UsersSeeder extends Seeder
         $kasir2 = User::create([
             'username' => 'kasir.maya',
             'name' => 'Maya Sari',
-            'email' => 'maya.kasir@sirama.go.id',
-            'password' => Hash::make('KasirMaya2024'),
+            'email' => 'kasir2@sirama.com',
+            'password' => Hash::make('password'),
             'nip' => '199203202001092002',
             'phone' => '082012345678',
             'is_active' => false, // One inactive user
@@ -134,8 +134,8 @@ class UsersSeeder extends Seeder
         $pendaftaran1 = User::create([
             'username' => 'daftar.yuni',
             'name' => 'Yuniarti Pratiwi',
-            'email' => 'yuni.pendaftaran@sirama.go.id',
-            'password' => Hash::make('PendaftaranYuni2024'),
+            'email' => 'pendaftaran@sirama.com',
+            'password' => Hash::make('password'),
             'nip' => '199304152002102001',
             'phone' => '082123456789',
             'is_active' => true,
@@ -143,20 +143,37 @@ class UsersSeeder extends Seeder
         ]);
         $pendaftaran1->assignRole('pendaftaran');
 
-        $this->command->info('Created 10 realistic SIRAMA Hospital users:');
+        // Additional roles for management
+        $manajemen1 = User::create([
+            'username' => 'mana.hendro',
+            'name' => 'Dr. Hendro Wibowo',
+            'email' => 'manajemenrs@sirama.com',
+            'password' => Hash::make('password'),
+            'nip' => '199004152001102001',
+            'phone' => '082123456790',
+            'is_active' => true,
+            'email_verified_at' => now(),
+        ]);
+        $manajemen1->assignRole('manajemenrs');
+
+        $this->command->info('Created 10 SIRAMA Hospital users with role-based emails:');
         $this->command->info('✅  2 Administrators (Ahmad Rahman, Siti Nurhaliza)');
         $this->command->info('✅  2 Doctors (Dr. Sumarno SpPD, Dr. Lia Kartika SpOG)');
         $this->command->info('✅  2 Nurses (Ayu Lestari, Budi Santoso)');
         $this->command->info('✅  1 Pharmacist (Dewi Sartika)');
         $this->command->info('✅  2 Cashiers (Rudi Hartono, Maya Sari - 1 inactive)');
         $this->command->info('✅  1 Registration Staff (Yuniarti Pratiwi)');
+        $this->command->info('✅  1 Management Staff (Dr. Hendro Wibowo)');
 
         $this->command->info('');
-        $this->command->info('Login credentials for testing:');
-        $this->command->info('Super Admin: superadmin@sirama.go.id / SuperAdmin2024');
-        $this->command->info('Admin: admin@sirama.go.id / AdminSirama2024');
-        $this->command->info('Doctor: sumarno.dokter@sirama.go.id / DokterSumarno2024');
-        $this->command->info('Nurse: ayu.perawat@sirama.go.id / PerawatAyu2024');
-        $this->command->info('Inactive user: maya.kasir@sirama.go.id / KasirMaya2024');
+        $this->command->info('Login credentials - Password: password (for all users)');
+        $this->command->info('Admin: admin@sirama.com');
+        $this->command->info('SuperAdmin: superadmin@sirama.com');
+        $this->command->info('Dokter: dokter@sirama.com');
+        $this->command->info('Perawat: perawat@sirama.com');
+        $this->command->info('Apoteker: apoteker@sirama.com');
+        $this->command->info('Kasir: kasir@sirama.com');
+        $this->command->info('Pendaftaran: pendaftaran@sirama.com');
+        $this->command->info('Manajemen RS: manajemenrs@sirama.com');
     }
 }

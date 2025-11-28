@@ -18,8 +18,31 @@ import {
   MdCheckCircle,
   MdWarning,
   MdError,
-  MdClose
+  MdClose,
+  MdPrint,
+  MdHistory
 } from 'react-icons/md'
+import { Line } from 'react-chartjs-2'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js'
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+)
 
 interface VitalSigns {
   id: string
@@ -38,6 +61,8 @@ interface VitalSigns {
   weight?: number
   height?: number
   bmi?: number
+  painScale?: number
+  consciousness?: 'composmentis' | 'apatis' | 'somnolen' | 'sopor' | 'koma'
   notes?: string
   nurseId: string
   nurseName: string
@@ -68,8 +93,12 @@ export default function VitalSignsPage() {
     oxygenSaturation: '',
     weight: '',
     height: '',
+    painScale: '',
+    consciousness: '',
     notes: ''
   })
+  const [chartData, setChartData] = useState<any>(null)
+  const [showChart, setShowChart] = useState(false)
 
   useEffect(() => {
     fetchPatients()
@@ -78,17 +107,17 @@ export default function VitalSignsPage() {
 
   const fetchPatients = async () => {
     try {
-      // Fetch active patients from nursing dashboard
-      const response = await fetch('/api/dashboard/nursing/active-patients')
+      // Fetch patients who need TTV monitoring
+      const response = await fetch('/api/registrations/need-ttv')
       if (response.ok) {
         const data = await response.json()
-        if (data.success && data.data && data.data.active_patients) {
+        if (data.success && data.data) {
           // Transform data to match our Patient interface
-          const transformedPatients: Patient[] = data.data.active_patients.map((patient: any) => ({
-            id: patient.patient_id.toString(),
+          const transformedPatients: Patient[] = data.data.map((patient: any) => ({
+            id: patient.registration_id.toString(),
             name: patient.patient_name,
-            room: patient.room || patient.department || 'Unknown',
-            bed: patient.bed || 'Unknown',
+            room: patient.ruangan || 'Unknown',
+            bed: 'Unknown', // Not available in this endpoint
             lastVitalSigns: null // Will be populated by fetchVitalSigns
           }))
           setPatients(transformedPatients)
@@ -150,6 +179,8 @@ export default function VitalSignsPage() {
             weight: vital.weight,
             height: vital.height,
             bmi: vital.bmi,
+            painScale: vital.pain_scale,
+            consciousness: vital.consciousness,
             notes: vital.notes,
             nurseId: vital.nurse_id.toString(),
             nurseName: vital.nurse?.name || 'Unknown',
@@ -182,6 +213,70 @@ export default function VitalSignsPage() {
       setVitalSigns(mockVitalSigns)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchChartData = async (registrationId: string) => {
+    try {
+      const response = await fetch(`/api/vital-signs/${registrationId}/chart`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.data) {
+          // The API returns data in correct structure for Chart.js
+          setChartData(data.data)
+          setShowChart(true)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching chart data:', error)
+    }
+  }
+
+  const checkAbnormalVitals = (vitals: any): { isAbnormal: boolean; warnings: string[] } => {
+    const warnings: string[] = []
+
+    // Business rules from specifications
+    const systolic = parseInt(vitals.bloodPressureSystolic) || 0
+    const diastolic = parseInt(vitals.bloodPressureDiastolic) || 0
+    const heartRate = parseInt(vitals.heartRate) || 0
+    const temperature = parseFloat(vitals.temperature) || 0
+    const respirationRate = parseInt(vitals.respirationRate) || 0
+    const oxygenSaturation = parseInt(vitals.oxygenSaturation) || 0
+    const painScale = parseInt(vitals.painScale) || 0
+
+    // Blood Pressure (90/60 - 140/90 mmHg)
+    if (systolic < 90 || systolic > 140 || diastolic < 60 || diastolic > 90) {
+      warnings.push(`Tekanan Darah abnormal: ${systolic}/${diastolic} mmHg (Normal: 90/60 - 140/90)`)
+    }
+
+    // Heart Rate (60-100 bpm)
+    if (heartRate < 60 || heartRate > 100) {
+      warnings.push(`Denyut Jantung abnormal: ${heartRate} bpm (Normal: 60-100)`)
+    }
+
+    // Temperature (36.5-37.5 °C)
+    if (temperature < 36.5 || temperature > 37.5) {
+      warnings.push(`Suhu abnormal: ${temperature}°C (Normal: 36.5-37.5)`)
+    }
+
+    // Respiratory Rate (12-20 per minute)
+    if (respirationRate < 12 || respirationRate > 20) {
+      warnings.push(`Laju Pernapasan abnormal: ${respirationRate}/min (Normal: 12-20)`)
+    }
+
+    // SPO2 (≥ 95%)
+    if (oxygenSaturation < 95) {
+      warnings.push(`Saturasi Oksigen abnormal: ${oxygenSaturation}% (Normal: ≥95%)`)
+    }
+
+    // Pain Scale (serious if ≥ 7)
+    if (painScale >= 7) {
+      warnings.push(`Skala Nyeri tinggi: ${painScale}/10 (Perhatian: ≥7)`)
+    }
+
+    return {
+      isAbnormal: warnings.length > 0,
+      warnings
     }
   }
 
@@ -224,13 +319,23 @@ export default function VitalSignsPage() {
     return ''
   }
 
+  const [showAlertModal, setShowAlertModal] = useState(false)
+  const [alertWarnings, setAlertWarnings] = useState<string[]>([])
+  const [pendingVitalData, setPendingVitalData] = useState<any>(null)
+
   const handleSaveVitalSigns = async () => {
     if (!selectedPatient) return
 
-    try {
-      // Prepare data for API
+    // Check for abnormal values first
+    const { isAbnormal, warnings } = checkAbnormalVitals(currentVitalSigns)
+
+    if (isAbnormal) {
+      // Show alert modal with warnings
+      setAlertWarnings(warnings)
+
+      // Prepare data but don't save yet
       const vitalData = {
-        registration_id: selectedPatient.id, // Assuming patient ID is registration ID for now
+        registration_id: selectedPatient.id,
         patient_id: selectedPatient.id,
         blood_pressure_systolic: parseInt(currentVitalSigns.bloodPressureSystolic) || null,
         blood_pressure_diastolic: parseInt(currentVitalSigns.bloodPressureDiastolic) || null,
@@ -240,10 +345,23 @@ export default function VitalSignsPage() {
         oxygen_saturation: parseInt(currentVitalSigns.oxygenSaturation) || null,
         weight: parseFloat(currentVitalSigns.weight) || null,
         height: parseFloat(currentVitalSigns.height) || null,
+        pain_scale: parseInt(currentVitalSigns.painScale) || null,
+        consciousness: currentVitalSigns.consciousness || null,
         notes: currentVitalSigns.notes || null,
         measured_at: new Date().toISOString()
       }
 
+      setPendingVitalData(vitalData)
+      setShowAlertModal(true)
+      return
+    }
+
+    // No warnings, save directly
+    await performSave(currentVitalSigns, selectedPatient)
+  }
+
+  const performSave = async (vitalData: any, patient: Patient) => {
+    try {
       // Save to API
       const response = await fetch('/api/vital-signs', {
         method: 'POST',
@@ -260,8 +378,8 @@ export default function VitalSignsPage() {
           const newVitalSigns: VitalSigns = {
             id: data.data.id.toString(),
             patientId: data.data.patient_id.toString(),
-            patientName: selectedPatient.name,
-            room: selectedPatient.room,
+            patientName: patient.name,
+            room: patient.room,
             timestamp: data.data.measured_at,
             bloodPressure: {
               systolic: data.data.blood_pressure_systolic || 0,
@@ -283,7 +401,7 @@ export default function VitalSignsPage() {
           // Update local state
           setVitalSigns(prev => [newVitalSigns, ...prev])
           setPatients(prev => prev.map(p =>
-            p.id === selectedPatient.id
+            p.id === patient.id
               ? { ...p, lastVitalSigns: newVitalSigns }
               : p
           ))
@@ -298,10 +416,15 @@ export default function VitalSignsPage() {
             oxygenSaturation: '',
             weight: '',
             height: '',
+            painScale: '',
+            consciousness: '',
             notes: ''
           })
           setShowForm(false)
           setSelectedPatient(null)
+          setShowAlertModal(false)
+          setAlertWarnings([])
+          setPendingVitalData(null)
 
           // Refresh data
           fetchVitalSigns()
@@ -314,39 +437,39 @@ export default function VitalSignsPage() {
       // Fallback to local state update if API fails
       const newVitalSigns: VitalSigns = {
         id: Date.now().toString(),
-        patientId: selectedPatient.id,
-        patientName: selectedPatient.name,
-        room: selectedPatient.room,
+        patientId: patient.id,
+        patientName: patient.name,
+        room: patient.room,
         timestamp: new Date().toISOString().slice(0, 19).replace('T', ' '),
         bloodPressure: {
-          systolic: parseInt(currentVitalSigns.bloodPressureSystolic) || 0,
-          diastolic: parseInt(currentVitalSigns.bloodPressureDiastolic) || 0
+          systolic: parseInt(vitalData.blood_pressure_systolic) || 0,
+          diastolic: parseInt(vitalData.blood_pressure_diastolic) || 0
         },
-        heartRate: parseInt(currentVitalSigns.heartRate) || 0,
-        temperature: parseFloat(currentVitalSigns.temperature) || 0,
-        respirationRate: parseInt(currentVitalSigns.respirationRate) || 0,
-        oxygenSaturation: parseInt(currentVitalSigns.oxygenSaturation) || 0,
-        weight: parseFloat(currentVitalSigns.weight) || undefined,
-        height: parseFloat(currentVitalSigns.height) || undefined,
-        bmi: currentVitalSigns.weight && currentVitalSigns.height
-          ? parseFloat(calculateBMI(parseFloat(currentVitalSigns.weight), parseFloat(currentVitalSigns.height)))
+        heartRate: parseInt(vitalData.heart_rate) || 0,
+        temperature: parseFloat(vitalData.temperature) || 0,
+        respirationRate: parseInt(vitalData.respiration_rate) || 0,
+        oxygenSaturation: parseInt(vitalData.oxygen_saturation) || 0,
+        weight: parseFloat(vitalData.weight) || undefined,
+        height: parseFloat(vitalData.height) || undefined,
+        bmi: vitalData.weight && vitalData.height
+          ? parseFloat(calculateBMI(parseFloat(vitalData.weight), parseFloat(vitalData.height)))
           : undefined,
-        notes: currentVitalSigns.notes,
+        notes: vitalData.notes,
         nurseId: 'current-nurse-id',
         nurseName: 'Siti Nurhaliza',
         status: determineStatus({
-          systolic: parseInt(currentVitalSigns.bloodPressureSystolic) || 0,
-          diastolic: parseInt(currentVitalSigns.bloodPressureDiastolic) || 0,
-          heartRate: parseInt(currentVitalSigns.heartRate) || 0,
-          temperature: parseFloat(currentVitalSigns.temperature) || 0,
-          respirationRate: parseInt(currentVitalSigns.respirationRate) || 0,
-          oxygenSaturation: parseInt(currentVitalSigns.oxygenSaturation) || 0
+          systolic: parseInt(vitalData.blood_pressure_systolic) || 0,
+          diastolic: parseInt(vitalData.blood_pressure_diastolic) || 0,
+          heartRate: parseInt(vitalData.heart_rate) || 0,
+          temperature: parseFloat(vitalData.temperature) || 0,
+          respirationRate: parseInt(vitalData.respiration_rate) || 0,
+          oxygenSaturation: parseInt(vitalData.oxygen_saturation) || 0
         })
       }
 
       setVitalSigns(prev => [newVitalSigns, ...prev])
       setPatients(prev => prev.map(p =>
-        p.id === selectedPatient.id
+        p.id === patient.id
           ? { ...p, lastVitalSigns: newVitalSigns }
           : p
       ))
@@ -360,10 +483,15 @@ export default function VitalSignsPage() {
         oxygenSaturation: '',
         weight: '',
         height: '',
+        painScale: '',
+        consciousness: '',
         notes: ''
       })
       setShowForm(false)
       setSelectedPatient(null)
+      setShowAlertModal(false)
+      setAlertWarnings([])
+      setPendingVitalData(null)
     }
   }
 
@@ -501,10 +629,19 @@ export default function VitalSignsPage() {
                 Catat TTV
               </button>
               {patient.lastVitalSigns && (
-                <button className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                  <MdLocalHospital className="text-lg" />
-                  Detail
-                </button>
+                <>
+                  <button
+                    onClick={() => fetchChartData(patient.id)}
+                    className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <MdLocalHospital className="text-lg" />
+                    Chart
+                  </button>
+                  <button className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <MdLocalHospital className="text-lg" />
+                    History
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -636,6 +773,40 @@ export default function VitalSignsPage() {
                 )}
               </div>
 
+              {/* Pain Scale */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Skala Nyeri (0-10)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  value={currentVitalSigns.painScale}
+                  onChange={(e) => setCurrentVitalSigns(prev => ({ ...prev, painScale: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Consciousness */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Kesadaran
+                </label>
+                <select
+                  value={currentVitalSigns.consciousness}
+                  onChange={(e) => setCurrentVitalSigns(prev => ({ ...prev, consciousness: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Pilih kesadaran</option>
+                  <option value="composmentis">Compos Mentis</option>
+                  <option value="apatis">Apatis</option>
+                  <option value="somnolen">Somnolen</option>
+                  <option value="sopor">Sopor</option>
+                  <option value="koma">Koma</option>
+                </select>
+              </div>
+
               {/* Notes */}
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -663,6 +834,179 @@ export default function VitalSignsPage() {
                 className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
               >
                 Simpan TTV
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Chart Modal */}
+      {showChart && chartData && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg w-full max-w-4xl p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Trend Tanda Vital - 24 Jam Terakhir
+              </h3>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    window.print();
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  <MdPrint className="text-lg" />
+                  Print
+                </button>
+                <button
+                  onClick={() => { setShowChart(false); setChartData(null); }}
+                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <MdClose className="text-gray-400 text-lg" />
+                </button>
+              </div>
+            </div>
+
+            <div className="h-96">
+              <Line
+                data={{
+                  labels: chartData.labels || [],
+                  datasets: [
+                    {
+                      label: 'Tekanan Darah Sistolik',
+                      data: chartData.bloodPressureSystolic || [],
+                      borderColor: 'rgb(255, 99, 132)',
+                      backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                      yAxisID: 'y',
+                    },
+                    {
+                      label: 'Tekanan Darah Diastolik',
+                      data: chartData.bloodPressureDiastolic || [],
+                      borderColor: 'rgb(255, 159, 64)',
+                      backgroundColor: 'rgba(255, 159, 64, 0.5)',
+                      yAxisID: 'y',
+                    },
+                    {
+                      label: 'Denyut Jantung',
+                      data: chartData.heartRate || [],
+                      borderColor: 'rgb(255, 205, 86)',
+                      backgroundColor: 'rgba(255, 205, 86, 0.5)',
+                      yAxisID: 'y',
+                    },
+                    {
+                      label: 'Suhu Tubuh',
+                      data: chartData.temperature || [],
+                      borderColor: 'rgb(75, 192, 192)',
+                      backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                      yAxisID: 'y1',
+                    },
+                    {
+                      label: 'Saturasi Oksigen',
+                      data: chartData.oxygenSaturation || [],
+                      borderColor: 'rgb(54, 162, 235)',
+                      backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                      yAxisID: 'y',
+                    },
+                  ],
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  interaction: {
+                    mode: 'index',
+                    intersect: false,
+                  },
+                  plugins: {
+                    title: {
+                      display: true,
+                      text: 'Trend Tanda Vital 24 Jam',
+                    },
+                  },
+                  scales: {
+                    y: {
+                      type: 'linear',
+                      display: true,
+                      position: 'left',
+                      title: {
+                        display: true,
+                        text: 'Tekanan Darah / Detak / Saturasi (%)',
+                      },
+                    },
+                    y1: {
+                      type: 'linear',
+                      display: true,
+                      position: 'right',
+                      title: {
+                        display: true,
+                        text: 'Suhu (°C)',
+                      },
+                      grid: {
+                        drawOnChartArea: false,
+                      },
+                    },
+                  },
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alert Modal for Abnormal Vitals */}
+      {showAlertModal && alertWarnings.length > 0 && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg w-full max-w-lg p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Peringatan Nilai Abnormal
+              </h3>
+              <button
+                onClick={() => { setShowAlertModal(false); setAlertWarnings([]); setPendingVitalData(null); }}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <MdClose className="text-gray-400 text-lg" />
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <div className="flex items-start gap-3 mb-4">
+                <MdWarning className="text-yellow-500 text-2xl mt-0.5" />
+                <p className="text-gray-700 dark:text-gray-300">
+                  Terdeteksi nilai tanda vital yang tidak normal. Pastikan untuk memberikan penanganan yang sesuai.
+                </p>
+              </div>
+
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-2">
+                  Abnormal Values:
+                </h4>
+                <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
+                  {alertWarnings.map((warning, index) => (
+                    <li key={index} className="flex items-start gap-2">
+                      <span className="text-yellow-500">•</span>
+                      {warning}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => { setShowAlertModal(false); setAlertWarnings([]); setPendingVitalData(null); }}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Batal & Edit
+              </button>
+              <button
+                onClick={() => {
+                  if (pendingVitalData && selectedPatient) {
+                    performSave(pendingVitalData, selectedPatient);
+                  }
+                }}
+                className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors"
+              >
+                Simpan Dengan Peringatan
               </button>
             </div>
           </div>
@@ -699,6 +1043,12 @@ export default function VitalSignsPage() {
                   SpO2 (%)
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Nyeri
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Kesadaran
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -733,6 +1083,12 @@ export default function VitalSignsPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                     {vital.oxygenSaturation}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    {vital.painScale || '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    {vital.consciousness ? vital.consciousness.charAt(0).toUpperCase() + vital.consciousness.slice(1) : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(vital.status)}`}>

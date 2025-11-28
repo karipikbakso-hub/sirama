@@ -17,7 +17,19 @@ class Triase extends Model
         'patient_id',
         'nurse_id',
 
-        // Triase data
+        // Triase data sesuai requirement
+        'kategori_triase',
+        'keluhan_utama',
+        'mekanisme_cedera',
+        'airway',
+        'breathing',
+        'circulation',
+        'disability',
+        'exposure',
+        'vital_signs_id',
+        'response_time',
+
+        // Legacy fields untuk kompatibilitas
         'triage_level',
         'chief_complaint',
         'vital_signs',
@@ -36,6 +48,7 @@ class Triase extends Model
     protected $casts = [
         'vital_signs' => 'array',
         'triage_time' => 'datetime',
+        'response_time' => 'datetime',
     ];
 
     // Relationships

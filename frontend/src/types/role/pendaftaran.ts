@@ -2,16 +2,50 @@
 
 export interface Patient {
   id: number
-  nik: string
+  mrn: string
   name: string
-  birthDate: string
+  nik: string
+  birth_date: string
   gender: 'L' | 'P'
-  phone: string
-  email?: string
+  blood_type?: string
+  insurance_status: 'BPJS' | 'Umum'
+  bpjs_number?: string
   address: string
-  bpjsNumber?: string
-  registrationDate: string
-  status: 'active' | 'inactive'
+  phone?: string
+  allergies?: string
+  chronic_diseases?: string
+  photo?: string
+  visit_history: Visit[]
+  documents: Document[]
+  created_at: string
+  updated_at: string
+}
+
+export interface Visit {
+  id: number
+  tanggal: string
+  poli: string
+  dokter: string
+  diagnosa: string
+  status: 'Selesai' | 'Dalam Proses' | 'Batal'
+  cppt?: CpptEntry[]
+}
+
+export interface CpptEntry {
+  id: number
+  subjective: string
+  objective: string
+  assessment: string
+  plan: string
+  created_at: string
+}
+
+export interface Document {
+  id: number
+  nama: string
+  url: string
+  tipe: 'KTP' | 'BPJS' | 'Lainnya'
+  uploaded_at: string
 }
 
 export interface Registration {

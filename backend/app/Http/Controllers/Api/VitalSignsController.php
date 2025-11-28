@@ -7,6 +7,7 @@ use App\Models\TandaVital;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 class VitalSignsController extends Controller
 {
@@ -76,6 +77,8 @@ class VitalSignsController extends Controller
                 'oxygen_saturation' => 'nullable|integer|min:50|max:100',
                 'weight' => 'nullable|numeric|min:0|max:500',
                 'height' => 'nullable|numeric|min:30|max:250',
+                'pain_scale' => 'nullable|integer|min:0|max:10',
+                'consciousness' => 'nullable|in:composmentis,apatis,somnolen,sopor,koma',
                 'notes' => 'nullable|string|max:1000',
                 'measured_at' => 'nullable|date'
             ]);
@@ -162,6 +165,8 @@ class VitalSignsController extends Controller
                 'oxygen_saturation' => 'sometimes|nullable|integer|min:50|max:100',
                 'weight' => 'sometimes|nullable|numeric|min:0|max:500',
                 'height' => 'sometimes|nullable|numeric|min:30|max:250',
+                'pain_scale' => 'sometimes|nullable|integer|min:0|max:10',
+                'consciousness' => 'sometimes|nullable|in:composmentis,apatis,somnolen,sopor,koma',
                 'notes' => 'sometimes|nullable|string|max:1000',
                 'measured_at' => 'sometimes|nullable|date'
             ]);
@@ -387,12 +392,100 @@ class VitalSignsController extends Controller
             (isset($data['heart_rate']) && ($data['heart_rate'] > 100 || $data['heart_rate'] < 60)) ||
             (isset($data['temperature']) && ($data['temperature'] > 38 || $data['temperature'] < 36)) ||
             (isset($data['respiration_rate']) && ($data['respiration_rate'] > 20 || $data['respiration_rate'] < 12)) ||
-            (isset($data['oxygen_saturation']) && $data['oxygen_saturation'] < 95)
+            (isset($data['oxygen_saturation']) && $data['oxygen_saturation'] < 95) ||
+            (isset($data['pain_scale']) && $data['pain_scale'] >= 7)
         ) {
             return 'warning';
         }
 
         return 'normal';
+    }
+
+    /**
+     * Mendapatkan data chart untuk grafik trend
+     */
+    public function getChartData($registrationId)
+    {
+        try {
+            $vitalSigns = TandaVital::with(['patient', 'registration', 'nurse'])
+                ->where('registration_id', $registrationId)
+                ->where('measured_at', '>=', now()->subHours(24))
+                ->orderBy('measured_at', 'asc')
+                ->get();
+
+            $chartData = [
+                'labels' => [],
+                'datasets' => [
+                    [
+                        'label' => 'Blood Pressure Systolic',
+                        'data' => [],
+                        'borderColor' => 'rgb(255, 99, 132)',
+                        'backgroundColor' => 'rgba(255, 99, 132, 0.5)',
+                        'yAxisID' => 'y',
+                    ],
+                    [
+                        'label' => 'Blood Pressure Diastolic',
+                        'data' => [],
+                        'borderColor' => 'rgb(54, 162, 235)',
+                        'backgroundColor' => 'rgba(54, 162, 235, 0.5)',
+                        'yAxisID' => 'y',
+                    ],
+                    [
+                        'label' => 'Heart Rate',
+                        'data' => [],
+                        'borderColor' => 'rgb(255, 205, 86)',
+                        'backgroundColor' => 'rgba(255, 205, 86, 0.5)',
+                        'yAxisID' => 'y1',
+                    ],
+                    [
+                        'label' => 'Temperature',
+                        'data' => [],
+                        'borderColor' => 'rgb(75, 192, 192)',
+                        'backgroundColor' => 'rgba(75, 192, 192, 0.5)',
+                        'yAxisID' => 'y2',
+                    ],
+                    [
+                        'label' => 'SpO2',
+                        'data' => [],
+                        'borderColor' => 'rgb(153, 102, 255)',
+                        'backgroundColor' => 'rgba(153, 102, 255, 0.5)',
+                        'yAxisID' => 'y3',
+                    ],
+                    [
+                        'label' => 'Respiratory Rate',
+                        'data' => [],
+                        'borderColor' => 'rgb(255, 159, 64)',
+                        'backgroundColor' => 'rgba(255, 159, 64, 0.5)',
+                        'yAxisID' => 'y1',
+                    ],
+                ]
+            ];
+
+            foreach ($vitalSigns as $vital) {
+                $time = $vital->measured_at->format('H:i');
+                $chartData['labels'][] = $time;
+
+                $chartData['datasets'][0]['data'][] = $vital->blood_pressure_systolic;
+                $chartData['datasets'][1]['data'][] = $vital->blood_pressure_diastolic;
+                $chartData['datasets'][2]['data'][] = $vital->heart_rate;
+                $chartData['datasets'][3]['data'][] = $vital->temperature;
+                $chartData['datasets'][4]['data'][] = $vital->oxygen_saturation;
+                $chartData['datasets'][5]['data'][] = $vital->respiration_rate;
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $chartData,
+                'message' => 'Data chart berhasil diambil'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat mengambil data chart',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -408,7 +501,9 @@ class VitalSignsController extends Controller
             'respiration_rate',
             'oxygen_saturation',
             'weight',
-            'height'
+            'height',
+            'pain_scale',
+            'consciousness'
         ];
 
         foreach ($vitalFields as $field) {
@@ -418,5 +513,84 @@ class VitalSignsController extends Controller
         }
 
         return false;
+    }
+
+    /**
+     * Get vital signs chart data for a registration
+     */
+    public function getChart($registrationId)
+    {
+        try {
+            $vitalSigns = TandaVital::with(['patient', 'registration', 'nurse'])
+                ->where('registration_id', $registrationId)
+                ->where('measured_at', '>=', now()->subHours(24)) // Last 24 hours
+                ->orderBy('measured_at', 'asc')
+                ->get();
+
+            $chartData = [
+                'labels' => [],
+                'datasets' => [
+                    [
+                        'label' => 'Sistolik',
+                        'data' => [],
+                        'borderColor' => 'rgb(255, 99, 132)',
+                        'backgroundColor' => 'rgba(255, 99, 132, 0.5)',
+                        'yAxisID' => 'y',
+                    ],
+                    [
+                        'label' => 'Diastolik',
+                        'data' => [],
+                        'borderColor' => 'rgb(54, 162, 235)',
+                        'backgroundColor' => 'rgba(54, 162, 235, 0.5)',
+                        'yAxisID' => 'y',
+                    ],
+                    [
+                        'label' => 'Heart Rate',
+                        'data' => [],
+                        'borderColor' => 'rgb(255, 205, 86)',
+                        'backgroundColor' => 'rgba(255, 205, 86, 0.5)',
+                        'yAxisID' => 'y',
+                    ],
+                    [
+                        'label' => 'Temperature',
+                        'data' => [],
+                        'borderColor' => 'rgb(75, 192, 192)',
+                        'backgroundColor' => 'rgba(75, 192, 192, 0.5)',
+                        'yAxisID' => 'y1',
+                    ],
+                    [
+                        'label' => 'SpO2',
+                        'data' => [],
+                        'borderColor' => 'rgb(153, 102, 255)',
+                        'backgroundColor' => 'rgba(153, 102, 255, 0.5)',
+                        'yAxisID' => 'y',
+                    ]
+                ]
+            ];
+
+            foreach ($vitalSigns as $vital) {
+                $time = Carbon::parse($vital->measured_at)->format('H:i');
+                $chartData['labels'][] = $time;
+
+                $chartData['datasets'][0]['data'][] = $vital->blood_pressure_systolic ?? null;
+                $chartData['datasets'][1]['data'][] = $vital->blood_pressure_diastolic ?? null;
+                $chartData['datasets'][2]['data'][] = $vital->heart_rate ?? null;
+                $chartData['datasets'][3]['data'][] = $vital->temperature ?? null;
+                $chartData['datasets'][4]['data'][] = $vital->oxygen_saturation ?? null;
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $chartData,
+                'message' => 'Data grafik tanda vital berhasil diambil'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat mengambil data grafik',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

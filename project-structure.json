@@ -22,7 +22,6 @@
           "/dashboard/[role]/pendaftaran/registrasi",
           "/dashboard/[role]/pendaftaran/pasien",
           "/dashboard/[role]/pendaftaran/pasien-baru",
-          "/dashboard/[role]/pendaftaran/antrian-management",
           "/dashboard/[role]/pendaftaran/antrian-prioritas",
           "/dashboard/[role]/pendaftaran/rujukan",
           "/dashboard/[role]/pendaftaran/laporan-harian",

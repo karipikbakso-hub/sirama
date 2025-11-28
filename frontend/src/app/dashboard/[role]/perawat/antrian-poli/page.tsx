@@ -87,7 +87,7 @@ export default function AntrianPoliPage() {
   const fetchPolyclinics = async () => {
     try {
       setLoading(true)
-      const response = await apiData.get('/nursing-queue/polyclinics')
+      const response = await apiData.get('/nursing/queue-managements/polyclinics')
 
       if (response.data.success) {
         setPolyclinics(response.data.data)
@@ -107,10 +107,10 @@ export default function AntrianPoliPage() {
     if (!polyclinicId) return
 
     try {
-      const response = await apiData.get(`/nursing-queue/${polyclinicId}`)
+      const response = await apiData.get(`/nursing/queue-managements?poli_id=${polyclinicId}`)
 
       if (response.data.success) {
-        setQueueItems(response.data.data)
+        setQueueItems(response.data.data.data) // Paginated response
       } else {
         throw new Error(response.data.message || 'Failed to fetch queue items')
       }
@@ -190,7 +190,16 @@ export default function AntrianPoliPage() {
 
   const handleCallNext = async (polyclinic: Polyclinic) => {
     try {
-      const response = await apiData.post(`/nursing-queue/${polyclinic.id}/call-next`, {})
+      // Get the next waiting patient
+      const nextPatient = queueItems.find(q => q.status === 'menunggu')
+      if (!nextPatient) {
+        alert('Tidak ada pasien menunggu')
+        return
+      }
+
+      const response = await apiData.post('/nursing/queue-managements/call', {
+        queue_id: nextPatient.id
+      })
 
       if (response.data.success) {
         // Refresh data
@@ -198,18 +207,15 @@ export default function AntrianPoliPage() {
 
         if (voiceEnabled) {
           // Voice announcement implementation
-          const nextPatient = response.data.data.patient
-          if (nextPatient) {
-            const speech = new SpeechSynthesisUtterance()
-            speech.text = `Nomor antrian ${nextPatient.queueNumber}, ${nextPatient.patientName}, silakan ke poliklinik ${polyclinic.name}`
-            speech.lang = 'id-ID' // Indonesian
-            speech.rate = 0.8
-            speech.volume = 1
+          const speech = new SpeechSynthesisUtterance()
+          speech.text = `Nomor antrian ${nextPatient.queueNumber}, ${nextPatient.patientName}, silakan ke poliklinik ${polyclinic.name}`
+          speech.lang = 'id-ID' // Indonesian
+          speech.rate = 0.8
+          speech.volume = 1
 
-            // Use speech synthesis
-            if ('speechSynthesis' in window) {
-              window.speechSynthesis.speak(speech)
-            }
+          // Use speech synthesis
+          if ('speechSynthesis' in window) {
+            window.speechSynthesis.speak(speech)
           }
         }
       } else {
@@ -223,7 +229,9 @@ export default function AntrianPoliPage() {
 
   const handleSkipPatient = async (queueItem: QueueItem) => {
     try {
-      const response = await apiData.post(`/nursing-queue/${queueItem.id}/skip`, {})
+      const response = await apiData.post('/nursing/queue-managements/skip', {
+        queue_id: queueItem.id
+      })
 
       if (response.data.success) {
         // Refresh data
@@ -239,7 +247,7 @@ export default function AntrianPoliPage() {
 
   const handleCompleteService = async (queueItem: QueueItem) => {
     try {
-      const response = await apiData.post(`/nursing-queue/${queueItem.id}/complete`, {})
+      const response = await apiData.patch(`/nursing/queue-managements/${queueItem.id}/complete`)
 
       if (response.data.success) {
         // Refresh data
@@ -255,7 +263,9 @@ export default function AntrianPoliPage() {
 
   const handleRecallPatient = async (queueItem: QueueItem) => {
     try {
-      const response = await apiData.post(`/nursing-queue/${queueItem.id}/recall`, {})
+      const response = await apiData.post('/nursing/queue-managements/call', {
+        queue_id: queueItem.id
+      })
 
       if (response.data.success) {
         // Refresh data
@@ -387,6 +397,7 @@ export default function AntrianPoliPage() {
                   <label className="text-sm text-gray-600 dark:text-gray-400">Auto Call:</label>
                   <button
                     onClick={() => setAutoCall(!autoCall)}
+                    aria-label={autoCall ? 'Nonaktifkan panggilan otomatis' : 'Aktifkan panggilan otomatis'}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                       autoCall ? 'bg-green-600' : 'bg-gray-200 dark:bg-gray-700'
                     }`}
@@ -402,6 +413,7 @@ export default function AntrianPoliPage() {
                   <label className="text-sm text-gray-600 dark:text-gray-400">Voice:</label>
                   <button
                     onClick={() => setVoiceEnabled(!voiceEnabled)}
+                    aria-label={voiceEnabled ? 'Nonaktifkan pengumuman suara' : 'Aktifkan pengumuman suara'}
                     className={`p-2 rounded-lg transition-colors ${
                       voiceEnabled ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-600'
                     }`}
@@ -429,7 +441,9 @@ export default function AntrianPoliPage() {
                 </div>
               </div>
               <div className="flex gap-2">
+                <label htmlFor="filter-status" className="sr-only">Filter Status Antrian</label>
                 <select
+                  id="filter-status"
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value as any)}
                   className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"

@@ -1,524 +1,972 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { FaUserPlus, FaEdit, FaSearch, FaEye } from 'react-icons/fa'
-import api from '@/lib/apiAuth'
+import { useState, useEffect, useCallback } from 'react'
+import { FaUserPlus, FaSearch, FaUserCheck, FaArrowLeft, FaIdCard, FaMapMarkerAlt, FaPhone, FaShieldAlt, FaHeartbeat, FaCamera, FaStethoscope, FaCalendarCheck, FaPrint } from 'react-icons/fa'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { pasienBaruSchema, type PasienBaruFormData } from '@/schemas/patientSchemas'
+import api from '@/lib/api'
+import toast from '@/lib/toast'
+import { useRegistrationStore } from '@/store/registrationStore'
+import { generatePatientCard, generateQueueNumber, downloadPDF, printPDF } from '@/lib/pdfGenerator'
 
-interface Patient {
-  id: number
-  no_rm?: string
-  mrn?: string
-  nama?: string
-  name?: string
-  nik: string
-  tanggal_lahir?: string
-  birth_date?: string
-  jenis_kelamin?: 'L' | 'P'
-  gender?: 'L' | 'P'
-  telepon?: string
-  phone?: string
-  alamat?: string
-  address?: string
-  kontak_darurat?: string
-  emergency_contact?: string
-  no_bpjs?: string
-  bpjs_number?: string
-  status?: string
-  created_at?: string
-}
+// UI Components
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 
-interface PatientFormData {
-  name: string
-  nik?: string
-  birth_date: string
-  gender: 'L' | 'P'
-  phone?: string
-  address?: string
-  emergency_contact?: string
-  bpjs_number?: string
-}
+// Webcam component
+import { WebcamCapture } from '@/components/ui/WebcamCapture'
 
-const validatePatientForm = (data: PatientFormData): string[] => {
-  const errors: string[] = []
+// Address cascading component
+import { AddressCascadingSelect } from '@/components/ui/AddressCascadingSelect'
 
-  if (!data.name || data.name.trim().length === 0) {
-    errors.push('Nama wajib diisi')
-  }
-
-  if (!data.birth_date || data.birth_date.trim().length === 0) {
-    errors.push('Tanggal lahir wajib diisi')
-  }
-
-  if (!data.gender || !['L', 'P'].includes(data.gender)) {
-    errors.push('Jenis kelamin wajib dipilih')
-  }
-
-  return errors
-}
-
-export default function RegistrasiPage() {
-  const [patients, setPatients] = useState<Patient[]>([])
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-  const [showForm, setShowForm] = useState(false)
-  const [editingPatient, setEditingPatient] = useState<Patient | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [formData, setFormData] = useState<PatientFormData>({
-    name: '',
-    nik: '',
-    birth_date: '',
-    gender: 'L',
-    phone: '',
-    address: '',
-    emergency_contact: '',
-    bpjs_number: ''
-  })
-  const [formErrors, setFormErrors] = useState<string[]>([])
-
-  // Fetch patients
-  const fetchPatients = async () => {
-    try {
-      setLoading(true)
-      const response = await api.get('/api/patients')
-      if (response.data.success) {
-        setPatients(response.data.data.data || [])
-      }
-    } catch (error: any) {
-      console.error('Error fetching patients:', error)
-      alert('Gagal memuat data pasien')
-    } finally {
-      setLoading(false)
-    }
-  }
+// Debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
 
   useEffect(() => {
-    fetchPatients()
-  }, [])
+    const handler = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay)
 
-  // Filter patients based on search
-  const filteredPatients = patients.filter(patient => {
-    const searchValue = searchTerm.toLowerCase()
-    const searchableValues = [
-      patient.name || patient.nama || '',
-      patient.nik || '',
-      patient.mrn || patient.no_rm || '',
-      patient.phone || patient.telepon || '',
-      patient.bpjs_number || patient.no_bpjs || ''
-    ]
+    return () => {
+      clearTimeout(handler)
+    }
+  }, [value, delay])
 
-    return searchableValues.some(fieldValue =>
-      fieldValue.toLowerCase().includes(searchValue)
-    )
+  return debouncedValue
+}
+
+export default function RegistrasiTerpaduPage() {
+  const store = useRegistrationStore()
+  const {
+    currentPhase,
+    searchQuery,
+    searchResults,
+    isSearching,
+    selectedPatient,
+    formData,
+    poliOptions,
+    doctorOptions,
+    currentStep,
+    isSubmitting,
+    successModal
+  } = store
+
+  // State for patient photo
+  const [patientPhoto, setPatientPhoto] = useState<string | null>(null)
+
+  // State for patient visit history
+  const [patientVisitHistory, setPatientVisitHistory] = useState<any[]>([])
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+
+  const debouncedSearchQuery = useDebounce(searchQuery, 500)
+
+  // Form for new patient registration
+  const form = useForm<PasienBaruFormData>({
+    resolver: zodResolver(pasienBaruSchema),
+    defaultValues: {
+      alergi: [],
+      penyakit_kronis: []
+    }
   })
 
-  // Handle form submission
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // Load initial data
+  useEffect(() => {
+    loadPoliOptions()
+  }, [])
 
-    const errors = validatePatientForm(formData)
-    if (errors.length > 0) {
-      setFormErrors(errors)
-      return
+  // Search patients when query changes
+  useEffect(() => {
+    if (debouncedSearchQuery.length >= 2) {
+      searchPatients(debouncedSearchQuery)
+    } else {
+      store.setSearchResults([])
     }
+  }, [debouncedSearchQuery])
 
+  const loadPoliOptions = async () => {
     try {
-      setSubmitting(true)
+      const response = await api.get('/api/polis/active')
+      if (response.data.success) {
+        store.setPoliOptions(response.data.data)
+      }
+    } catch (error) {
+      console.error('Failed to load poli options:', error)
+    }
+  }
 
-      const payload = {
-        ...formData,
-        nik: formData.nik || null,
-        phone: formData.phone || null,
-        address: formData.address || null,
-        emergency_contact: formData.emergency_contact || null,
-        bpjs_number: formData.bpjs_number || null,
-        status: 'active'
+  const searchPatients = async (query: string) => {
+    store.setIsSearching(true)
+    try {
+      const response = await api.get('/api/pendaftaran/pasien/search', {
+        params: { q: query }
+      })
+      if (response.data.success) {
+        store.setSearchResults(response.data.data || [])
+      }
+    } catch (error) {
+      console.error('Search failed:', error)
+      store.setSearchResults([])
+    } finally {
+      store.setIsSearching(false)
+    }
+  }
+
+  const loadDoctorsForPoli = async (poliId: number) => {
+    try {
+      const response = await api.get('/api/doctors/by-poli', {
+        params: { poli_id: poliId }
+      })
+      if (response.data.success) {
+        store.setDoctorOptions(response.data.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to load doctors:', error)
+      store.setDoctorOptions([])
+    }
+  }
+
+  const handlePatientSelect = (patient: any) => {
+    store.setSelectedPatient(patient)
+    loadPatientVisitHistory(patient.id)
+    store.setCurrentPhase('visit_registration')
+  }
+
+  const loadPatientVisitHistory = async (patientId: number) => {
+    setIsLoadingHistory(true)
+    try {
+      const response = await api.get(`/api/pendaftaran/pasien/${patientId}/riwayat-kunjungan`)
+      if (response.data.success) {
+        setPatientVisitHistory(response.data.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to load patient visit history:', error)
+      setPatientVisitHistory([])
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }
+
+  const handleNewPatientRegistration = () => {
+    store.setCurrentPhase('new_patient')
+  }
+
+  const handlePatientFormSubmit = async (data: PasienBaruFormData) => {
+    try {
+      store.setIsSubmitting(true)
+
+      // Generate MR number first
+      const mrResponse = await api.get('/api/pendaftaran/generate-mr-number')
+      const mrNumber = mrResponse.data.data.mr_number
+
+      const submitData = {
+        ...data,
+        tanggal_lahir: data.tanggal_lahir.toISOString().split('T')[0],
+        no_rm: mrNumber
       }
 
-      if (editingPatient) {
-        // Update patient
-        const response = await api.put(`/api/patients/${editingPatient.id}`, payload)
-        if (response.data.success) {
-          alert('Data pasien berhasil diperbarui')
-          setShowForm(false)
-          setEditingPatient(null)
-          setFormData({
-            name: '',
-            nik: '',
-            birth_date: '',
-            gender: 'L',
-            phone: '',
-            address: '',
-            emergency_contact: '',
-            bpjs_number: ''
-          })
-          setFormErrors([])
-          fetchPatients()
-        }
-      } else {
-        // Create new patient
-        const response = await api.post('/api/patients', payload)
-        if (response.data.success) {
-          alert('Pasien baru berhasil ditambahkan')
-          setShowForm(false)
-          setFormData({
-            name: '',
-            nik: '',
-            birth_date: '',
-            gender: 'L',
-            phone: '',
-            address: '',
-            emergency_contact: '',
-            bpjs_number: ''
-          })
-          setFormErrors([])
-          fetchPatients()
-        }
+      const response = await api.post('/api/pendaftaran/pasien-baru', submitData)
+
+      if (response.data.success) {
+        const { pasien } = response.data.data
+        store.setSelectedPatient({
+          id: pasien.id,
+          no_rm: pasien.no_rm,
+          nama_lengkap: pasien.nama_lengkap,
+          nik: pasien.nik,
+          tanggal_lahir: pasien.tanggal_lahir,
+          jenis_kelamin: pasien.jenis_kelamin,
+          telepon: pasien.telepon
+        })
+        store.setCurrentPhase('visit_registration')
+        toast.success('Pasien berhasil didaftarkan!')
+        form.reset()
       }
     } catch (error: any) {
-      console.error('Error saving patient:', error)
-      const message = error.response?.data?.message || 'Gagal menyimpan data pasien'
-      alert(message)
+      console.error('Patient registration failed:', error)
+      const message = error.response?.data?.message || 'Gagal mendaftarkan pasien'
+      toast.error(message)
     } finally {
-      setSubmitting(false)
+      store.setIsSubmitting(false)
     }
   }
 
-  // Handle edit
-  const handleEdit = (patient: Patient) => {
-    setEditingPatient(patient)
-    setFormData({
-      name: patient.name || patient.nama || '',
-      nik: patient.nik || '',
-      birth_date: patient.birth_date || patient.tanggal_lahir || '',
-      gender: (patient.gender || patient.jenis_kelamin || 'L') as 'L' | 'P',
-      phone: patient.phone || patient.telepon || '',
-      address: patient.address || patient.alamat || '',
-      emergency_contact: patient.emergency_contact || patient.kontak_darurat || '',
-      bpjs_number: patient.bpjs_number || patient.no_bpjs || ''
-    })
-    setFormErrors([])
-    setShowForm(true)
+  const handleVisitRegistration = async () => {
+    if (!selectedPatient) return
+
+    try {
+      store.setIsSubmitting(true)
+
+      const visitData = {
+        patient_id: selectedPatient.id,
+        jenis_kunjungan: formData.jenis_kunjungan || 'Rawat Jalan',
+        poli_id: formData.poli_id,
+        dokter_id: formData.dokter_id,
+        keluhan_utama: formData.keluhan_utama,
+        jenis_bayar: formData.jenis_bayar || 'Umum'
+      }
+
+      const response = await api.post('/api/registrations/unified', visitData)
+
+      if (response.data.success) {
+        const { registration, queue_number } = response.data.data
+        store.setSuccessModal({
+          registration,
+          queue_number,
+          patient: selectedPatient
+        })
+        toast.success('Registrasi kunjungan berhasil!')
+      }
+    } catch (error: any) {
+      console.error('Visit registration failed:', error)
+      const message = error.response?.data?.message || 'Gagal mendaftarkan kunjungan'
+      toast.error(message)
+    } finally {
+      store.setIsSubmitting(false)
+    }
   }
 
-  // Handle cancel
-  const handleCancel = () => {
-    setShowForm(false)
-    setEditingPatient(null)
-    setFormData({
-      name: '',
-      nik: '',
-      birth_date: '',
-      gender: 'L',
-      phone: '',
-      address: '',
-      emergency_contact: '',
-      bpjs_number: ''
-    })
-    setFormErrors([])
+  const resetToSearch = () => {
+    store.reset()
+  }
+
+  // Render functions
+  const renderSearchPhase = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-3">
+            <FaSearch className="text-blue-600" />
+            Pencarian Pasien
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="search">Cari Pasien</Label>
+            <Input
+              id="search"
+              placeholder="Ketik nama, nomor RM, NIK, atau nomor BPJS..."
+              value={searchQuery}
+              onChange={(e) => store.setSearchQuery(e.target.value)}
+              className="mt-1"
+            />
+            {isSearching && (
+              <p className="text-sm text-gray-500 mt-2">Mencari...</p>
+            )}
+          </div>
+
+          {searchResults.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="font-medium">Hasil Pencarian:</h3>
+              {searchResults.slice(0, 10).map((patient) => (
+                <Card key={patient.id} className="cursor-pointer hover:bg-gray-50 transition-colors"
+                      onClick={() => handlePatientSelect(patient)}>
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-medium">{patient.nama_lengkap}</h4>
+                        <p className="text-sm text-gray-600">RM: {patient.no_rm} | NIK: {patient.nik}</p>
+                        {patient.no_bpjs && (
+                          <p className="text-sm text-gray-600">BPJS: {patient.no_bpjs}</p>
+                        )}
+                      </div>
+                      <Button size="sm" onClick={(e) => {
+                        e.stopPropagation()
+                        handlePatientSelect(patient)
+                      }}>
+                        <FaUserCheck className="mr-2" />
+                        Pilih
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {searchQuery.length >= 2 && searchResults.length === 0 && !isSearching && (
+            <div className="text-center py-8">
+              <FaUserPlus className="text-gray-400 text-4xl mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Pasien Tidak Ditemukan</h3>
+              <p className="text-gray-600 mb-4">Pasien dengan kriteria tersebut belum terdaftar.</p>
+              <Button onClick={handleNewPatientRegistration}>
+                <FaUserPlus className="mr-2" />
+                Daftarkan Pasien Baru
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+
+  const renderNewPatientPhase = () => {
+    const steps = [
+      { id: 1, title: 'Data Pribadi', icon: FaIdCard },
+      { id: 2, title: 'Alamat', icon: FaMapMarkerAlt },
+      { id: 3, title: 'Kontak & Asuransi', icon: FaPhone },
+      { id: 4, title: 'Riwayat Kesehatan', icon: FaHeartbeat }
+    ]
+
+    return (
+      <div className="space-y-6">
+        {/* Progress Indicator */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              {steps.map((step, index) => {
+                const Icon = step.icon
+                const isActive = currentStep === step.id
+                const isCompleted = currentStep > step.id
+
+                return (
+                  <div key={step.id} className="flex items-center">
+                    <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
+                      isCompleted ? 'bg-green-600 text-white' :
+                      isActive ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'
+                    }`}>
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <span className={`ml-2 text-sm font-medium ${
+                      isActive ? 'text-blue-600' : 'text-gray-600'
+                    }`}>
+                      {step.title}
+                    </span>
+                    {index < steps.length - 1 && (
+                      <div className={`w-12 h-0.5 mx-4 ${
+                        isCompleted ? 'bg-green-600' : 'bg-gray-200'
+                      }`} />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <Progress value={(currentStep / steps.length) * 100} className="w-full" />
+          </CardContent>
+        </Card>
+
+        {/* Form Content */}
+        <Card>
+          <CardContent className="p-6">
+            {currentStep === 1 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Data Pribadi</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="nik">NIK *</Label>
+                    <Input
+                      id="nik"
+                      {...form.register('nik')}
+                      placeholder="16 digit NIK"
+                      maxLength={16}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="nama_lengkap">Nama Lengkap *</Label>
+                    <Input
+                      id="nama_lengkap"
+                      {...form.register('nama_lengkap')}
+                      placeholder="Nama lengkap"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="tanggal_lahir">Tanggal Lahir *</Label>
+                    <Input
+                      id="tanggal_lahir"
+                      type="date"
+                      {...form.register('tanggal_lahir', { valueAsDate: true })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="jenis_kelamin">Jenis Kelamin *</Label>
+                    <select
+                      {...form.register('jenis_kelamin')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      aria-label="Jenis Kelamin"
+                    >
+                      <option value="">Pilih jenis kelamin</option>
+                      <option value="L">Laki-Laki</option>
+                      <option value="P">Perempuan</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {currentStep === 2 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Alamat Lengkap</h3>
+                <AddressCascadingSelect
+                  value={{
+                    provinsi: form.watch('provinsi') || '',
+                    kota: form.watch('kota') || '',
+                    kecamatan: form.watch('kecamatan') || '',
+                    kelurahan: form.watch('kelurahan') || '',
+                    rt: form.watch('rt') || '',
+                    rw: form.watch('rw') || '',
+                    kode_pos: form.watch('kode_pos') || ''
+                  }}
+                  onChange={(address) => {
+                    form.setValue('provinsi', address.provinsi || '')
+                    form.setValue('kota', address.kota || '')
+                    form.setValue('kecamatan', address.kecamatan || '')
+                    form.setValue('kelurahan', address.kelurahan || '')
+                    form.setValue('rt', address.rt || '')
+                    form.setValue('rw', address.rw || '')
+                    form.setValue('kode_pos', address.kode_pos || '')
+                  }}
+                  errors={{
+                    provinsi: form.formState.errors.provinsi?.message,
+                    kota: form.formState.errors.kota?.message,
+                    kecamatan: form.formState.errors.kecamatan?.message,
+                    kelurahan: form.formState.errors.kelurahan?.message,
+                    rt: form.formState.errors.rt?.message,
+                    rw: form.formState.errors.rw?.message,
+                    kode_pos: form.formState.errors.kode_pos?.message
+                  }}
+                />
+              </div>
+            )}
+
+            {currentStep === 3 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Kontak & Asuransi</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="telepon">Nomor Telepon *</Label>
+                    <Input
+                      id="telepon"
+                      {...form.register('telepon')}
+                      placeholder="08xxxxxxxxxx"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="telepon_alternatif">Telepon Alternatif</Label>
+                    <Input
+                      id="telepon_alternatif"
+                      {...form.register('telepon_alternatif')}
+                      placeholder="08xxxxxxxxxx"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      {...form.register('email')}
+                      placeholder="email@example.com"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="jenis_asuransi">Jenis Asuransi *</Label>
+                    <select
+                      {...form.register('jenis_asuransi')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                      aria-label="Jenis Asuransi"
+                    >
+                      <option value="">Pilih jenis asuransi</option>
+                      <option value="BPJS">BPJS</option>
+                      <option value="Asuransi Swasta">Asuransi Swasta</option>
+                      <option value="Perusahaan">Perusahaan</option>
+                      <option value="Umum">Umum</option>
+                    </select>
+                  </div>
+                  {form.watch('jenis_asuransi') === 'BPJS' && (
+                    <>
+                      <div>
+                        <Label htmlFor="no_bpjs">Nomor BPJS</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="no_bpjs"
+                            {...form.register('no_bpjs')}
+                            placeholder="13 digit"
+                            maxLength={13}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              const bpjsNumber = form.getValues('no_bpjs');
+                              if (!bpjsNumber || bpjsNumber.length !== 13) {
+                                toast.error('Nomor BPJS harus 13 digit');
+                                return;
+                              }
+
+                              try {
+                                const response = await api.post('/api/pendaftaran/validasi-bpjs', {
+                                  no_bpjs: bpjsNumber
+                                });
+
+                                if (response.data.success) {
+                                  toast.success('BPJS valid! Data pasien terverifikasi.');
+                                  // Optionally populate patient data from BPJS response
+                                } else {
+                                  toast.error('BPJS tidak valid atau tidak aktif');
+                                }
+                              } catch (error: any) {
+                                console.error('BPJS validation failed:', error);
+                                toast.error('Gagal memverifikasi BPJS');
+                              }
+                            }}
+                          >
+                            Verifikasi
+                          </Button>
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="kelas_bpjs">Kelas BPJS</Label>
+                        <select
+                          {...form.register('kelas_bpjs')}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                          aria-label="Kelas BPJS"
+                        >
+                          <option value="">Pilih kelas</option>
+                          <option value="1">Kelas 1</option>
+                          <option value="2">Kelas 2</option>
+                          <option value="3">Kelas 3</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+                  {(form.watch('jenis_asuransi') === 'Asuransi Swasta' || form.watch('jenis_asuransi') === 'Perusahaan') && (
+                    <>
+                      <div>
+                        <Label htmlFor="provider_asuransi">Provider Asuransi</Label>
+                        <Input
+                          id="provider_asuransi"
+                          {...form.register('provider_asuransi')}
+                          placeholder="Nama perusahaan asuransi"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="nomor_asuransi">Nomor Polis</Label>
+                        <Input
+                          id="nomor_asuransi"
+                          {...form.register('nomor_asuransi')}
+                          placeholder="Nomor polis asuransi"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Kontak Darurat */}
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <h4 className="text-md font-medium mb-4">Kontak Darurat</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="nama_penanggung_jawab">Nama Kontak Darurat *</Label>
+                      <Input
+                        id="nama_penanggung_jawab"
+                        {...form.register('nama_penanggung_jawab')}
+                        placeholder="Nama lengkap kontak darurat"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="hubungan_penanggung_jawab">Hubungan</Label>
+                      <select
+                        {...form.register('hubungan_penanggung_jawab')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                        aria-label="Hubungan"
+                      >
+                        <option value="">Pilih hubungan</option>
+                        <option value="Suami">Suami</option>
+                        <option value="Istri">Istri</option>
+                        <option value="Anak">Anak</option>
+                        <option value="Orang Tua">Orang Tua</option>
+                        <option value="Saudara">Saudara</option>
+                        <option value="Kerabat">Kerabat</option>
+                        <option value="Teman">Teman</option>
+                        <option value="Lainnya">Lainnya</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label htmlFor="telepon_penanggung_jawab">Nomor Telepon Darurat *</Label>
+                      <Input
+                        id="telepon_penanggung_jawab"
+                        {...form.register('telepon_penanggung_jawab')}
+                        placeholder="08xxxxxxxxxx"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="kontak_darurat">Kontak Darurat Tambahan</Label>
+                      <Input
+                        id="kontak_darurat"
+                        {...form.register('kontak_darurat')}
+                        placeholder="Kontak darurat lainnya"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {currentStep === 4 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Riwayat Kesehatan & Foto</h3>
+                <div>
+                  <Label>Riwayat Penyakit Kronis</Label>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+                    {['Diabetes', 'Hipertensi', 'Penyakit Jantung', 'Penyakit Ginjal', 'Asma', 'Riwayat Stroke', 'Riwayat Kanker', 'Hepatitis'].map((disease) => (
+                      <label key={disease} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          value={disease}
+                          {...form.register('penyakit_kronis')}
+                          className="form-checkbox"
+                        />
+                        <span className="text-sm">{disease}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Webcam untuk foto pasien */}
+                <div className="mt-6">
+                  <Label>Foto Pasien (Opsional)</Label>
+                  <div className="mt-2">
+                    <WebcamCapture
+                      onCapture={(imageSrc) => {
+                        // Convert base64 to File object
+                        fetch(imageSrc)
+                          .then(res => res.blob())
+                          .then(blob => {
+                            const file = new File([blob], 'patient-photo.jpg', { type: 'image/jpeg' });
+                            store.updateFormData({ foto_pasien: file });
+                          });
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Navigation Buttons */}
+        <div className="flex justify-between">
+          <Button
+            variant="outline"
+            onClick={() => store.setCurrentStep(Math.max(1, currentStep - 1))}
+            disabled={currentStep === 1}
+          >
+            Sebelumnya
+          </Button>
+
+          {currentStep < 4 ? (
+            <Button onClick={() => store.setCurrentStep(currentStep + 1)}>
+              Selanjutnya
+            </Button>
+          ) : (
+            <Button onClick={form.handleSubmit(handlePatientFormSubmit)} disabled={isSubmitting}>
+              {isSubmitting ? 'Mendaftarkan...' : 'Daftarkan Pasien'}
+            </Button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  const renderVisitRegistrationPhase = () => (
+    <div className="space-y-6">
+      {/* Patient Info */}
+      {selectedPatient && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3">
+              <FaUserCheck className="text-green-600" />
+              Data Pasien
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Nama Lengkap</Label>
+                <p className="font-medium">{selectedPatient.nama_lengkap}</p>
+              </div>
+              <div>
+                <Label>Nomor RM</Label>
+                <p className="font-medium">{selectedPatient.no_rm}</p>
+              </div>
+              <div>
+                <Label>NIK</Label>
+                <p className="font-medium">{selectedPatient.nik}</p>
+              </div>
+              <div>
+                <Label>Jenis Kelamin</Label>
+                <p className="font-medium">{selectedPatient.jenis_kelamin === 'L' ? 'Laki-Laki' : 'Perempuan'}</p>
+              </div>
+            </div>
+
+            {/* Riwayat Kunjungan */}
+            <div className="mt-6">
+              <Label className="text-sm font-medium text-gray-700">Riwayat Kunjungan</Label>
+              {isLoadingHistory ? (
+                <div className="mt-2 p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-500">Memuat riwayat kunjungan...</p>
+                </div>
+              ) : patientVisitHistory.length > 0 ? (
+                <div className="mt-2 space-y-2 max-h-40 overflow-y-auto">
+                  {patientVisitHistory.slice(0, 5).map((visit: any, index: number) => (
+                    <div key={visit.id || index} className="p-3 bg-gray-50 rounded-lg">
+                      <div className="text-sm text-gray-600">
+                        <p><strong>Tanggal:</strong> {visit.tanggal}</p>
+                        <p><strong>Poli:</strong> {visit.poli}</p>
+                        <p><strong>Dokter:</strong> {visit.dokter}</p>
+                        <p><strong>Status:</strong> {visit.status}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {patientVisitHistory.length > 5 && (
+                    <p className="text-xs text-gray-500 text-center">
+                      Dan {patientVisitHistory.length - 5} kunjungan lainnya...
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-2 p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-500">Belum ada riwayat kunjungan</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Visit Registration Form */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-3">
+            <FaStethoscope className="text-blue-600" />
+            Registrasi Kunjungan
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="jenis_kunjungan">Jenis Kunjungan *</Label>
+              <select
+                id="jenis_kunjungan"
+                value={formData.jenis_kunjungan || ''}
+                onChange={(e) => store.updateFormData({ jenis_kunjungan: e.target.value as any })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                aria-label="Jenis Kunjungan"
+              >
+                <option value="">Pilih jenis kunjungan</option>
+                <option value="Rawat Jalan">Rawat Jalan</option>
+                <option value="IGD">IGD</option>
+                <option value="Rujukan">Rujukan</option>
+              </select>
+            </div>
+
+            <div>
+              <Label htmlFor="poli">Poli Tujuan *</Label>
+              <select
+                id="poli"
+                value={formData.poli_id || ''}
+                onChange={(e) => {
+                  const poliId = parseInt(e.target.value)
+                  store.updateFormData({ poli_id: poliId })
+                  loadDoctorsForPoli(poliId)
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                aria-label="Poli Tujuan"
+              >
+                <option value="">Pilih poli</option>
+                {poliOptions.map((poli) => (
+                  <option key={poli.id} value={poli.id}>
+                    {poli.nama_poli}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <Label htmlFor="dokter">Dokter *</Label>
+              <select
+                id="dokter"
+                value={formData.dokter_id || ''}
+                onChange={(e) => store.updateFormData({ dokter_id: parseInt(e.target.value) })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                disabled={!formData.poli_id}
+                aria-label="Dokter"
+              >
+                <option value="">Pilih dokter</option>
+                {doctorOptions.map((doctor) => (
+                  <option key={doctor.id} value={doctor.id}>
+                    {doctor.name} - {doctor.specialization}
+                    {doctor.quota_remaining !== undefined && doctor.quota_total !== undefined && (
+                      ` (Quota: ${doctor.quota_remaining}/${doctor.quota_total})`
+                    )}
+                  </option>
+                ))}
+              </select>
+              {doctorOptions.length > 0 && (
+                <div className="mt-2 text-sm text-gray-600">
+                  {doctorOptions.map((doctor) => (
+                    <div key={doctor.id} className="flex justify-between items-center">
+                      <span>{doctor.name}</span>
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        (doctor.quota_remaining || 0) > 0
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        Quota: {doctor.quota_remaining || 0}/{doctor.quota_total || 0}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="jenis_bayar">Jenis Pembayaran *</Label>
+              <select
+                id="jenis_bayar"
+                value={formData.jenis_bayar || ''}
+                onChange={(e) => store.updateFormData({ jenis_bayar: e.target.value as any })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                aria-label="Jenis Pembayaran"
+              >
+                <option value="">Pilih jenis pembayaran</option>
+                <option value="BPJS">BPJS</option>
+                <option value="Umum">Umum</option>
+                <option value="Swasta">Asuransi Swasta</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="keluhan">Keluhan Utama *</Label>
+            <Textarea
+              id="keluhan"
+              value={formData.keluhan_utama || ''}
+              onChange={(e) => store.updateFormData({ keluhan_utama: e.target.value })}
+              placeholder="Jelaskan keluhan utama pasien"
+              rows={3}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-between">
+        <Button variant="outline" onClick={resetToSearch}>
+          <FaArrowLeft className="mr-2" />
+          Kembali ke Pencarian
+        </Button>
+        <Button onClick={handleVisitRegistration} disabled={isSubmitting}>
+          {isSubmitting ? 'Mendaftarkan...' : 'Daftarkan Kunjungan'}
+        </Button>
+      </div>
+    </div>
+  )
+
+  const renderSuccessModal = () => {
+    if (!successModal) return null
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FaCalendarCheck className="text-green-600 w-8 h-8" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              Registrasi Berhasil!
+            </h3>
+            <p className="text-gray-600 mb-4">
+              Pasien berhasil didaftarkan dengan nomor antrian: <strong>{successModal.queue_number}</strong>
+            </p>
+
+            <div className="flex gap-3 justify-center">
+              <Button onClick={() => store.setSuccessModal(null)}>
+                Tutup
+              </Button>
+              <Button
+                onClick={() => {
+                  // Generate patient card PDF
+                  const patientCardData = {
+                    no_rm: successModal.patient.no_rm,
+                    nama_lengkap: successModal.patient.nama_lengkap,
+                    nik: successModal.patient.nik,
+                    tanggal_lahir: successModal.patient.tanggal_lahir,
+                    jenis_kelamin: successModal.patient.jenis_kelamin,
+                    alamat: 'Alamat belum lengkap', // This would come from patient data
+                    telepon: successModal.patient.telepon,
+                    jenis_asuransi: 'Umum', // This would come from patient data
+                    no_bpjs: undefined
+                  };
+
+                  const doc = generatePatientCard(patientCardData);
+                  downloadPDF(doc, `kartu-berobat-${successModal.patient.no_rm}.pdf`);
+                }}
+                variant="outline"
+              >
+                <FaIdCard className="mr-2" />
+                Cetak Kartu Berobat
+              </Button>
+              <Button
+                onClick={() => {
+                  // Generate queue number PDF
+                  const queueData = {
+                    queue_number: successModal.queue_number,
+                    patient_name: successModal.patient.nama_lengkap,
+                    poli_name: 'Poli Umum', // This would come from registration data
+                    doctor_name: 'dr. Ahmad Santoso', // This would come from registration data
+                    registration_date: new Date().toLocaleDateString('id-ID')
+                  };
+
+                  const doc = generateQueueNumber(queueData);
+                  downloadPDF(doc, `nomor-antrian-${successModal.queue_number}.pdf`);
+                }}
+                variant="outline"
+              >
+                <FaPrint className="mr-2" />
+                Cetak Nomor Antrian
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen p-4 md:p-8 transition-all duration-500 bg-gradient-to-br from-gray-100 via-white to-gray-50 dark:from-zinc-950 dark:via-neutral-900 dark:to-zinc-800 text-gray-900 dark:text-gray-100">
-      <div className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold mb-2 tracking-wide">
-          Registrasi Pasien
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Kelola data pasien baru dan existing
-        </p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-gray-900">
+      <div className="max-w-6xl mx-auto p-6 space-y-8">
 
-      {/* Action Buttons */}
-      <div className="mb-6 flex flex-col sm:flex-row gap-4">
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex items-center gap-3 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
-        >
-          <FaUserPlus />
-          Tambah Pasien Baru
-        </button>
-      </div>
-
-      {/* Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold mb-6">
-              {editingPatient ? 'Edit Data Pasien' : 'Tambah Pasien Baru'}
-            </h2>
-
-            <form onSubmit={onSubmit} className="space-y-6">
-              {formErrors.length > 0 && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                  <ul className="text-red-700 dark:text-red-300 text-sm">
-                    {formErrors.map((error, index) => (
-                      <li key={index}>• {error}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Nama Lengkap *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                    placeholder="Masukkan nama lengkap"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    NIK
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.nik}
-                    onChange={(e) => setFormData(prev => ({ ...prev, nik: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                    placeholder="16 digit NIK"
-                    maxLength={16}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Tanggal Lahir *
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.birth_date}
-                    onChange={(e) => setFormData(prev => ({ ...prev, birth_date: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Jenis Kelamin *
-                  </label>
-                  <select
-                    value={formData.gender}
-                    onChange={(e) => setFormData(prev => ({ ...prev, gender: e.target.value as 'L' | 'P' }))}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                  >
-                    <option value="">Pilih jenis kelamin</option>
-                    <option value="L">Laki-laki</option>
-                    <option value="P">Perempuan</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    No. Telepon
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                    placeholder="Masukkan no. telepon"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    No. BPJS
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.bpjs_number}
-                    onChange={(e) => setFormData(prev => ({ ...prev, bpjs_number: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                    placeholder="Masukkan no. BPJS"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Alamat
-                </label>
-                <textarea
-                  value={formData.address}
-                  onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                  rows={3}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 resize-none"
-                  placeholder="Masukkan alamat lengkap"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Kontak Darurat
-                </label>
-                <input
-                  type="tel"
-                  value={formData.emergency_contact}
-                  onChange={(e) => setFormData(prev => ({ ...prev, emergency_contact: e.target.value }))}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                  placeholder="No. telepon kontak darurat"
-                />
-              </div>
-
-              <div className="flex gap-4 pt-6">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
-                >
-                  {submitting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Menyimpan...
-                    </>
-                  ) : (
-                    <>
-                      <FaUserPlus />
-                      {editingPatient ? 'Update' : 'Simpan'}
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  className="flex-1 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium py-3 px-6 rounded-lg transition-colors"
-                >
-                  Batal
-                </button>
-              </div>
-            </form>
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+              <FaUserPlus className="text-blue-600" />
+              Registrasi Terpadu
+            </h1>
+            <p className="text-gray-600 dark:text-gray-300 mt-2">
+              Pencarian pasien dan registrasi kunjungan dalam satu alur
+            </p>
           </div>
+          <Button variant="outline" onClick={() => window.history.back()}>
+            <FaArrowLeft className="mr-2" />
+            Kembali
+          </Button>
         </div>
-      )}
 
-      {/* Search */}
-      <div className="bg-white/70 dark:bg-zinc-900/60 border border-gray-200 dark:border-zinc-800 backdrop-blur-md shadow-xl rounded-2xl p-6 mb-6">
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <FaSearch className="text-gray-400" />
-          </div>
-          <input
-            type="text"
-            placeholder="Cari pasien berdasarkan nama, NIK, atau No. RM..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-          />
-        </div>
-      </div>
+        {/* Phase Content */}
+        {currentPhase === 'search' && renderSearchPhase()}
+        {currentPhase === 'new_patient' && renderNewPatientPhase()}
+        {currentPhase === 'visit_registration' && renderVisitRegistrationPhase()}
 
-      {/* Table */}
-      <div className="bg-white/70 dark:bg-zinc-900/60 border border-gray-200 dark:border-zinc-800 backdrop-blur-md shadow-xl rounded-2xl p-6">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-800">
-              <tr>
-                <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400 font-medium border-b border-gray-200 dark:border-gray-700">No. RM</th>
-                <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400 font-medium border-b border-gray-200 dark:border-gray-700">Nama Pasien</th>
-                <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400 font-medium border-b border-gray-200 dark:border-gray-700">NIK</th>
-                <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400 font-medium border-b border-gray-200 dark:border-gray-700">Tanggal Lahir</th>
-                <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400 font-medium border-b border-gray-200 dark:border-gray-700">Jenis Kelamin</th>
-                <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400 font-medium border-b border-gray-200 dark:border-gray-700">Telepon</th>
-                <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400 font-medium border-b border-gray-200 dark:border-gray-700">No. BPJS</th>
-                <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400 font-medium border-b border-gray-200 dark:border-gray-700">Status</th>
-                <th className="px-4 py-3 text-left text-gray-600 dark:text-gray-400 font-medium border-b border-gray-200 dark:border-gray-700">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="text-gray-800 dark:text-gray-200">
-              {loading ? (
-                <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center">
-                    <div className="flex items-center justify-center gap-3">
-                      <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                      <span>Memuat data pasien...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : filteredPatients.length > 0 ? (
-                filteredPatients.map((patient) => (
-                  <tr
-                    key={patient.id}
-                    className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition"
-                  >
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-sm">
-                        {patient.mrn || patient.no_rm || `RM${patient.id}`}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="font-medium">
-                        {patient.name || patient.nama}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-sm">
-                        {patient.nik || '-'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {patient.birth_date || patient.tanggal_lahir ? new Date(patient.birth_date || patient.tanggal_lahir!).toLocaleDateString('id-ID') : '-'}
-                    </td>
-                    <td className="px-4 py-3">
-                      {patient.gender || patient.jenis_kelamin === 'L' ? 'Laki-laki' : patient.gender || patient.jenis_kelamin === 'P' ? 'Perempuan' : '-'}
-                    </td>
-                    <td className="px-4 py-3">
-                      {patient.phone || patient.telepon || '-'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-sm">
-                        {patient.bpjs_number || patient.no_bpjs || '-'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        patient.status === 'active' || patient.status === 'aktif'
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                          : patient.status === 'inactive' || patient.status === 'tidak_aktif'
-                          ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
-                          : 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300'
-                      }`}>
-                        {patient.status === 'active' || patient.status === 'aktif' ? 'Aktif' :
-                         patient.status === 'inactive' || patient.status === 'tidak_aktif' ? 'Tidak Aktif' :
-                         patient.status === 'meninggal' ? 'Meninggal' : patient.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleEdit(patient)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <FaEdit className="text-sm" />
-                        </button>
-                        <button
-                          className="p-2 text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-900/20 rounded-lg transition-colors"
-                          title="Lihat Detail"
-                        >
-                          <FaEye className="text-sm" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
-                  <FaSearch className="mx-auto text-3xl mb-2 opacity-50" />
-                  <p>Tidak ada data pasien ditemukan</p>
-                </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        {/* Success Modal */}
+        {renderSuccessModal()}
+
       </div>
     </div>
   )

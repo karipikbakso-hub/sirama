@@ -51,33 +51,52 @@ function DokterDashboardHome() {
   const fetchTodayPatients = async () => {
     try {
       setLoading(true)
-      const response = await fetch('http://localhost:8000/api/examinations/today-patients', {
+      setError(null)
+
+      // Coba fetch data real dari backend
+      const response = await fetch('http://localhost:8000/api/pendaftaran/dashboard/pasien-hari-ini', {
         headers: {
           'Content-Type': 'application/json',
         },
       })
 
       if (!response.ok) {
-        throw new Error('Failed to fetch patients')
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
 
       const data = await response.json()
-      if (data.success) {
-        setPatients(data.data.data || [])
+      if (data.success && data.data && data.data.length > 0) {
+        // Transform data dari API ke format yang diharapkan komponen
+        const transformedPatients: DoctorTodayPatient[] = data.data.map((patient: any) => ({
+          id: patient.id.toString(),
+          name: patient.patientName || 'Unknown',
+          nik: patient.patientNik || '',
+          birthDate: '1990-01-01',
+          gender: 'L',
+          diagnosis: '',
+          status: patient.status || 'waiting',
+          queueNumber: patient.queueNumber || parseInt(patient.id),
+          appointmentTime: patient.registeredAt ? new Date(patient.registeredAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '00:00'
+        }))
+        setPatients(transformedPatients)
+        setError(null) // Clear any previous error
       } else {
-        throw new Error(data.message || 'Failed to fetch patients')
+        // Jika data kosong atau tidak success
+        setPatients([])
+        setError('Tidak ada data pasien hari ini.')
       }
+
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError(err instanceof Error ? err.message : 'Gagal memuat data pasien')
       console.error('Error fetching patients:', err)
-    } finally {
-      setLoading(false)
+      setPatients([])
     }
   }
 
+
   const handleViewPatient = (patient: DoctorTodayPatient) => {
     // Navigate to patient EMR/detail page
-    router.push(`/dashboard/dokter/emr?patientId=${patient.patient.id}&registrationId=${patient.id}`)
+    router.push(`/dashboard/dokter/emr?patientId=${patient.id}&registrationId=${patient.id}`)
   }
 
   const handleRefreshPatients = () => {
@@ -407,7 +426,7 @@ function DokterDashboardHome() {
             ) : patients.length > 0 ? (
               <div className="overflow-x-auto">
                 <Table
-                  columns={getDoctorTodayPatientsColumns({ onViewPatient: handleViewPatient })}
+                  columns={getDoctorTodayPatientsColumns()}
                   data={patients}
                 />
               </div>

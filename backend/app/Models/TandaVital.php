@@ -34,6 +34,10 @@ class TandaVital extends Model
         'status',
         'notes',
 
+        // Pain Scale dan Consciousness
+        'pain_scale',
+        'consciousness',
+
         // Timestamp pengukuran
         'measured_at',
 

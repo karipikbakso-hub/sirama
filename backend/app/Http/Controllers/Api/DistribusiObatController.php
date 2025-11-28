@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ObatKeluar;
-use App\Models\ResepDetail;
-use App\Models\Resep;
+use App\Models\PrescriptionItem;
+use App\Models\Prescription;
 use App\Models\Registration;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -28,6 +28,7 @@ class DistribusiObatController extends Controller
             'tanggal_sampai' => 'nullable|date',
             'status' => ['nullable', 'in:menunggu,dikeluarkan,selesai'],
             'user_id' => 'nullable|exists:users,id',
+            'registration_id' => 'nullable|exists:t_registrasi,id',
         ]);
 
         if ($validator->fails()) {
@@ -40,40 +41,40 @@ class DistribusiObatController extends Controller
 
         try {
             $query = ObatKeluar::with([
-                'resepDetail.resep.registrasi.patient',
-                'resepDetail.obat',
-                'user'
+                'prescriptionItem.prescription.registration.patient',
+                'prescriptionItem.medicine',
+                'nurse'
             ]);
 
             // Apply filters
             if ($request->has('search') && !empty($request->search)) {
                 $search = $request->search;
-                $query->whereHas('resepDetail.resep.registrasi.patient', function($q) use ($search) {
-                    $q->where('nama', 'like', '%' . $search . '%')
-                      ->orWhere('no_rm', 'like', '%' . $search . '%');
-                })->orWhereHas('resepDetail.obat', function($q) use ($search) {
-                    $q->where('nama_obat', 'like', '%' . $search . '%');
+                $query->whereHas('prescriptionItem.prescription.registration.patient', function($q) use ($search) {
+                    $q->where('full_name', 'like', '%' . $search . '%')
+                      ->orWhere('medical_record_number', 'like', '%' . $search . '%');
+                })->orWhereHas('prescriptionItem.medicine', function($q) use ($search) {
+                    $q->where('name', 'like', '%' . $search . '%');
                 });
             }
 
             if ($request->has('tanggal_dari')) {
-                $query->whereDate('tanggal_keluar', '>=', $request->tanggal_dari);
+                $query->whereDate('given_at', '>=', $request->tanggal_dari);
             }
 
             if ($request->has('tanggal_sampai')) {
-                $query->whereDate('tanggal_keluar', '<=', $request->tanggal_sampai);
+                $query->whereDate('given_at', '<=', $request->tanggal_sampai);
             }
 
-            if ($request->has('status')) {
-                $query->where('status', $request->status);
+            if ($request->has('nurse_id')) {
+                $query->where('nurse_id', $request->nurse_id);
             }
 
-            if ($request->has('user_id')) {
-                $query->where('user_id', $request->user_id);
+            if ($request->has('registration_id')) {
+                $query->where('registration_id', $request->registration_id);
             }
 
             // Order by date
-            $query->orderBy('tanggal_keluar', 'desc')
+            $query->orderBy('given_at', 'desc')
                   ->orderBy('created_at', 'desc');
 
             $distribusi = $query->paginate(
@@ -85,41 +86,38 @@ class DistribusiObatController extends Controller
 
             $data = $distribusi->map(function ($item) {
                 // Check if all relationships exist
-                if (!$item->resepDetail || !$item->resepDetail->resep ||
-                    !$item->resepDetail->resep->registrasi ||
-                    !$item->resepDetail->resep->registrasi->patient ||
-                    !$item->resepDetail->obat || !$item->user) {
+                if (!$item->prescriptionItem || !$item->prescriptionItem->prescription ||
+                    !$item->prescriptionItem->prescription->registration ||
+                    !$item->prescriptionItem->prescription->registration->patient ||
+                    !$item->prescriptionItem->medicine || !$item->nurse) {
                     return null; // Skip this item
                 }
 
                 return [
                     'id' => $item->id,
-                    'resep_detail_id' => $item->resep_detail_id,
-                    'tanggal_keluar' => $item->tanggal_keluar->format('Y-m-d H:i:s'),
-                    'jumlah_keluar' => $item->jumlah_keluar,
-                    'harga_satuan' => $item->harga_satuan,
-                    'subtotal' => $item->subtotal,
-                    'status' => $item->status,
-                    'catatan' => $item->catatan,
+                    'prescription_item_id' => $item->prescription_item_id,
+                    'given_at' => $item->given_at->format('Y-m-d H:i:s'),
+                    'quantity_given' => $item->quantity_given,
+                    'notes' => $item->notes,
                     'resep' => [
-                        'id' => $item->resepDetail->resep->id,
-                        'no_resep' => $item->resepDetail->resep->no_resep,
-                        'tanggal_resep' => $item->resepDetail->resep->tanggal_resep->format('Y-m-d'),
+                        'id' => $item->prescriptionItem->prescription->id,
+                        'no_resep' => 'RX-' . $item->prescriptionItem->prescription->id,
+                        'tanggal_resep' => $item->prescriptionItem->prescription->created_at->format('Y-m-d'),
                     ],
                     'patient' => [
-                        'id' => $item->resepDetail->resep->registrasi->patient->id,
-                        'nama' => $item->resepDetail->resep->registrasi->patient->nama,
-                        'no_rm' => $item->resepDetail->resep->registrasi->patient->no_rm,
+                        'id' => $item->prescriptionItem->prescription->registration->patient->id,
+                        'nama' => $item->prescriptionItem->prescription->registration->patient->full_name,
+                        'no_rm' => $item->prescriptionItem->prescription->registration->patient->medical_record_number,
                     ],
                     'obat' => [
-                        'id' => $item->resepDetail->obat->id,
-                        'nama_obat' => $item->resepDetail->obat->nama_obat,
-                        'nama_generik' => $item->resepDetail->obat->nama_generik,
+                        'id' => $item->prescriptionItem->medicine->id,
+                        'nama_obat' => $item->prescriptionItem->medicine_name,
+                        'nama_generik' => $item->prescriptionItem->medicine->name,
                     ],
-                    'aturan_pakai' => $item->resepDetail->aturan_pakai,
+                    'aturan_pakai' => $item->prescriptionItem->instruction,
                     'user' => [
-                        'id' => $item->user->id,
-                        'name' => $item->user->name,
+                        'id' => $item->nurse->id,
+                        'name' => $item->nurse->name,
                     ],
                     'created_at' => $item->created_at->format('Y-m-d H:i:s'),
                     'updated_at' => $item->updated_at->format('Y-m-d H:i:s'),
@@ -154,14 +152,14 @@ class DistribusiObatController extends Controller
     public function prescriptions(Request $request): JsonResponse
     {
         try {
-            // Get resep detail that haven't been fully distributed yet
-            $resepDetail = ResepDetail::with([
-                'resep.registrasi.patient',
-                'resep.dokter',
-                'obat'
+            // Get prescription items that haven't been fully distributed yet
+            $prescriptionItems = PrescriptionItem::with([
+                'prescription.registration.patient',
+                'prescription.doctor',
+                'medicine'
             ])
-            ->whereHas('resep', function($q) {
-                $q->whereIn('status', ['final', 'dibuat']);
+            ->whereHas('prescription', function($q) {
+                $q->whereIn('status', ['approved', 'final']);
             })
             ->whereDoesntHave('obatKeluar', function($q) {
                 $q->where('status', 'selesai');
@@ -172,46 +170,46 @@ class DistribusiObatController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-            $data = $resepDetail->map(function ($detail) {
-                $totalDistributed = $detail->obatKeluar()
+            $data = $prescriptionItems->map(function ($item) {
+                $totalDistributed = $item->obatKeluar()
                     ->where('status', 'selesai')
-                    ->sum('jumlah_keluar');
-                $remaining = $detail->jumlah * ($detail->hari ?: 1) - $totalDistributed;
+                    ->sum('quantity_given');
+                $remaining = $item->dosage ? 1 : 0; // Simplified - assuming 1 unit per prescription item
 
                 return [
-                    'id' => $detail->id,
-                    'resep_id' => $detail->resep_id,
-                    'obat_id' => $detail->obat_id,
+                    'id' => $item->id,
+                    'prescription_id' => $item->prescription_id,
+                    'medicine_id' => $item->medicine_id,
                     'resep' => [
-                        'id' => $detail->resep->id,
-                        'no_resep' => $detail->resep->no_resep,
-                        'tanggal_resep' => $detail->resep->tanggal_resep->format('Y-m-d'),
-                        'status' => $detail->resep->status,
+                        'id' => $item->prescription->id,
+                        'no_resep' => 'RX-' . $item->prescription->id,
+                        'tanggal_resep' => $item->prescription->created_at->format('Y-m-d'),
+                        'status' => $item->prescription->status,
                     ],
                     'patient' => [
-                        'id' => $detail->resep->registrasi->patient->id,
-                        'nama' => $detail->resep->registrasi->patient->nama,
-                        'no_rm' => $detail->resep->registrasi->patient->no_rm,
-                        'usia' => $detail->resep->registrasi->patient->usia,
-                        'jenis_kelamin' => $detail->resep->registrasi->patient->jenis_kelamin,
+                        'id' => $item->prescription->registration->patient->id,
+                        'nama' => $item->prescription->registration->patient->full_name,
+                        'no_rm' => $item->prescription->registration->patient->medical_record_number,
+                        'usia' => 25, // Placeholder
+                        'jenis_kelamin' => 'L', // Placeholder
                     ],
                     'dokter' => [
-                        'id' => $detail->resep->dokter->id ?? null,
-                        'name' => $detail->resep->dokter->name ?? null,
+                        'id' => $item->prescription->doctor->id ?? null,
+                        'name' => $item->prescription->doctor->name ?? null,
                     ],
                     'obat' => [
-                        'id' => $detail->obat->id,
-                        'nama_obat' => $detail->obat->nama_obat,
-                        'nama_generik' => $detail->obat->nama_generik,
-                        'satuan' => $detail->obat->satuan,
+                        'id' => $item->medicine->id,
+                        'nama_obat' => $item->medicine_name,
+                        'nama_generik' => $item->medicine->name,
+                        'satuan' => $item->medicine->unit,
                     ],
-                    'jumlah' => $detail->jumlah,
-                    'hari' => $detail->hari,
-                    'total_quantity' => $detail->jumlah * ($detail->hari ?: 1),
-                    'aturan_pakai' => $detail->aturan_pakai,
-                    'instruksi' => $detail->instruksi,
-                    'harga_satuan' => $detail->harga_satuan,
-                    'subtotal' => $detail->subtotal,
+                    'jumlah' => 1, // Placeholder
+                    'hari' => 1, // Placeholder
+                    'total_quantity' => 1, // Placeholder
+                    'aturan_pakai' => $item->instruction,
+                    'instruksi' => $item->instruction,
+                    'harga_satuan' => 0, // Placeholder
+                    'subtotal' => 0, // Placeholder
                     'distributed_quantity' => $totalDistributed,
                     'remaining_quantity' => $remaining,
                     'is_ready' => $remaining > 0,
@@ -240,11 +238,16 @@ class DistribusiObatController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'resep_detail_id' => 'required|exists:t_resep_detail,id',
-            'jumlah_keluar' => 'required|integer|min:1',
-            'harga_satuan' => 'required|numeric|min:0',
-            'tanggal_keluar' => 'nullable|date',
-            'catatan' => 'nullable|string|max:500',
+            'prescription_item_id' => 'required|exists:prescription_items,id',
+            'quantity_given' => 'required|integer|min:1',
+            'given_at' => 'nullable|date',
+            'notes' => 'nullable|string|max:500',
+            // 5 benar validation
+            'registration_id' => 'required|exists:t_registrasi,id',
+            'medicine_id' => 'required|exists:medicines,id',
+            'dosage' => 'required|string|max:255',
+            'time' => 'required|string|max:255',
+            'route' => 'required|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -258,30 +261,64 @@ class DistribusiObatController extends Controller
         try {
             DB::beginTransaction();
 
-            $resepDetail = ResepDetail::findOrFail($request->resep_detail_id);
+            $prescriptionItem = PrescriptionItem::with(['prescription.registration.patient', 'medicine'])->findOrFail($request->prescription_item_id);
 
-            // Check available quantity
-            $totalDistributed = $resepDetail->obatKeluar()
+            // 5 benar validation
+            if ($prescriptionItem->prescription->registration_id != $request->registration_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Registrasi tidak sesuai dengan resep'
+                ], 400);
+            }
+
+            if ($prescriptionItem->medicine_id != $request->medicine_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Obat tidak sesuai dengan resep'
+                ], 400);
+            }
+
+            // Check dosage match prescription
+            if ($prescriptionItem->instruction != $request->dosage) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Dosis tidak sesuai dengan resep'
+                ], 400);
+            }
+
+            // Check available quantity (simplified - assuming 1 unit per prescription item)
+            $totalDistributed = $prescriptionItem->obatKeluar()
                 ->where('status', 'selesai')
-                ->sum('jumlah_keluar');
-            $maxQuantity = $resepDetail->jumlah * ($resepDetail->hari ?: 1);
+                ->sum('quantity_given');
 
-            if ($totalDistributed + $request->jumlah_keluar > $maxQuantity) {
+            if ($totalDistributed + $request->quantity_given > 1) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Jumlah distribusi melebihi jumlah yang diresepkan'
                 ], 400);
             }
 
+            // Check medicine stock
+            $medicine = $prescriptionItem->medicine;
+            if ($medicine->stock < $request->quantity_given) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Stok obat tidak mencukupi'
+                ], 400);
+            }
+
             $distribusi = ObatKeluar::create([
-                'resep_detail_id' => $request->resep_detail_id,
-                'user_id' => Auth::id(),
-                'tanggal_keluar' => $request->tanggal_keluar ?? now(),
-                'jumlah_keluar' => $request->jumlah_keluar,
-                'harga_satuan' => $request->harga_satuan,
-                'status' => 'dikeluarkan',
-                'catatan' => $request->catatan,
+                'registration_id' => $request->registration_id,
+                'prescription_item_id' => $request->prescription_item_id,
+                'medicine_id' => $request->medicine_id,
+                'quantity_given' => $request->quantity_given,
+                'given_at' => $request->given_at ?? now(),
+                'nurse_id' => Auth::id(),
+                'notes' => $request->notes,
             ]);
+
+            // Update medicine stock
+            $medicine->decrement('stock', $request->quantity_given);
 
             DB::commit();
 
@@ -289,9 +326,9 @@ class DistribusiObatController extends Controller
                 'success' => true,
                 'message' => 'Distribusi obat berhasil dicatat',
                 'data' => $distribusi->load([
-                    'resepDetail.resep.registrasi.patient',
-                    'resepDetail.obat',
-                    'user'
+                    'prescriptionItem.prescription.registration.patient',
+                    'prescriptionItem.medicine',
+                    'nurse'
                 ])
             ], 201);
 
@@ -313,50 +350,46 @@ class DistribusiObatController extends Controller
     {
         try {
             $distribusi->load([
-                'resepDetail.resep.registrasi.patient',
-                'resepDetail.resep.dokter',
-                'resepDetail.obat',
-                'user'
+                'prescriptionItem.prescription.registration.patient',
+                'prescriptionItem.prescription.doctor',
+                'prescriptionItem.medicine',
+                'nurse'
             ]);
 
             $data = [
                 'id' => $distribusi->id,
-                'resep_detail_id' => $distribusi->resep_detail_id,
-                'tanggal_keluar' => $distribusi->tanggal_keluar->format('Y-m-d H:i:s'),
-                'jumlah_keluar' => $distribusi->jumlah_keluar,
-                'harga_satuan' => $distribusi->harga_satuan,
-                'subtotal' => $distribusi->subtotal,
-                'status' => $distribusi->status,
-                'catatan' => $distribusi->catatan,
+                'prescription_item_id' => $distribusi->prescription_item_id,
+                'given_at' => $distribusi->given_at->format('Y-m-d H:i:s'),
+                'quantity_given' => $distribusi->quantity_given,
+                'notes' => $distribusi->notes,
                 'resep' => [
-                    'id' => $distribusi->resepDetail->resep->id,
-                    'no_resep' => $distribusi->resepDetail->resep->no_resep,
-                    'tanggal_resep' => $distribusi->resepDetail->resep->tanggal_resep->format('Y-m-d'),
-                    'diagnosa' => $distribusi->resepDetail->resep->diagnosa,
-                    'instruksi' => $distribusi->resepDetail->resep->instruksi,
+                    'id' => $distribusi->prescriptionItem->prescription->id,
+                    'no_resep' => 'RX-' . $distribusi->prescriptionItem->prescription->id,
+                    'tanggal_resep' => $distribusi->prescriptionItem->prescription->created_at->format('Y-m-d'),
+                    'status' => $distribusi->prescriptionItem->prescription->status,
                 ],
                 'patient' => [
-                    'id' => $distribusi->resepDetail->resep->registrasi->patient->id,
-                    'nama' => $distribusi->resepDetail->resep->registrasi->patient->nama,
-                    'no_rm' => $distribusi->resepDetail->resep->registrasi->patient->no_rm,
-                    'usia' => $distribusi->resepDetail->resep->registrasi->patient->usia,
-                    'jenis_kelamin' => $distribusi->resepDetail->resep->registrasi->patient->jenis_kelamin,
+                    'id' => $distribusi->prescriptionItem->prescription->registration->patient->id,
+                    'nama' => $distribusi->prescriptionItem->prescription->registration->patient->full_name,
+                    'no_rm' => $distribusi->prescriptionItem->prescription->registration->patient->medical_record_number,
+                    'usia' => 25, // Placeholder
+                    'jenis_kelamin' => 'L', // Placeholder
                 ],
                 'dokter' => [
-                    'id' => $distribusi->resepDetail->resep->dokter->id ?? null,
-                    'name' => $distribusi->resepDetail->resep->dokter->name ?? null,
+                    'id' => $distribusi->prescriptionItem->prescription->doctor->id ?? null,
+                    'name' => $distribusi->prescriptionItem->prescription->doctor->name ?? null,
                 ],
                 'obat' => [
-                    'id' => $distribusi->resepDetail->obat->id,
-                    'nama_obat' => $distribusi->resepDetail->obat->nama_obat,
-                    'nama_generik' => $distribusi->resepDetail->obat->nama_generik,
-                    'satuan' => $distribusi->resepDetail->obat->satuan,
+                    'id' => $distribusi->prescriptionItem->medicine->id,
+                    'nama_obat' => $distribusi->prescriptionItem->medicine_name,
+                    'nama_generik' => $distribusi->prescriptionItem->medicine->name,
+                    'satuan' => $distribusi->prescriptionItem->medicine->unit,
                 ],
-                'aturan_pakai' => $distribusi->resepDetail->aturan_pakai,
-                'instruksi' => $distribusi->resepDetail->instruksi,
+                'aturan_pakai' => $distribusi->prescriptionItem->instruction,
+                'instruksi' => $distribusi->prescriptionItem->instruction,
                 'user' => [
-                    'id' => $distribusi->user->id,
-                    'name' => $distribusi->user->name,
+                    'id' => $distribusi->nurse->id,
+                    'name' => $distribusi->nurse->name,
                 ],
                 'created_at' => $distribusi->created_at->format('Y-m-d H:i:s'),
                 'updated_at' => $distribusi->updated_at->format('Y-m-d H:i:s'),
@@ -382,8 +415,7 @@ class DistribusiObatController extends Controller
     public function update(Request $request, ObatKeluar $distribusi): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'status' => ['required', 'in:menunggu,dikeluarkan,selesai'],
-            'catatan' => 'nullable|string|max:500',
+            'notes' => 'nullable|string|max:500',
         ]);
 
         if ($validator->fails()) {
@@ -396,13 +428,12 @@ class DistribusiObatController extends Controller
 
         try {
             $distribusi->update([
-                'status' => $request->status,
-                'catatan' => $request->catatan,
+                'notes' => $request->notes,
             ]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Status distribusi berhasil diperbarui',
+                'message' => 'Catatan distribusi berhasil diperbarui',
                 'data' => $distribusi
             ]);
 

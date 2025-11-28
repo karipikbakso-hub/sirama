@@ -114,16 +114,9 @@ export function useAdminDashboard() {
       setLoading(true)
       setError(null)
 
-      // In development, use mock data
-      // In production, uncomment the API call below
-      /*
+      // Call real API endpoint
       const response = await api.get('/api/dashboard/admin')
       setData(response.data)
-      */
-
-      // Mock data for development - simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500))
-      setData(mockAdminData)
       setLoading(false)
 
     } catch (err: any) {

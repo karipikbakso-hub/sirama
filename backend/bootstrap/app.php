@@ -11,6 +11,9 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withProviders([
+        \Spatie\Permission\PermissionServiceProvider::class,
+    ])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->api(prepend: [
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
@@ -22,8 +25,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'verified' => \App\Http\Middleware\EnsureEmailIsVerified::class,
             'no.csrf' => \App\Http\Middleware\NoCsrf::class,
-            // 'role' => \Spatie\Permission\Middlewares\RoleMiddleware::class,
-            // 'permission' => \Spatie\Permission\Middlewares\PermissionMiddleware::class,
+            'role' => \Spatie\Permission\Middlewares\RoleMiddleware::class,
+            'permission' => \Spatie\Permission\Middlewares\PermissionMiddleware::class,
         ]);
 
         // Exclude API routes and auth routes from CSRF verification for Sanctum token authentication

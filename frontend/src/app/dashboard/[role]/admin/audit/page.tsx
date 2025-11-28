@@ -1,35 +1,38 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { format, parseISO } from 'date-fns'
 import {
   MdVisibility,
   MdDownload,
   MdRefresh,
-  MdFilterList,
-  MdExpandMore,
-  MdExpandLess,
   MdDeleteForever,
+  MdSearch,
+  MdFilterList,
   MdList,
   MdViewList,
-  MdSearch
+  MdArrowUpward,
+  MdArrowDownward,
+  MdError,
+  MdInfo,
+  MdWarning
 } from 'react-icons/md'
-import { DataTable } from '@/components/ui/data-table'
+import { DateRangePicker } from '@/components/ui/DateRangePicker'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import api from '@/lib/api'
 import toast from '@/lib/toast'
 
 interface AuditLog {
   id: number
-  timestamp: string
+  user_id: number | null
   action: string
-  user: string
-  details: string
-  ipAddress: string
-  status: 'success' | 'warning' | 'error' | 'info'
-  module: string
-  old_values?: any
-  new_values?: any
-  user_agent?: string
+  resource: string | null
+  resource_id: number | null
+  ip_address: string | null
+  user_agent: string | null
+  payload: string | null
+  created_at: string
+  timestamp_formatted: string
+  user_name: string
 }
 
 interface StatsData {
@@ -37,8 +40,8 @@ interface StatsData {
   today_logs: number
   week_logs: number
   month_logs: number
-  by_level: Record<string, number>
-  by_module: Record<string, number>
+  by_action: Record<string, number>
+  by_resource: Record<string, number>
   recent_users: string[]
 }
 
@@ -46,52 +49,140 @@ export default function AuditLogsPage() {
   // State
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [pagination, setPagination] = useState({
     current_page: 1,
     last_page: 1,
-    per_page: 20,
+    per_page: 50, // As per spec: 50 items/page
     total: 0
   })
 
   // Filters
-  const [searchTerm, setSearchTerm] = useState('')
-  const [userFilter, setUserFilter] = useState('all')
-  const [moduleFilter, setModuleFilter] = useState('all')
-  const [ipFilter, setIpFilter] = useState('')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+   const [searchTerm, setSearchTerm] = useState('')
+   const [userIdFilter, setUserIdFilter] = useState('')
+   const [actionFilter, setActionFilter] = useState('')
+   const [resourceFilter, setResourceFilter] = useState('')
+   const [dateFrom, setDateFrom] = useState('')
+   const [dateTo, setDateTo] = useState('')
+
+   // Sorting
+   const [sortBy, setSortBy] = useState('created_at')
+   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+
+   // Dropdown options
+   const [users, setUsers] = useState<{value: string, label: string}[]>([])
+   const [actions, setActions] = useState<{value: string, label: string}[]>([])
+   const [resources, setResources] = useState<{value: string, label: string}[]>([])
 
   // Modals
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [deleteDays, setDeleteDays] = useState(30)
+  const [deleteDays, setDeleteDays] = useState(180) // Default 6 months as per spec
 
-  // Expanded states
-  const [expandedLogs, setExpandedLogs] = useState<Set<number>>(new Set())
-
-  // Stats and options
+  // Stats
   const [stats, setStats] = useState<StatsData | null>(null)
-  const [users, setUsers] = useState<string[]>([])
-  const [modules, setModules] = useState<{value: string, label: string}[]>([])
+  const [statsLoading, setStatsLoading] = useState(true)
+  const [filtersLoading, setFiltersLoading] = useState(true)
+
+  // Handle sorting
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortBy(column)
+      setSortDirection('asc')
+    }
+    fetchLogs(1) // Reset to first page when sorting
+  }
+
+  // Handle pagination
+  const handlePageChange = (page: number) => {
+    fetchLogs(page)
+  }
+
+  // Fetch dropdown options
+  const fetchDropdownOptions = async () => {
+    try {
+      setFiltersLoading(true)
+      const [usersRes, actionsRes, resourcesRes] = await Promise.allSettled([
+        api.get('/api/audit-logs/users'),
+        api.get('/api/audit-logs/actions'),
+        api.get('/api/audit-logs/resources')
+      ])
+
+      // Handle users response
+      if (usersRes.status === 'fulfilled' && usersRes.value.data.success) {
+        setUsers(usersRes.value.data.data)
+      } else {
+        console.warn('Failed to load users for filter')
+        // Only set fallback if it's not a 404 error
+        if (usersRes.status === 'rejected' && usersRes.reason?.response?.status !== 404) {
+          setUsers([]) // Set empty array as fallback
+        }
+      }
+      
+      // Handle actions response
+      if (actionsRes.status === 'fulfilled' && actionsRes.value.data.success) {
+        setActions(actionsRes.value.data.data)
+      } else {
+        console.warn('Failed to load actions for filter')
+        // Only set fallback if it's not a 404 error
+        if (actionsRes.status === 'rejected' && actionsRes.reason?.response?.status !== 404) {
+          setActions([
+            { value: 'create', label: 'Create' },
+            { value: 'update', label: 'Update' },
+            { value: 'delete', label: 'Delete' },
+            { value: 'view', label: 'View' },
+            { value: 'login', label: 'Login' },
+            { value: 'logout', label: 'Logout' }
+          ]) // Set default actions as fallback
+        }
+      }
+      
+      // Handle resources response
+      if (resourcesRes.status === 'fulfilled' && resourcesRes.value.data.success) {
+        setResources(resourcesRes.value.data.data)
+      } else {
+        console.warn('Failed to load resources for filter')
+        // Only set fallback if it's not a 404 error
+        if (resourcesRes.status === 'rejected' && resourcesRes.reason?.response?.status !== 404) {
+          setResources([
+            { value: 'users', label: 'Users' },
+            { value: 'patients', label: 'Patients' },
+            { value: 'prescriptions', label: 'Prescriptions' },
+            { value: 'billings', label: 'Billings' }
+          ]) // Set default resources as fallback
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching dropdown options:', error)
+      toast.error('Gagal memuat opsi filter')
+    } finally {
+      setFiltersLoading(false)
+    }
+  }
 
   // Fetch data
   const fetchLogs = async (page = 1) => {
     try {
       setLoading(true)
+      setError(null)
 
       const params = new URLSearchParams({
         page: page.toString(),
         per_page: pagination.per_page.toString(),
         search: searchTerm,
-        user: userFilter === 'all' ? '' : userFilter,
-        module: moduleFilter === 'all' ? '' : moduleFilter,
-        ip_address: ipFilter,
+        user_id: userIdFilter,
+        action: actionFilter,
+        resource: resourceFilter,
         date_from: dateFrom,
-        date_to: dateTo
+        date_to: dateTo,
+        sort_by: sortBy,
+        sort_direction: sortDirection
       })
 
-      const response = await api.get(`/api/audit/logs?${params}`)
+      const response = await api.get(`/api/audit-logs?${params}`)
       const result = response.data
 
       if (result.success) {
@@ -102,10 +193,21 @@ export default function AuditLogsPage() {
           per_page: result.data.per_page,
           total: result.data.total
         })
+      } else {
+        setError(result.message || 'Gagal memuat data audit log')
+        toast.error(result.message || 'Gagal memuat data audit log')
+        // Set empty logs as fallback
+        setLogs([])
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching audit logs:', error)
-      toast.error('Failed to load audit logs')
+      // Only show error message if it's not a 404
+      if (error.response?.status !== 404) {
+        setError(error.response?.data?.message || 'Terjadi kesalahan saat memuat data')
+        toast.error('Gagal memuat audit logs')
+      }
+      // Set empty logs as fallback
+      setLogs([])
     } finally {
       setLoading(false)
     }
@@ -114,91 +216,64 @@ export default function AuditLogsPage() {
   // Fetch stats
   const fetchStats = async () => {
     try {
-      const response = await api.get('/api/audit/statistics')
+      setStatsLoading(true)
+      const response = await api.get('/api/audit-logs/statistics')
       const result = response.data
+      
       if (result.success) {
         setStats(result.data)
+      } else {
+        console.warn('Failed to load statistics:', result.message)
+        setStats(null)
       }
-    } catch (error) {
-      console.error('Error fetching stats:', error)
+    } catch (error: any) {
+      // Handle 404 specifically
+      if (error.response?.status === 404) {
+        console.warn('Statistics endpoint not found (404)')
+      } else {
+        console.error('Error fetching stats:', error)
+      }
+      setStats(null)
+    } finally {
+      setStatsLoading(false)
     }
-  }
-
-  // Fetch filter options
-  const fetchFilterOptions = async () => {
-    try {
-      const [usersRes, modulesRes] = await Promise.all([
-        api.get('/api/audit/users'),
-        api.get('/api/audit/modules')
-      ])
-
-      const usersResult = usersRes.data
-      const modulesResult = modulesRes.data
-
-      if (usersResult.success) setUsers(usersResult.data)
-      if (modulesResult.success) setModules(modulesResult.data)
-    } catch (error) {
-      console.error('Error fetching filter options:', error)
-    }
-  }
-
-  // Initialize
-  useEffect(() => {
-    fetchStats()
-    fetchFilterOptions()
-    fetchLogs()
-  }, [])
-
-  // Debounced filter effect
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      fetchLogs(1)
-    }, 300)
-    return () => clearTimeout(timeoutId)
-  }, [searchTerm, userFilter, moduleFilter, ipFilter, dateFrom, dateTo])
-
-  // Page change
-  const handlePageChange = (page: number) => {
-    fetchLogs(page)
-  }
-
-  // Clear filters
-  const clearFilters = () => {
-    setSearchTerm('')
-    setUserFilter('all')
-    setModuleFilter('all')
-    setIpFilter('')
-    setDateFrom('')
-    setDateTo('')
   }
 
   // View log details
   const viewLogDetails = async (logId: number) => {
     try {
-      const response = await api.get(`/api/audit/logs/${logId}`)
+      const response = await api.get(`/api/audit-logs/${logId}`)
       const result = response.data
 
       if (result.success) {
         setSelectedLog(result.data)
         setShowDetailModal(true)
+      } else {
+        toast.error(result.message || 'Gagal memuat detail log')
       }
-    } catch (error) {
-      console.error('Error fetching log details:', error)
-      toast.error('Failed to load log details')
+    } catch (error: any) {
+      if (error.response?.status !== 404) {
+        console.error('Error fetching log details:', error)
+        toast.error('Gagal memuat detail log')
+      }
     }
   }
 
   // Export logs
-  const exportLogs = async (format: 'csv' | 'json') => {
+  const exportLogs = async (format: 'excel' | 'pdf') => {
+    if (loading) return;
+    
     try {
       const params = new URLSearchParams({
         format,
+        user_id: userIdFilter,
+        action: actionFilter,
+        resource: resourceFilter,
         date_from: dateFrom,
-        date_to: dateTo,
-        module: moduleFilter === 'all' ? '' : moduleFilter
+        date_to: dateTo
       })
 
-      const response = await api.get(`/api/audit/export?${params}`)
+      const response = await api.post(`/api/audit-logs/export`, Object.fromEntries(params))
       const result = response.data
 
       if (result.success) {
@@ -209,21 +284,25 @@ export default function AuditLogsPage() {
         link.click()
         document.body.removeChild(link)
 
-        toast.success('Export completed successfully')
+        toast.success('Ekspor berhasil')
       } else {
-        toast.error(result.message || 'Export failed')
+        toast.error(result.message || 'Ekspor gagal')
       }
-    } catch (error) {
-      console.error('Error exporting logs:', error)
-      toast.error('Failed to export logs')
+    } catch (error: any) {
+      if (error.response?.status !== 404) {
+        console.error('Error exporting logs:', error)
+        toast.error('Gagal mengekspor logs')
+      }
     }
   }
 
   // Delete old logs
   const deleteOldLogs = async () => {
+    if (loading) return;
+    
     try {
-      const response = await api.delete('/api/audit/logs/cleanup', {
-        days: deleteDays
+      const response = await api.delete('/api/audit-logs/cleanup', {
+        data: { days: deleteDays }
       })
 
       const result = response.data
@@ -234,161 +313,239 @@ export default function AuditLogsPage() {
         fetchLogs()
         fetchStats()
       } else {
-        toast.error(result.message || 'Failed to delete old logs')
+        toast.error(result.message || 'Gagal menghapus log lama')
       }
-    } catch (error) {
-      console.error('Error deleting old logs:', error)
-      toast.error('Failed to delete old logs')
+    } catch (error: any) {
+      if (error.response?.status !== 404) {
+        console.error('Error deleting old logs:', error)
+        toast.error('Gagal menghapus log lama')
+      }
     }
-  }
-
-  // Toggle expanded
-  const toggleExpanded = (logId: number) => {
-    const newExpanded = new Set(expandedLogs)
-    if (newExpanded.has(logId)) {
-      newExpanded.delete(logId)
-    } else {
-      newExpanded.add(logId)
-    }
-    setExpandedLogs(newExpanded)
   }
 
   // Helper functions
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'success': return 'bg-green-100 text-green-800 border-green-200'
-      case 'error': return 'bg-red-100 text-red-800 border-red-200'
-      case 'warning': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      default: return 'bg-blue-100 text-blue-800 border-blue-200'
+  const getActionColor = (action: string) => {
+    const actionLower = action.toLowerCase()
+    if (actionLower === 'login' || actionLower === 'create') {
+      return 'bg-green-100 text-green-800 border-green-200'
+    }
+    if (actionLower === 'update' || actionLower === 'view') {
+      return 'bg-blue-100 text-blue-800 border-blue-200'
+    }
+    if (actionLower === 'delete' || actionLower === 'logout') {
+      return 'bg-red-100 text-red-800 border-red-200'
+    }
+    return 'bg-gray-100 text-gray-800 border-gray-200'
+  }
+
+  // Clear filters
+  const clearFilters = () => {
+    setSearchTerm('')
+    setUserIdFilter('')
+    setActionFilter('')
+    setResourceFilter('')
+    setDateFrom('')
+    setDateTo('')
+    setSortBy('created_at')
+    setSortDirection('desc')
+  }
+
+  const formatPayload = (payload: string | null) => {
+    if (!payload) return null
+    try {
+      return JSON.parse(payload)
+    } catch {
+      return payload
     }
   }
 
-  const getActionColor = (action: string) => {
-    if (action.toLowerCase().includes('create') || action.toLowerCase().includes('login')) {
-      return 'bg-green-100 text-green-800'
+  // Effects
+  useEffect(() => {
+    fetchDropdownOptions()
+    fetchStats()
+  }, [])
+
+  useEffect(() => {
+    fetchLogs()
+  }, [searchTerm, userIdFilter, actionFilter, resourceFilter, dateFrom, dateTo, sortBy, sortDirection])
+
+  // Format timestamp according to spec: DD/MM/YYYY HH:mm:ss WIB
+  const formatTimestamp = (dateString: string, formatted?: string) => {
+    if (formatted) {
+      // Ensure it ends with WIB
+      return formatted.endsWith('WIB') ? formatted : `${formatted} WIB`
     }
-    if (action.toLowerCase().includes('update')) {
-      return 'bg-blue-100 text-blue-800'
+    
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) {
+        return 'Invalid Date'
+      }
+      
+      const day = String(date.getDate()).padStart(2, '0')
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const year = date.getFullYear()
+      const hours = String(date.getHours()).padStart(2, '0')
+      const minutes = String(date.getMinutes()).padStart(2, '0')
+      const seconds = String(date.getSeconds()).padStart(2, '0')
+      
+      return `${day}/${month}/${year} ${hours}:${minutes}:${seconds} WIB`
+    } catch {
+      return 'Invalid Date'
     }
-    if (action.toLowerCase().includes('delete') || action.toLowerCase().includes('logout')) {
-      return 'bg-red-100 text-red-800'
-    }
-    return 'bg-gray-100 text-gray-800'
   }
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto px-4 py-6">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Audit Logs
+            Log Audit
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Monitor system activities and user actions
+            Monitor aktivitas user dan sistem rumah sakit
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
           <button
             onClick={() => setShowDeleteModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+            disabled={loading}
+            className="inline-flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-lg text-sm font-medium transition-colors"
           >
             <MdDeleteForever className="text-lg" />
-            Clean Up
+            <span className="hidden sm:inline">Hapus Log Lama</span>
+            <span className="sm:hidden">Hapus</span>
           </button>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => exportLogs('csv')}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+              onClick={() => exportLogs('excel')}
+              disabled={loading}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg text-sm font-medium transition-colors"
             >
               <MdDownload className="text-lg" />
-              CSV
+              <span className="hidden sm:inline">Excel</span>
             </button>
             <button
-              onClick={() => exportLogs('json')}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+              onClick={() => exportLogs('pdf')}
+              disabled={loading}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg text-sm font-medium transition-colors"
             >
               <MdDownload className="text-lg" />
-              JSON
+              <span className="hidden sm:inline">PDF</span>
             </button>
           </div>
 
           <button
             onClick={() => fetchLogs()}
             disabled={loading}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg text-sm font-medium transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg text-sm font-medium transition-colors"
           >
             <MdRefresh className={`text-lg ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+            <span className="hidden sm:inline">Refresh</span>
           </button>
         </div>
       </div>
 
       {/* Stats Cards */}
-      {stats && (
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <div className="flex items-center gap-3">
-              <MdList className="text-blue-500 text-2xl" />
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Logs</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {stats.total_logs.toLocaleString()}
-                </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6">
+        {statsLoading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 animate-pulse">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+                <div className="flex-1">
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20 mb-2"></div>
+                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+                </div>
               </div>
             </div>
-          </div>
+          ))
+        ) : stats ? (
+          <>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                  <MdList className="text-blue-600 dark:text-blue-400 text-xl" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Log</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {stats.total_logs.toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <div className="flex items-center gap-3">
-              <MdViewList className="text-green-500 text-2xl" />
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Today</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {stats.today_logs.toLocaleString()}
-                </p>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                  <MdViewList className="text-green-600 dark:text-green-400 text-xl" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Hari Ini</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {stats.today_logs.toLocaleString()}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <div className="flex items-center gap-3">
-              <MdFilterList className="text-orange-500 text-2xl" />
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">This Week</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {stats.week_logs.toLocaleString()}
-                </p>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+                  <MdFilterList className="text-orange-600 dark:text-orange-400 text-xl" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Minggu Ini</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {stats.week_logs.toLocaleString()}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <div className="flex items-center gap-3">
-              <MdVisibility className="text-purple-500 text-2xl" />
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                  <MdVisibility className="text-purple-600 dark:text-purple-400 text-xl" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">User Aktif</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {stats.recent_users.length}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="col-span-full bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-6">
+            <div className="flex items-start gap-3">
+              <MdWarning className="text-yellow-500 dark:text-yellow-400 text-xl mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Users</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {stats.recent_users.length}
+                <h3 className="font-medium text-yellow-800 dark:text-yellow-200">Statistik Tidak Tersedia</h3>
+                <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                  Statistik audit log tidak dapat dimuat. Fungsi ini akan aktif ketika backend sudah dikonfigurasi dengan benar.
                 </p>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex flex-col lg:flex-row gap-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
+        <div className="space-y-4">
           {/* Search */}
           <div className="flex-1">
             <div className="relative">
               <MdSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-lg" />
               <input
                 type="text"
-                placeholder="Search logs..."
+                placeholder="Cari log berdasarkan username, action, atau resource..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -396,318 +553,381 @@ export default function AuditLogsPage() {
             </div>
           </div>
 
-          {/* User Filter */}
-          <div className="w-full lg:w-48">
-            <select
-              value={userFilter}
-              onChange={(e) => setUserFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              aria-label="Filter by user"
-            >
-              <option value="all">All Users</option>
-              {users.map(user => (
-                <option key={user} value={user}>{user}</option>
-              ))}
-            </select>
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+             {/* User Filter */}
+             <div>
+               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                 User
+               </label>
+               {filtersLoading ? (
+                 <div className="w-full h-10 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
+               ) : (
+                 <SearchableSelect
+                   options={users}
+                   value={userIdFilter}
+                   onChange={setUserIdFilter}
+                   placeholder="Pilih user..."
+                   className="w-full"
+                 />
+               )}
+             </div>
 
-          {/* Module Filter */}
-          <div className="w-full lg:w-48">
-            <select
-              value={moduleFilter}
-              onChange={(e) => setModuleFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              aria-label="Filter by module"
-            >
-              <option value="all">All Modules</option>
-              {modules.map(module => (
-                <option key={module.value} value={module.value}>
-                  {module.label}
-                </option>
-              ))}
-            </select>
-          </div>
+             {/* Action Filter */}
+             <div>
+               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                 Action
+               </label>
+               {filtersLoading ? (
+                 <div className="w-full h-10 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
+               ) : (
+                 <select
+                   value={actionFilter}
+                   onChange={(e) => setActionFilter(e.target.value)}
+                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                   aria-label="Filter berdasarkan action"
+                 >
+                   <option value="">Semua Action</option>
+                   {actions.map((action) => (
+                     <option key={action.value} value={action.value}>
+                       {action.label}
+                     </option>
+                   ))}
+                 </select>
+               )}
+             </div>
 
-          {/* Date From */}
-          <div className="w-full lg:w-32">
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              aria-label="Start date"
-            />
-          </div>
+             {/* Resource Filter */}
+             <div>
+               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                 Resource
+               </label>
+               {filtersLoading ? (
+                 <div className="w-full h-10 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
+               ) : (
+                 <SearchableSelect
+                   options={resources}
+                   value={resourceFilter}
+                   onChange={setResourceFilter}
+                   placeholder="Pilih resource..."
+                   className="w-full"
+                 />
+               )}
+             </div>
 
-          {/* Date To */}
-          <div className="w-full lg:w-32">
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              aria-label="End date"
-            />
-          </div>
-
-          {/* IP Filter */}
-          <div className="w-full lg:w-32">
-            <input
-              type="text"
-              placeholder="IP Address"
-              value={ipFilter}
-              onChange={(e) => setIpFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              aria-label="Filter by IP address"
-            />
-          </div>
+             {/* Date Range Filter */}
+             <div>
+               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                 Rentang Tanggal
+               </label>
+               {filtersLoading ? (
+                 <div className="w-full h-10 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
+               ) : (
+                 <DateRangePicker
+                   startDate={dateFrom}
+                   endDate={dateTo}
+                   onStartDateChange={setDateFrom}
+                   onEndDateChange={setDateTo}
+                 />
+               )}
+             </div>
+           </div>
 
           {/* Clear Filters */}
-          <button
-            onClick={clearFilters}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium transition-colors"
-          >
-            Clear
-          </button>
+          <div className="flex justify-end">
+            <button
+              onClick={clearFilters}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium transition-colors"
+            >
+              Bersihkan Filter
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Timeline View */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+      {/* Logs Table */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400">Loading audit logs...</p>
+          <div className="p-12 text-center">
+            <div className="inline-block animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400 font-medium">Memuat audit logs...</p>
+          </div>
+        ) : error ? (
+          <div className="p-12 text-center">
+            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <MdError className="text-2xl text-red-500" />
+            </div>
+            <p className="text-red-600 dark:text-red-400 font-medium">Error: {error}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">Gagal memuat data audit log</p>
+            <button
+              onClick={() => fetchLogs()}
+              className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              Coba Lagi
+            </button>
           </div>
         ) : logs.length === 0 ? (
-          <div className="p-8 text-center">
-            <MdList className="text-4xl text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600 dark:text-gray-400">No audit logs found</p>
+          <div className="p-12 text-center">
+            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+              <MdList className="text-2xl text-gray-400" />
+            </div>
+            <p className="text-gray-600 dark:text-gray-400 font-medium">Tidak ada audit logs ditemukan</p>
+            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">Coba ubah filter pencarian</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200 dark:divide-gray-700">
-            {logs.map((log) => (
-              <div key={log.id} className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-gray-600 dark:text-gray-400 font-medium">
-                    {log.user.charAt(0).toUpperCase()}
-                  </div>
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-900">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[150px]">
+                      <button
+                        onClick={() => handleSort('created_at')}
+                        className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-300"
+                      >
+                        Timestamp
+                        {sortBy === 'created_at' && (
+                          sortDirection === 'asc' ? 
+                            <MdArrowUpward className="text-xs" /> : 
+                            <MdArrowDownward className="text-xs" />
+                        )}
+                      </button>
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[120px]">
+                      <button
+                        onClick={() => handleSort('user_name')}
+                        className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-300"
+                      >
+                        User
+                        {sortBy === 'user_name' && (
+                          sortDirection === 'asc' ? 
+                            <MdArrowUpward className="text-xs" /> : 
+                            <MdArrowDownward className="text-xs" />
+                        )}
+                      </button>
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[100px]">
+                      <button
+                        onClick={() => handleSort('action')}
+                        className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-300"
+                      >
+                        Action
+                        {sortBy === 'action' && (
+                          sortDirection === 'asc' ? 
+                            <MdArrowUpward className="text-xs" /> : 
+                            <MdArrowDownward className="text-xs" />
+                        )}
+                      </button>
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[120px]">
+                      Resource
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider min-w-[120px]">
+                      IP Address
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-32">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {logs.map((log) => (
+                    <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {formatTimestamp(log.created_at, log.timestamp_formatted)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {log.user_name || '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getActionColor(log.action)}`}>
+                          {log.action?.toUpperCase() || '-'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {log.resource} {log.resource_id ? `(${log.resource_id})` : ''}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white font-mono">
+                        {log.ip_address || '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button
+                          onClick={() => viewLogDetails(log.id)}
+                          className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                        >
+                          <MdVisibility className="text-lg" />
+                          <span className="hidden md:inline">Detail</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border ${getActionColor(log.action)}`}>
-                        {log.action.toUpperCase()}
-                      </span>
-                      <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(log.status)}`}>
-                        {log.status.toUpperCase()}
-                      </span>
-                      <span className="text-sm text-gray-600 dark:text-gray-400">{log.module}</span>
-                      <span className="text-sm text-gray-500 dark:text-gray-500">
-                        {format(parseISO(log.timestamp), 'MMM dd, yyyy HH:mm')}
-                      </span>
-                    </div>
-
-                    <p className="text-gray-900 dark:text-white font-medium mb-2">
-                      {log.details}
+            {/* Pagination */}
+            {pagination.last_page > 1 && (
+              <div className="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6">
+                <div className="flex-1 flex justify-between sm:hidden">
+                  <button
+                    onClick={() => handlePageChange(pagination.current_page - 1)}
+                    disabled={pagination.current_page === 1}
+                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                  >
+                    Sebelumnya
+                  </button>
+                  <button
+                    onClick={() => handlePageChange(pagination.current_page + 1)}
+                    disabled={pagination.current_page === pagination.last_page}
+                    className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                  >
+                    Selanjutnya
+                  </button>
+                </div>
+                <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      Menampilkan <span className="font-medium">{((pagination.current_page - 1) * pagination.per_page) + 1}</span> sampai{' '}
+                      <span className="font-medium">{Math.min(pagination.current_page * pagination.per_page, pagination.total)}</span> dari{' '}
+                      <span className="font-medium">{pagination.total}</span> hasil
                     </p>
-
-                    <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
-                      <span>User: <span className="font-medium text-blue-600 dark:text-blue-400">{log.user}</span></span>
-                      <span>IP: {log.ipAddress}</span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
+                  </div>
+                  <div>
+                    <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
                       <button
-                        onClick={() => viewLogDetails(log.id)}
-                        className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                        onClick={() => handlePageChange(pagination.current_page - 1)}
+                        disabled={pagination.current_page === 1}
+                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
                       >
-                        <MdVisibility className="text-lg" />
-                        View Details
+                        Sebelumnya
                       </button>
+                      <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Halaman {pagination.current_page} dari {pagination.last_page}
+                      </span>
                       <button
-                        onClick={() => toggleExpanded(log.id)}
-                        className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                        onClick={() => handlePageChange(pagination.current_page + 1)}
+                        disabled={pagination.current_page === pagination.last_page}
+                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
                       >
-                        {expandedLogs.has(log.id) ? (
-                          <>
-                            <MdExpandLess className="text-lg" />
-                            Hide Details
-                          </>
-                        ) : (
-                          <>
-                            <MdExpandMore className="text-lg" />
-                            Show More
-                          </>
-                        )}
+                        Selanjutnya
                       </button>
-                    </div>
-
-                    {expandedLogs.has(log.id) && (
-                      <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg space-y-3">
-                        {(log.old_values || log.new_values) && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {log.old_values && (
-                              <div>
-                                <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Previous Values</h4>
-                                <pre className="text-xs bg-red-50 dark:bg-red-900/20 p-3 rounded text-red-800 dark:text-red-200 overflow-x-auto">
-                                  {JSON.stringify(log.old_values, null, 2)}
-                                </pre>
-                              </div>
-                            )}
-                            {log.new_values && (
-                              <div>
-                                <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">New Values</h4>
-                                <pre className="text-xs bg-green-50 dark:bg-green-900/20 p-3 rounded text-green-800 dark:text-green-200 overflow-x-auto">
-                                  {JSON.stringify(log.new_values, null, 2)}
-                                </pre>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        {log.user_agent && (
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-1">User Agent</h4>
-                            <p className="text-xs text-gray-600 dark:text-gray-400 break-all">{log.user_agent}</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    </nav>
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* Pagination */}
-      {pagination.last_page > 1 && !loading && logs.length > 0 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Showing {((pagination.current_page - 1) * pagination.per_page) + 1} to{' '}
-            {Math.min(pagination.current_page * pagination.per_page, pagination.total)} of{' '}
-            {pagination.total} entries
-          </p>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => handlePageChange(pagination.current_page - 1)}
-              disabled={pagination.current_page === 1}
-              className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-              Previous
-            </button>
-            <span className="text-sm">
-              Page {pagination.current_page} of {pagination.last_page}
-            </span>
-            <button
-              onClick={() => handlePageChange(pagination.current_page + 1)}
-              disabled={pagination.current_page === pagination.last_page}
-              className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Detail Modal */}
       {showDetailModal && selectedLog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] my-8 overflow-hidden">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-700">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Audit Log Details</h2>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                    <MdVisibility className="text-blue-600 dark:text-blue-400 text-lg" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">Detail Log Audit</h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">ID: {selectedLog.id}</p>
+                  </div>
+                </div>
                 <button
                   onClick={() => setShowDetailModal(false)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  className="w-8 h-8 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
                 >
                   ×
                 </button>
               </div>
             </div>
 
-            <div className="p-6 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Action</h3>
-                  <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium border ${getActionColor(selectedLog.action)}`}>
-                    {selectedLog.action.toUpperCase()}
-                  </span>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Status</h3>
-                  <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(selectedLog.status)}`}>
-                    {selectedLog.status.toUpperCase()}
-                  </span>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">User</h3>
-                  <p className="text-gray-900 dark:text-white">{selectedLog.user}</p>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Module</h3>
-                  <p className="text-gray-900 dark:text-white">{selectedLog.module}</p>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">IP Address</h3>
-                  <p className="text-gray-900 dark:text-white font-mono">{selectedLog.ipAddress}</p>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Timestamp</h3>
-                  <p className="text-gray-900 dark:text-white">
-                    {format(parseISO(selectedLog.timestamp), 'PPP pp')}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Details</h3>
-                <p className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg text-gray-900 dark:text-white">
-                  {selectedLog.details}
-                </p>
-              </div>
-
-              {(selectedLog.old_values || selectedLog.new_values) && (
-                <div>
-                  <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Data Changes</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {selectedLog.old_values && (
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Previous Values</h4>
-                        <pre className="text-xs bg-red-50 dark:bg-red-900/20 p-3 rounded overflow-x-auto text-red-800 dark:text-red-200">
-                          {JSON.stringify(selectedLog.old_values, null, 2)}
-                        </pre>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="space-y-4">
+                  <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                      <MdList className="text-blue-500" />
+                      Informasi Dasar
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Timestamp</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">
+                          {formatTimestamp(selectedLog.created_at, selectedLog.timestamp_formatted)}
+                        </span>
                       </div>
-                    )}
-                    {selectedLog.new_values && (
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">New Values</h4>
-                        <pre className="text-xs bg-green-50 dark:bg-green-900/20 p-3 rounded overflow-x-auto text-green-800 dark:text-green-200">
-                          {JSON.stringify(selectedLog.new_values, null, 2)}
-                        </pre>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">User</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{selectedLog.user_name || '-'}</span>
                       </div>
-                    )}
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Action</span>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getActionColor(selectedLog.action)}`}>
+                          {selectedLog.action?.toUpperCase() || '-'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                      <MdFilterList className="text-green-500" />
+                      Resource Info
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Resource</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{selectedLog.resource || '-'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">Resource ID</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white font-mono">{selectedLog.resource_id || '-'}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              )}
 
-              {selectedLog.user_agent && (
-                <div>
-                  <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">User Agent</h3>
-                  <p className="text-xs font-mono p-3 bg-gray-50 dark:bg-gray-900 rounded-lg text-gray-700 dark:text-gray-300 break-all">
-                    {selectedLog.user_agent}
-                  </p>
+                <div className="space-y-4">
+                  <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                      <MdVisibility className="text-purple-500" />
+                      Technical Details
+                    </h3>
+                    <div className="space-y-3">
+                      <div>
+                        <span className="text-sm text-gray-600 dark:text-gray-400 block mb-1">IP Address</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">{selectedLog.ip_address || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-sm text-gray-600 dark:text-gray-400 block mb-1">User Agent</span>
+                        <span className="text-xs text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded break-all block">{selectedLog.user_agent || '-'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {selectedLog.payload && (
+                <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                    <MdSearch className="text-orange-500" />
+                    Payload (JSON)
+                  </h3>
+                  <pre className="text-xs bg-white dark:bg-gray-800 p-4 rounded-lg overflow-x-auto text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-600 max-h-64 overflow-y-auto">
+                    {JSON.stringify(formatPayload(selectedLog.payload), null, 2)}
+                  </pre>
                 </div>
               )}
             </div>
 
-            <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+            <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex justify-end">
               <button
                 onClick={() => setShowDetailModal(false)}
-                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium transition-colors"
+                className="px-6 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium transition-colors"
               >
-                Close
+                Tutup
               </button>
             </div>
           </div>
@@ -716,36 +936,36 @@ export default function AuditLogsPage() {
 
       {/* Delete Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full my-8">
             <div className="p-6 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-3">
                 <MdDeleteForever className="text-red-500 text-2xl" />
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Clean Up Old Logs</h2>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Hapus Log Lama</h2>
               </div>
             </div>
 
             <div className="p-6">
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                This will permanently delete audit logs older than the specified number of days.
-                This action cannot be undone.
+                Aksi ini akan menghapus log audit yang lebih lama dari jumlah hari yang ditentukan.
+                Tindakan ini tidak dapat dibatalkan.
               </p>
 
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Delete logs older than:
+                  Hapus log yang lebih lama dari:
                 </label>
                 <select
                   value={deleteDays}
                   onChange={(e) => setDeleteDays(Number(e.target.value))}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  aria-label="Pilih periode penghapusan log"
                 >
-                  <option value={7}>7 days</option>
-                  <option value={30}>30 days</option>
-                  <option value={60}>60 days</option>
-                  <option value={90}>90 days</option>
-                  <option value={180}>180 days</option>
-                  <option value={365}>1 year</option>
+                  <option value={30}>30 hari</option>
+                  <option value={60}>60 hari</option>
+                  <option value={90}>90 hari</option>
+                  <option value={180}>180 hari (6 bulan)</option>
+                  <option value={365}>365 hari (1 tahun)</option>
                 </select>
               </div>
 
@@ -754,13 +974,13 @@ export default function AuditLogsPage() {
                   onClick={() => setShowDeleteModal(false)}
                   className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium transition-colors"
                 >
-                  Cancel
+                  Batal
                 </button>
                 <button
                   onClick={deleteOldLogs}
                   className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
                 >
-                  Delete Logs
+                  Hapus Log
                 </button>
               </div>
             </div>

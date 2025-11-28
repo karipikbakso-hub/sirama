@@ -7,7 +7,7 @@ const validRoles = ['admin', 'pendaftaran', 'dokter', 'perawat', 'apoteker', 'ka
 // Public paths that don't require authentication
 const publicPaths = ['/login', '/']
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Allow public paths
@@ -19,7 +19,6 @@ export function middleware(request: NextRequest) {
   const isDashboard = pathname.startsWith('/dashboard')
 
   if (isDashboard) {
-    // Cek token di cookies dengan lebih fleksible
     const token = request.cookies.get('token')?.value
 
     console.log('Middleware check:', {
@@ -28,16 +27,17 @@ export function middleware(request: NextRequest) {
       cookieLength: token?.length || 0
     })
 
+    // If no token, redirect to login
     if (!token) {
-      // Strategy: Allow dashboard access first, let RoleGuard handle authentication
-      // This prevents race condition between middleware redirect and client-side auth
-      console.log('Middleware: No token found, allowing access to let auth store handle it')
+      console.log('Middleware: No token found, redirecting to login')
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
 
+    try {
       // Extract role from path /dashboard/{role}/...
       const pathParts = pathname.split('/')
       const requestedRole = pathParts[2] // dashboard/[role]
 
-      // Validate if it's a proper role-based path
       if (!requestedRole) {
         // Root dashboard path - allow access, let client handle redirect
         return NextResponse.next()
@@ -49,11 +49,51 @@ export function middleware(request: NextRequest) {
         return NextResponse.next()
       }
 
+      // Enhanced early role validation to prevent race condition
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:8000'
+      
+      // Validate user token and get role
+      const userResponse = await fetch(`${baseUrl}/api/user`, {
+        headers: {
+          'Cookie': `token=${token}; path=/`,
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      })
+
+      if (!userResponse.ok) {
+        // Token invalid, redirect to login
+        console.log('Middleware: Token validation failed, redirecting to login')
+        return NextResponse.redirect(new URL('/login', request.url))
+      }
+
+      const userData = await userResponse.json()
+      const userRoles = userData.roles || []
+      const primaryRole = userRoles[0] || 'user'
+
+      console.log('Role validation:', {
+        requestedRole,
+        userRole: primaryRole,
+        userRoles
+      })
+
+      // Check if user has access to requested role
+      // Admin can access all roles
+      const hasAccess = primaryRole === 'admin' || primaryRole === requestedRole
+
+      if (!hasAccess) {
+        // Wrong role - redirect to correct dashboard
+        console.log(`Middleware: Role mismatch. User: ${primaryRole}, Requested: ${requestedRole}`)
+        const correctDashboard = `/dashboard/${primaryRole}`
+        console.log('Redirecting to:', correctDashboard)
+        return NextResponse.redirect(new URL(correctDashboard, request.url))
+      }
+
+    } catch (error) {
+      console.error('Middleware error:', error)
+      // On error, allow request to let client handle
       return NextResponse.next()
     }
-
-    // If token exists, allow access - let client-side RoleGuard handle authorization
-    return NextResponse.next()
   }
 
   return NextResponse.next()

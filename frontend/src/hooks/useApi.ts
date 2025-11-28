@@ -44,7 +44,11 @@ export function useMutate<T>(
       } else if (method === 'put') {
         response = await api.put<SuccessResponse<T>>(endpoint, data)
       } else if (method === 'delete') {
-        response = await api.delete<SuccessResponse<T>>(endpoint, data)
+        // For delete requests, we may need to append the ID to the endpoint
+        const deleteEndpoint = data?.id ? `${endpoint}/${data.id}` : 
+                             typeof data === 'string' ? `${endpoint}${data}` : 
+                             endpoint
+        response = await api.delete<SuccessResponse<T>>(deleteEndpoint)
       }
       return response!.data.data // Extract data from SuccessResponse wrapper
     },

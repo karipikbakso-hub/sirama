@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Registration extends Model
 {
+    protected $table = 't_registrasi';
 
     protected $fillable = [
         'patient_id',
@@ -92,7 +93,7 @@ class Registration extends Model
      */
     public function doctor(): BelongsTo
     {
-        return $this->belongsTo(Doctor::class, 'doctor_id');
+        return $this->belongsTo(User::class, 'doctor_id');
     }
 
     /**
@@ -101,6 +102,14 @@ class Registration extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * Relationship with poli
+     */
+    public function poli(): BelongsTo
+    {
+        return $this->belongsTo(Poli::class, 'poli_id');
     }
 
     /**

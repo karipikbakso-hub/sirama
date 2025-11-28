@@ -14,12 +14,6 @@ import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Plus, Edit, Search, Filter, Eye, Printer, Trash2 } from 'lucide-react';
 
 // Types
-interface Patient {
-  id: number;
-  name: string;
-  mrn: string;
-}
-
 interface Medicine {
   id: number;
   nama_obat: string;
@@ -31,7 +25,16 @@ interface Medicine {
 interface Registration {
   id: number;
   patient_id: number;
-  patient: Patient;
+  full_name: string;
+  medical_record_number: string;
+  date_of_birth: string;
+  gender: string;
+  phone: string;
+  insurance_type: string;
+  queue_number: string;
+  registration_date: string;
+  status: string;
+  complaint: string;
 }
 
 interface Prescription {
@@ -43,7 +46,20 @@ interface Prescription {
   instruksi: string;
   tanggal_resep: string;
   status: 'draft' | 'final' | 'dibuat' | 'selesai';
-  registrasi: Registration;
+  registrasi: {
+    id: number;
+    patient_id: number;
+    full_name: string;
+    medical_record_number: string;
+    date_of_birth: string;
+    gender: string;
+    phone: string;
+    insurance_type: string;
+    queue_number: string;
+    registration_date: string;
+    status: string;
+    complaint: string;
+  };
   dokter: {
     id: number;
     name: string;
@@ -104,13 +120,18 @@ export default function ResepPage() {
 
   const fetchPrescriptions = async () => {
     try {
-      const response = await fetch('/api/prescriptions');
+      // For now, we'll fetch prescriptions for all patients since we don't have a specific patient context
+      // In a real implementation, this would be filtered by the doctor's patients or current session
+      const response = await fetch('/api/prescriptions?patient_id=1'); // Temporary: fetch for patient ID 1
       if (response.ok) {
         const data = await response.json();
-        setPrescriptions(data.data.data || []);
+        // Ensure we get an array, handle both paginated and direct array responses
+        const prescriptionsData = data.data?.data || data.data || [];
+        setPrescriptions(Array.isArray(prescriptionsData) ? prescriptionsData : []);
       }
     } catch (error) {
       console.error('Error fetching prescriptions:', error);
+      setPrescriptions([]); // Set to empty array on error
     } finally {
       setLoading(false);
     }
@@ -121,22 +142,28 @@ export default function ResepPage() {
       const response = await fetch('/api/registrations?per_page=100');
       if (response.ok) {
         const data = await response.json();
-        setRegistrations(data.data.data || []);
+        // Ensure we get an array, handle both paginated and direct array responses
+        const registrationsData = data.data?.data || data.data || [];
+        setRegistrations(Array.isArray(registrationsData) ? registrationsData : []);
       }
     } catch (error) {
       console.error('Error fetching registrations:', error);
+      setRegistrations([]); // Set to empty array on error
     }
   };
 
   const fetchMedicines = async () => {
     try {
-      const response = await fetch('/api/master-medicines');
+      const response = await fetch('/api/medicines?per_page=100');
       if (response.ok) {
         const data = await response.json();
-        setMedicines(data.data || []);
+        // Ensure we get an array, handle both paginated and direct array responses
+        const medicinesData = data.data?.data || data.data || [];
+        setMedicines(Array.isArray(medicinesData) ? medicinesData : []);
       }
     } catch (error) {
       console.error('Error fetching medicines:', error);
+      setMedicines([]); // Set to empty array on error
     }
   };
 
@@ -327,12 +354,12 @@ export default function ResepPage() {
     }
   };
 
-  const filteredPrescriptions = prescriptions.filter(prescription => {
+  const filteredPrescriptions = (prescriptions || []).filter(prescription => {
     const matchesSearch = !searchTerm ||
-      prescription.no_resep.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prescription.registrasi.patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prescription.registrasi.patient.mrn.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prescription.diagnosa.toLowerCase().includes(searchTerm.toLowerCase());
+      prescription.no_resep?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      prescription.registrasi?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      prescription.registrasi?.medical_record_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      prescription.diagnosa?.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesFilter = !filterStatus || prescription.status === filterStatus;
 
@@ -403,10 +430,10 @@ export default function ResepPage() {
                   <SearchableSelect
                     options={registrations.map(registration => ({
                       value: registration.id.toString(),
-                      label: `${registration.patient.name} (${registration.patient.mrn})`,
+                      label: `${registration.full_name} (${registration.medical_record_number})`,
                     }))}
                     value={formData.registrasi_id}
-                    onValueChange={(value) => handleFormChange('registrasi_id', value)}
+                    onChange={(value) => handleFormChange('registrasi_id', value)}
                     placeholder="Pilih pasien..."
                   />
                 </div>
@@ -478,7 +505,7 @@ export default function ResepPage() {
                             label: `${medicine.nama_obat} (${medicine.satuan})`,
                           }))}
                           value={item.obat_id}
-                          onValueChange={(value) => handleMedicineChange(index, 'obat_id', value)}
+                          onChange={(value) => handleMedicineChange(index, 'obat_id', value)}
                           placeholder="Pilih obat..."
                         />
                       </div>
@@ -616,8 +643,8 @@ export default function ResepPage() {
                   <TableCell className="font-medium">{prescription.no_resep}</TableCell>
                   <TableCell>
                     <div>
-                      <div className="font-medium">{prescription.registrasi.patient.name}</div>
-                      <div className="text-sm text-muted-foreground">{prescription.registrasi.patient.mrn}</div>
+                      <div className="font-medium">{prescription.registrasi.full_name}</div>
+                      <div className="text-sm text-muted-foreground">{prescription.registrasi.medical_record_number}</div>
                     </div>
                   </TableCell>
                   <TableCell className="max-w-xs truncate" title={prescription.diagnosa}>

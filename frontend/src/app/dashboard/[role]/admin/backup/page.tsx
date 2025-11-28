@@ -15,6 +15,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { JadwalBackup, RiwayatBackup } from '@/types/role/admin'
 
+interface BackupStats {
+  totalCount: number
+  totalSizeBytes: number
+  lastBackupAt: string | null
+}
+
+interface BackupData {
+  stats: BackupStats
+  data: RiwayatBackup[]
+}
+
+interface ScheduleData {
+  data: JadwalBackup[]
+}
+
+interface StatsData {
+  data: BackupStats
+}
+
 export default function BackupPage() {
   const { user } = useAuth()
   const [isBackupRunning, setIsBackupRunning] = useState(false)
@@ -22,32 +41,49 @@ export default function BackupPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState('manual')
 
-  // Admin role check
-  if (!user?.roles?.includes('admin')) {
+  // Admin permission check
+  if (!user?.permissions?.includes('manage-backups')) {
     return null
   }
 
-  const { data: backupData, isLoading, refetch } = useFetch('/api/backups/histories')
-  const { data: schedulesData, refetch: refetchSchedules } = useFetch('/api/backups/schedules')
+  const { data: backupData, isLoading, refetch } = useFetch<BackupData>('/api/backups/histories')
+  const { data: schedulesData, refetch: refetchSchedules } = useFetch<ScheduleData>('/api/backups/schedules')
+  const { data: statsData } = useFetch<StatsData>('/api/backups/statistics')
   const createMutation = useMutate('post', '/api/backups/manual')
-  const deleteMutation = useMutate('delete', '/api/backups')
+  const deleteMutation = useMutate('delete', '/api/backups/')
 
-  const stats = (backupData as any)?.stats || { totalCount: 0, totalSizeBytes: 0, lastBackupAt: null }
-  const backups = (backupData as any)?.data || []
-  const schedules = (schedulesData as any)?.data || []
+  // Use stats from dedicated API if available, otherwise from backupData
+  const stats = statsData?.data || backupData?.stats || { totalCount: 0, totalSizeBytes: 0, lastBackupAt: null }
+  const backups = backupData?.data || []
+  const schedules = schedulesData?.data || []
 
   const handleBackup = async () => {
     try {
       setIsBackupRunning(true)
-      setProgress(0)
+      setProgress(10)
 
-      const res = await createMutation.mutateAsync({})
+      // Simulate progress updates
+      const progressInterval = setInterval(() => {
+        setProgress((prev) => {
+          if (prev >= 90) return 90
+          return prev + 15
+        })
+      }, 800)
+
+      await createMutation.mutateAsync({})
+
+      setProgress(100)
+      clearInterval(progressInterval)
+
       toast.success('Backup berhasil dibuat!')
       refetch()
       setIsBackupRunning(false)
+      setProgress(0)
     } catch (error: any) {
       setIsBackupRunning(false)
-      toast.error(error.response?.data?.message || 'Gagal membuat backup')
+      setProgress(0)
+      console.error('Backup error:', error)
+      toast.error(error?.message || 'Gagal membuat backup')
     }
   }
 
@@ -55,11 +91,11 @@ export default function BackupPage() {
     if (!confirm(`Hapus backup "${backup.nama_file}"?`)) return
 
     try {
-      await deleteMutation.mutateAsync(`/${backup.id}`)
+      await deleteMutation.mutateAsync(backup.id)
       toast.success('Backup berhasil dihapus!')
       refetch()
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Gagal menghapus backup')
+      toast.error(error?.message || 'Gagal menghapus backup')
     }
   }
 
@@ -227,7 +263,6 @@ export default function BackupPage() {
                           size="sm"
                           variant="danger"
                           onClick={() => handleDelete(backup)}
-                          disabled={deleteMutation.isPending}
                           title="Hapus"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -389,7 +424,7 @@ export default function BackupPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => window.open(`/api/backups/download/${backup.id}`, '_blank')}
+                              onClick={() => window.open(`/api/backups/${backup.id}/download`, '_blank')}
                               title="Download"
                             >
                               <Download className="h-4 w-4" />
@@ -399,8 +434,6 @@ export default function BackupPage() {
                             size="sm"
                             variant="danger"
                             onClick={() => handleDelete(backup)}
-                            disabled={deleteMutation.isPending}
-                            title="Hapus"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

@@ -47,11 +47,10 @@ interface Role {
 }
 
 interface UserFormData {
-  name: string
+  username: string
+  fullName: string
   email: string
   role: string
-  username?: string
-  fullName?: string
   password?: string
   password_confirmation?: string
   roleIds?: number[]
@@ -67,15 +66,17 @@ export default function UserPage() {
   const [showResetPasswordForm, setShowResetPasswordForm] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [newUser, setNewUser] = useState<UserFormData>({
-    name: '',
+    fullName: '',
     email: '',
     role: 'kasir',
+    username: '',
     isActive: true
   })
   const [editUser, setEditUser] = useState<UserFormData>({
-    name: '',
+    fullName: '',
     email: '',
     role: 'kasir',
+    username: '',
     isActive: true
   })
   const [resetPasswordData, setResetPasswordData] = useState({
@@ -141,7 +142,7 @@ export default function UserPage() {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       queryClient.invalidateQueries({ queryKey: ['user-statistics'] })
       setShowAddForm(false)
-      setNewUser({ name: '', email: '', role: 'kasir' })
+      setNewUser({ fullName: '', email: '', role: 'kasir', username: '' })
       toast.success('User berhasil ditambahkan')
     },
     onError: (error: any) => {
@@ -229,13 +230,11 @@ export default function UserPage() {
   const users = usersData?.data || []
   const pagination = usersData?.meta || {}
 
-  // Note: Filtering is now handled by the API, but keeping client-side filter for additional filtering
+  // Note: Role and status filtering is now handled by the API, keeping only client-side search for additional filtering
   const filteredUsers = users.filter((user: User) => {
     const matchesSearch = (user.name || user.fullName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesRole = filterRole === 'all' || user.role === filterRole
-    const matchesStatus = filterStatus === 'all' || user.status === filterStatus
-    return matchesSearch && matchesRole && matchesStatus
+                          user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    return matchesSearch
   })
 
   const getRoleIcon = (role: string) => {
@@ -279,13 +278,13 @@ export default function UserPage() {
   }
 
   const handleAddUser = () => {
-    if (!newUser.name || !newUser.email) {
-      toast.error('Nama dan email harus diisi')
+    if (!newUser.username || !newUser.fullName || !newUser.email) {
+      toast.error('Username, nama lengkap dan email harus diisi')
       return
     }
 
     // Find selected role and use its ID
-    const selectedRole = roles.find(role => role.name === newUser.role)
+    const selectedRole = roles.find((role: { id: number; name: string; label?: string }) => role.name === newUser.role)
     if (!selectedRole) {
       toast.error('Role tidak valid')
       return
@@ -293,18 +292,22 @@ export default function UserPage() {
 
     // Add password for new user
     const userData = {
-      ...newUser,
+      username: newUser.username,
+      fullName: newUser.fullName, // Map 'fullName' to 'fullName' for backend
+      email: newUser.email,
+      role: newUser.role,
       password: 'password123', // Default password, user should change it
       password_confirmation: 'password123',
-      roleIds: [selectedRole.id] // Send role IDs instead of role name
+      roleIds: [selectedRole.id], // Send role IDs instead of role name
+      isActive: newUser.isActive
     }
 
     createUserMutation.mutate(userData)
   }
 
   const handleEditUser = () => {
-    if (!selectedUser || !editUser.name || !editUser.email) {
-      toast.error('Nama dan email harus diisi')
+    if (!selectedUser || !editUser.username || !editUser.fullName || !editUser.email) {
+      toast.error('Username, nama lengkap dan email harus diisi')
       return
     }
 
@@ -318,7 +321,7 @@ export default function UserPage() {
     })
 
     // Find selected role and use its ID (case-insensitive comparison)
-    const selectedRole = roles.find(role =>
+    const selectedRole = roles.find((role: { id: number; name: string; label?: string }) =>
       role.name.toLowerCase() === editUser.role.toLowerCase()
     )
     console.log('🎯 Selected role from roles.find():', selectedRole)
@@ -327,7 +330,7 @@ export default function UserPage() {
       console.error('❌ Role tidak valid!', {
         selectedRole,
         editUserRole: editUser.role,
-        availableRoleNames: roles.map(r => r.name)
+        availableRoleNames: roles.map((r: { id: number; name: string; label?: string }) => r.name)
       })
       toast.error(`Role '${editUser.role}' tidak valid. Pastikan role tersedia.`)
       return
@@ -336,9 +339,9 @@ export default function UserPage() {
     updateUserMutation.mutate({
       id: selectedUser.id,
       data: {
-        fullName: editUser.name,  // ✅ FIX: Backend expects 'fullName'
+        username: editUser.username,
+        fullName: editUser.fullName,  // Map 'fullName' to 'fullName' for backend
         email: editUser.email,
-        username: editUser.username,  // ✅ FIX: Add required username field
         roleIds: [selectedRole.id], // Send role IDs instead of role name
         isActive: editUser.isActive
       }
@@ -406,13 +409,20 @@ export default function UserPage() {
             <select
               value={filterRole}
               onChange={(e) => setFilterRole(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={rolesLoading}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
               aria-label="Filter by role"
             >
               <option value="all">Semua Role</option>
-              {roles.map((role: { id: number; name: string; label?: string }) => (
-                <option key={role.name} value={role.name}>{role.label || role.name}</option>
-              ))}
+              {rolesLoading ? (
+                <option disabled>Loading roles...</option>
+              ) : rolesError ? (
+                <option disabled>Error loading roles</option>
+              ) : (
+                roles.map((role: { id: number; name: string; label?: string }) => (
+                  <option key={role.name} value={role.name}>{role.label || role.name}</option>
+                ))
+              )}
             </select>
           </div>
 
@@ -509,7 +519,7 @@ export default function UserPage() {
                           onClick={() => {
                             setSelectedUser(user)
                             setEditUser({
-                              name: user.name || user.fullName || '',
+                              fullName: user.name || user.fullName || '',
                               username: user.username || '',
                               email: user.email,
                               role: user.roles?.[0]?.name || user.role || 'kasir',
@@ -564,12 +574,25 @@ export default function UserPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  value={newUser.username}
+                  onChange={(e) => setNewUser(prev => ({ ...prev, username: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Masukkan username"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Nama Lengkap
                 </label>
                 <input
                   type="text"
-                  value={newUser.name}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, name: e.target.value }))}
+                  value={newUser.fullName}
+                  onChange={(e) => setNewUser(prev => ({ ...prev, fullName: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Masukkan nama lengkap"
                 />
@@ -595,12 +618,19 @@ export default function UserPage() {
                 <select
                   value={newUser.role}
                   onChange={(e) => setNewUser(prev => ({ ...prev, role: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={rolesLoading}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
                   aria-label="Pilih role pengguna"
                 >
-              {roles.map((role: { id: number; name: string; label?: string }) => (
-                <option key={role.name} value={role.name}>{role.label || role.name}</option>
-              ))}
+                  {rolesLoading ? (
+                    <option disabled>Loading roles...</option>
+                  ) : rolesError ? (
+                    <option disabled>Error loading roles</option>
+                  ) : (
+                    roles.map((role: { id: number; name: string; label?: string }) => (
+                      <option key={role.name} value={role.name}>{role.label || role.name}</option>
+                    ))
+                  )}
                 </select>
               </div>
             </div>
@@ -634,12 +664,25 @@ export default function UserPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  value={editUser.username}
+                  onChange={(e) => setEditUser(prev => ({ ...prev, username: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Masukkan username"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Nama Lengkap
                 </label>
                 <input
                   type="text"
-                  value={editUser.name}
-                  onChange={(e) => setEditUser(prev => ({ ...prev, name: e.target.value }))}
+                  value={editUser.fullName}
+                  onChange={(e) => setEditUser(prev => ({ ...prev, fullName: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Masukkan nama lengkap"
                 />
@@ -665,12 +708,19 @@ export default function UserPage() {
                 <select
                   value={editUser.role}
                   onChange={(e) => setEditUser(prev => ({ ...prev, role: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={rolesLoading}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
                   aria-label="Pilih role pengguna"
                 >
-              {roles.map((role: { id: number; name: string; label: string }) => (
-                <option key={role.name} value={role.name}>{role.label || role.name}</option>
-              ))}
+                  {rolesLoading ? (
+                    <option disabled>Loading roles...</option>
+                  ) : rolesError ? (
+                    <option disabled>Error loading roles</option>
+                  ) : (
+                    roles.map((role: { id: number; name: string; label?: string }) => (
+                      <option key={role.name} value={role.name}>{role.label || role.name}</option>
+                    ))
+                  )}
                 </select>
               </div>
 

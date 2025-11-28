@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { FaShieldAlt, FaSearch, FaPlus, FaEdit, FaTrash, FaEye, FaSpinner, FaExclamationTriangle, FaCheckCircle, FaSort, FaSortUp, FaSortDown, FaPrint } from 'react-icons/fa'
+import { FaShieldAlt, FaSearch, FaFilter, FaDownload, FaCheckCircle, FaTimesCircle, FaClock, FaExclamationTriangle, FaPrint, FaEye, FaCheck, FaTimes, FaCalendarAlt, FaChartBar } from 'react-icons/fa'
 import {
   useReactTable,
   getCoreRowModel,
@@ -24,366 +24,236 @@ type SEP = {
   bpjs_number: string
   service_type: string
   diagnosis: string
-  status: 'active' | 'inactive' | 'rejected'
-  notes?: string
+  status: 'active' | 'inactive' | 'cancelled' | 'expired'
+  validation_status: 'valid' | 'invalid' | 'not_checked'
+  expiry_date: string
   created_at: string
-  updated_at: string
+  validated_at?: string
+  flagged_reason?: string
+  is_expired: boolean
+  is_suspicious: boolean
   patient?: {
     id: number
-    mrn: string
     name: string
+    mrn: string
   }
   registration?: {
     id: number
     registration_no: string
-    created_at: string
   }
+  dpjp?: {
+    id: number
+    name: string
+  }
+  poli?: {
+    id: number
+    name: string
+  }
+  validation_badge: [string, string]
 }
 
-type SEPForm = {
-  patient_id: string
-  registration_id: string
-  bpjs_number: string
+type FilterOptions = {
+  date_from: string
+  date_to: string
+  status: string
+  validation_status: string
   service_type: string
-  diagnosis: string
-  notes: string
+  poli_id: string
+  doctor_id: string
 }
 
-export default function SEPPatientPage() {
+export default function SEPValidationPage() {
   const [seps, setSEPs] = useState<SEP[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [totalRecords, setTotalRecords] = useState(0)
-  const [perPage, setPerPage] = useState(10)
-
-  // Form states
-  const [showForm, setShowForm] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [editingSEP, setEditingSEP] = useState<SEP | null>(null)
-  const [formData, setFormData] = useState<SEPForm>({
-    patient_id: '',
-    registration_id: '',
-    bpjs_number: '',
-    service_type: '',
-    diagnosis: '',
-    notes: ''
+  const [loading, setLoading] = useState(false)
+  const [validationLoading, setValidationLoading] = useState<Set<number>>(new Set())
+  const [statistics, setStatistics] = useState({
+    total_seps: 0,
+    valid: 0,
+    invalid: 0,
+    not_checked: 0,
+    expired_soon: 0,
+    suspicious: 0,
+    validation_rate: 0
   })
+  const [filters, setFilters] = useState<FilterOptions>({
+    date_from: '',
+    date_to: '',
+    status: '',
+    validation_status: '',
+    service_type: '',
+    poli_id: '',
+    doctor_id: ''
+  })
+  const [showFilters, setShowFilters] = useState(false)
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [selectedSEP, setSelectedSEP] = useState<SEP | null>(null)
+  const [validationResult, setValidationResult] = useState<any>(null)
 
-  // Patient and registration search states
-  const [patientSearchTerm, setPatientSearchTerm] = useState('')
-  const [patientSearchResults, setPatientSearchResults] = useState<any[]>([])
-  const [showPatientDropdown, setShowPatientDropdown] = useState(false)
-  const [selectedPatient, setSelectedPatient] = useState<any | null>(null)
-  const [searchingPatients, setSearchingPatients] = useState(false)
-
-  const [registrationSearchTerm, setRegistrationSearchTerm] = useState('')
-  const [registrationSearchResults, setRegistrationSearchResults] = useState<any[]>([])
-  const [showRegistrationDropdown, setShowRegistrationDropdown] = useState(false)
-  const [selectedRegistration, setSelectedRegistration] = useState<any | null>(null)
-  const [searchingRegistrations, setSearchingRegistrations] = useState(false)
-
-  // TanStack Table states
+  // Table states
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = useState({})
 
-  // Fetch SEPs with pagination
-  const fetchSEPs = async (page = 1, search = '', newPerPage?: number) => {
+  // Fetch SEPs
+  const fetchSEPs = async (newFilters = filters) => {
     try {
       setLoading(true)
-      const params = new URLSearchParams({
-        page: page.toString(),
-        per_page: (newPerPage || perPage).toString(),
-      })
+      const params = new URLSearchParams()
 
-      if (search) {
-        params.append('search', search)
-      }
+      // Add pagination
+      params.append('per_page', '50')
+
+      // Add filters
+      Object.entries(newFilters).forEach(([key, value]) => {
+        if (value) params.append(key, value)
+      })
 
       const response = await api.get(`/api/seps?${params}`)
       if (response.data.success) {
-        const paginationData = response.data.data
-        setSEPs(paginationData.data || [])
-        setCurrentPage(paginationData.current_page || 1)
-        setTotalPages(paginationData.last_page || 1)
-        setTotalRecords(paginationData.total || 0)
-      } else {
-        throw new Error(response.data.message || 'Failed to fetch SEPs')
+        setSEPs(response.data.data.data || [])
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Failed to load SEPs')
-      console.error('Error fetching SEPs:', err)
+    } catch (error: any) {
+      console.error('Error fetching SEPs:', error)
     } finally {
       setLoading(false)
     }
   }
 
+  // Fetch statistics
+  const fetchStatistics = async () => {
+    try {
+      const response = await api.get('/api/seps/statistics')
+      if (response.data.success) {
+        setStatistics(response.data.data)
+      }
+    } catch (error: any) {
+      console.error('Error fetching statistics:', error)
+    }
+  }
+
   useEffect(() => {
     fetchSEPs()
+    fetchStatistics()
   }, [])
 
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSubmitting(true)
-
-    try {
-      const submitData = {
-        patient_id: formData.patient_id,
-        registration_id: formData.registration_id,
-        bpjs_number: formData.bpjs_number,
-        service_type: formData.service_type,
-        diagnosis: formData.diagnosis,
-        notes: formData.notes
-      }
-
-      if (editingSEP) {
-        await api.put(`/api/seps/${editingSEP.id}`, submitData)
-      } else {
-        await api.post('/api/seps', submitData)
-      }
-
-      await fetchSEPs() // Refresh data
-      setShowForm(false)
-      setFormData({
-        patient_id: '',
-        registration_id: '',
-        bpjs_number: '',
-        service_type: '',
-        diagnosis: '',
-        notes: ''
-      })
-      setPatientSearchTerm('')
-      setRegistrationSearchTerm('')
-      setSelectedPatient(null)
-      setSelectedRegistration(null)
-      setEditingSEP(null)
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Failed to save SEP')
-      console.error('Error saving SEP:', err)
-    } finally {
-      setSubmitting(false)
-    }
+  // Handle filter changes
+  const handleFilterChange = (key: keyof FilterOptions, value: string) => {
+    setFilters(prev => ({ ...prev, [key]: value }))
   }
 
-  // Handle input changes
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
+  const applyFilters = () => {
+    fetchSEPs()
   }
 
-  // Open form
-  const handleTambah = () => {
-    setFormData({
-      patient_id: '',
-      registration_id: '',
-      bpjs_number: '',
+  const resetFilters = () => {
+    setFilters({
+      date_from: '',
+      date_to: '',
+      status: '',
+      validation_status: '',
       service_type: '',
-      diagnosis: '',
-      notes: ''
+      poli_id: '',
+      doctor_id: ''
     })
-    setEditingSEP(null)
-    setPatientSearchTerm('')
-    setRegistrationSearchTerm('')
-    setSelectedPatient(null)
-    setSelectedRegistration(null)
-    setShowForm(true)
-  }
-
-  // Close form
-  const handleCloseForm = () => {
-    setShowForm(false)
-    setPatientSearchTerm('')
-    setRegistrationSearchTerm('')
-    setSelectedPatient(null)
-    setSelectedRegistration(null)
-  }
-
-  // Search patients
-  const searchPatients = async (query: string) => {
-    if (query.length < 2) return
-
-    setSearchingPatients(true)
-    try {
-      const response = await api.get(`/api/patients-search?q=${encodeURIComponent(query)}`)
-      if (response.data.success) {
-        setPatientSearchResults(response.data.data || [])
-      }
-    } catch (err: any) {
-      console.error('Error searching patients:', err)
-      setPatientSearchResults([])
-    } finally {
-      setSearchingPatients(false)
-    }
-  }
-
-  // Search registrations
-  const searchRegistrations = async (query: string) => {
-    if (query.length < 2) return
-
-    setSearchingRegistrations(true)
-    try {
-      const response = await api.get(`/api/registrations?search=${encodeURIComponent(query)}&per_page=10`)
-      if (response.data.success) {
-        setRegistrationSearchResults(response.data.data.data || [])
-      }
-    } catch (err: any) {
-      console.error('Error searching registrations:', err)
-      setRegistrationSearchResults([])
-    } finally {
-      setSearchingRegistrations(false)
-    }
-  }
-
-  // Handle edit SEP
-  const handleEdit = (sep: SEP) => {
-    setEditingSEP(sep)
-    setFormData({
-      patient_id: sep.patient_id.toString(),
-      registration_id: sep.registration_id.toString(),
-      bpjs_number: sep.bpjs_number,
-      service_type: sep.service_type,
-      diagnosis: sep.diagnosis,
-      notes: sep.notes || ''
+    fetchSEPs({
+      date_from: '',
+      date_to: '',
+      status: '',
+      validation_status: '',
+      service_type: '',
+      poli_id: '',
+      doctor_id: ''
     })
-    const patient = sep.patient
-    const registration = sep.registration
-    const patientName = patient?.name || 'N/A'
-    const patientMRN = patient?.mrn || 'N/A'
-    const registrationNo = registration?.registration_no || 'N/A'
-
-    setPatientSearchTerm(`${patientName} - ${patientMRN}`)
-    setRegistrationSearchTerm(`${registrationNo} - ${patientName}`)
-    setSelectedPatient(patient || null)
-    setSelectedRegistration(registration || null)
-    setShowForm(true)
   }
 
-  // Handle delete SEP
-  const handleDelete = async (sepId: number) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus SEP ini?')) return
+  // Validation functions
+  const validateSEP = async (sep: SEP) => {
+    if (!sep) return
+
+    setValidationLoading(prev => new Set([...prev, sep.id]))
 
     try {
-      await api.delete(`/api/seps/${sepId}`)
-      await fetchSEPs() // Refresh data
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Failed to delete SEP')
-      console.error('Error deleting SEP:', err)
+      const response = await api.post(`/api/seps/${sep.id}/validate`)
+      if (response.data.success) {
+        await fetchSEPs() // Refresh data
+        await fetchStatistics() // Refresh statistics
+
+        // Show result briefly
+        setValidationResult(response.data.data)
+        setSelectedSEP(sep)
+        setShowDetailModal(true)
+
+        setTimeout(() => setValidationResult(null), 5000)
+      }
+    } catch (error: any) {
+      console.error('Error validating SEP:', error)
+    } finally {
+      setValidationLoading(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(sep.id)
+        return newSet
+      })
     }
   }
 
-  // Handle print SEP
-  const handleCetak = (sep: SEP) => {
-    // Create print content for SEP
-    const patientName = sep.patient?.name || 'N/A'
-    const patientMRN = sep.patient?.mrn || 'N/A'
-    const statusText = sep.status === 'active' ? 'AKTIF' :
-                      sep.status === 'inactive' ? 'NONAKTIF' :
-                      sep.status === 'rejected' ? 'DITOLAK' : 'N/A'
+  const bulkValidateSEPs = async (sepIds: number[]) => {
+    try {
+      const response = await api.post('/api/seps/bulk-validate', { sep_ids: sepIds })
+      if (response.data.success) {
+        await fetchSEPs()
+        await fetchStatistics()
+      }
+    } catch (error: any) {
+      console.error('Error bulk validating SEPs:', error)
+    }
+  }
 
+  const flagSuspiciousSEP = async (sep: SEP, reason: string) => {
+    try {
+      await api.post(`/api/seps/${sep.id}/flag-suspicious`, { reason })
+      await fetchSEPs()
+      await fetchStatistics()
+    } catch (error: any) {
+      console.error('Error flagging suspicious SEP:', error)
+    }
+  }
+
+  // Export functions
+  const exportToExcel = () => {
+    // Implementation for Excel export
+    console.log('Export to Excel')
+  }
+
+  const exportToPDF = () => {
+    // Implementation for PDF export
+    console.log('Export to PDF')
+  }
+
+  // Print SEP
+  const printSEP = (sep: SEP) => {
     const printContent = `
       <!DOCTYPE html>
       <html>
         <head>
-          <title>SEP - ${patientName}</title>
+          <title>SEP - ${sep.patient?.name || 'N/A'}</title>
           <style>
-            body {
-              font-family: 'Arial', sans-serif;
-              margin: 0;
-              padding: 20px;
-              background: white;
-            }
-            .sep {
-              max-width: 400px;
-              margin: 0 auto;
-              border: 2px solid #2563eb;
-              border-radius: 10px;
-              padding: 20px;
-              background: white;
-            }
-            .header {
-              text-align: center;
-              border-bottom: 2px solid #2563eb;
-              padding-bottom: 10px;
-              margin-bottom: 15px;
-            }
-            .hospital-name {
-              font-size: 16px;
-              font-weight: bold;
-              color: #2563eb;
-              margin-bottom: 3px;
-            }
-            .sep-title {
-              font-size: 12px;
-              color: #666;
-            }
-            .sep-number {
-              text-align: center;
-              font-size: 24px;
-              font-weight: bold;
-              color: #2563eb;
-              margin: 15px 0;
-              padding: 10px;
-              background: #f0f9ff;
-              border-radius: 8px;
-              border: 2px solid #2563eb;
-            }
-            .info-section {
-              margin-bottom: 15px;
-            }
-            .info-row {
-              display: flex;
-              margin-bottom: 6px;
-            }
-            .label {
-              font-weight: bold;
-              width: 100px;
-              color: #333;
-              font-size: 11px;
-            }
-            .value {
-              color: #666;
-              font-size: 11px;
-            }
-            .service-type {
-              text-align: center;
-              font-weight: bold;
-              color: #2563eb;
-              margin: 15px 0;
-              padding: 8px;
-              background: #f8fafc;
-              border-radius: 5px;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 15px;
-              font-size: 10px;
-              color: #999;
-              border-top: 1px solid #eee;
-              padding-top: 10px;
-            }
-            .status {
-              text-align: center;
-              margin: 10px 0;
-              padding: 5px;
-              border-radius: 4px;
-              font-weight: bold;
-              font-size: 12px;
-            }
-            .status-active { background: #dcfce7; color: #166534; }
-            .status-inactive { background: #f3f4f6; color: #374151; }
-            .status-rejected { background: #fee2e2; color: #dc2626; }
-            @media print {
-              body { margin: 0; }
-              .sep { border: none; max-width: none; }
-            }
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .sep { max-width: 600px; margin: 0 auto; border: 2px solid #2563eb; padding: 20px; }
+            .header { text-align: center; border-bottom: 2px solid #2563eb; padding-bottom: 10px; margin-bottom: 15px; }
+            .hospital-name { font-size: 18px; font-weight: bold; color: #2563eb; }
+            .sep-title { font-size: 12px; color: #666; }
+            .sep-number { text-align: center; font-size: 28px; font-weight: bold; color: #2563eb; margin: 15px 0; padding: 15px; background: #f0f9ff; border-radius: 8px; }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+            .info-item { margin-bottom: 5px; }
+            .label { font-weight: bold; color: #333; }
+            .value { color: #666; }
+            .service-type { text-align: center; font-weight: bold; color: #2563eb; margin: 15px 0; padding: 10px; background: #f8fafc; border-radius: 5px; }
+            .validation-status { text-align: center; margin: 15px 0; padding: 8px; border-radius: 5px; font-weight: bold; }
+            .valid { background: #dcfce7; color: #166534; }
+            .invalid { background: #fee2e2; color: #dc2626; }
+            .not-checked { background: #fef3c7; color: #92400e; }
+            .footer { text-align: center; margin-top: 20px; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
           </style>
         </head>
         <body>
@@ -397,22 +267,30 @@ export default function SEPPatientPage() {
               ${sep.sep_number}
             </div>
 
-            <div class="info-section">
-              <div class="info-row">
-                <span class="label">Nama:</span>
-                <span class="value">${patientName}</span>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="label">Nama Pasien:</span><br>
+                <span class="value">${sep.patient?.name || 'N/A'}</span>
               </div>
-              <div class="info-row">
-                <span class="label">MRN:</span>
-                <span class="value">${patientMRN}</span>
+              <div class="info-item">
+                <span class="label">No. MRN:</span><br>
+                <span class="value">${sep.patient?.mrn || 'N/A'}</span>
               </div>
-              <div class="info-row">
-                <span class="label">BPJS:</span>
+              <div class="info-item">
+                <span class="label">No. BPJS:</span><br>
                 <span class="value">${sep.bpjs_number}</span>
               </div>
-              <div class="info-row">
-                <span class="label">Diagnosis:</span>
-                <span class="value">${sep.diagnosis}</span>
+              <div class="info-item">
+                <span class="label">No. Registrasi:</span><br>
+                <span class="value">${sep.registration?.registration_no || 'N/A'}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">DPJP:</span><br>
+                <span class="value">${sep.dpjp?.name || 'N/A'}</span>
+              </div>
+              <div class="info-item">
+                <span class="label">Poli:</span><br>
+                <span class="value">${sep.poli?.name || 'N/A'}</span>
               </div>
             </div>
 
@@ -420,12 +298,28 @@ export default function SEPPatientPage() {
               ${sep.service_type}
             </div>
 
-            <div class="status status-${sep.status}">
-              ${statusText}
+            <div class="validation-status ${sep.validation_status.replace('_', '-') || 'not-checked'}">
+              Status Validasi: ${sep.validation_badge[0] || 'Belum Dicek'}
             </div>
 
+            <div style="margin-top: 15px;">
+              <span class="label">Diagnosa:</span><br>
+              <span class="value">${sep.diagnosis}</span>
+            </div>
+
+            <div style="margin-top: 10px;">
+              <span class="label">Tanggal Pembuatan:</span>
+              <span class="value">${new Date(sep.created_at).toLocaleDateString('id-ID')}</span>
+            </div>
+
+            ${sep.validated_at ? `
+            <div style="margin-top: 5px;">
+              <span class="label">Terakhir Divalidasi:</span>
+              <span class="value">${new Date(sep.validated_at).toLocaleDateString('id-ID')}</span>
+            </div>
+            ` : ''}
+
             <div class="footer">
-              <div>Dibuat pada: ${new Date(sep.created_at).toLocaleString('id-ID')}</div>
               <div>Dicetak pada: ${new Date().toLocaleString('id-ID')}</div>
               <div>SEP ini berlaku untuk pelayanan kesehatan sesuai ketentuan BPJS</div>
             </div>
@@ -434,216 +328,158 @@ export default function SEPPatientPage() {
       </html>
     `
 
-    // Open print window
-    const printWindow = window.open('', '_blank', 'width=500,height=700')
+    const printWindow = window.open('', '_blank', 'width=800,height=600')
     if (printWindow) {
       printWindow.document.write(printContent)
       printWindow.document.close()
       printWindow.focus()
-
-      // Wait for content to load then print
-      printWindow.onload = () => {
-        printWindow.print()
-        printWindow.close()
-      }
-    } else {
-      alert('Popup blocker mungkin aktif. Silakan izinkan popup untuk mencetak SEP.')
+      printWindow.print()
     }
   }
 
-  // Filter SEPs based on search
-  const filteredSEPs = seps.filter(sep => {
-    const patient = sep.patient
-    const searchLower = searchTerm.toLowerCase()
-    return (
-      (patient?.name || '').toLowerCase().includes(searchLower) ||
-      (patient?.mrn || '').toLowerCase().includes(searchLower) ||
-      sep.sep_number.toLowerCase().includes(searchLower)
-    )
-  })
-
-  // Helper functions
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-      case 'inactive': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-      case 'rejected': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-    }
-  }
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'active': return 'Aktif'
-      case 'inactive': return 'Nonaktif'
-      case 'rejected': return 'Ditolak'
-      default: return status
-    }
-  }
-
-  const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString)
-    return {
-      date: date.toLocaleDateString('id-ID'),
-      time: date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
-    }
-  }
-
-  // TanStack Table column definitions
+  // Table columns
   const columns = useMemo<ColumnDef<SEP>[]>(() => [
-    {
-      accessorKey: 'patient.name',
-      header: ({ column }) => (
-        <div className="flex items-center gap-2 cursor-pointer select-none" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-          <span>Nama Pasien</span>
-          <div className="flex flex-col">
-            {column.getIsSorted() === 'asc' ? <FaSortUp className="text-blue-500" /> :
-             column.getIsSorted() === 'desc' ? <FaSortDown className="text-blue-500" /> :
-             <FaSort className="text-gray-400" />}
-          </div>
-        </div>
-      ),
-      cell: ({ row }) => {
-        const patient = row.original.patient
-        return (
-          <div className="flex flex-col">
-            <span className="font-medium">{patient?.name || 'N/A'}</span>
-            <span className="text-xs text-gray-500 md:hidden">{patient?.mrn || 'N/A'}</span>
-          </div>
-        )
-      },
-      filterFn: 'includesString',
-    },
-    {
-      accessorKey: 'patient.mrn',
-      header: 'No. Rekam Medis',
-      cell: ({ row }) => {
-        const patient = row.original.patient
-        return (
-          <span className="hidden md:inline">{patient?.mrn || 'N/A'}</span>
-        )
-      },
-      filterFn: 'includesString',
-    },
     {
       accessorKey: 'sep_number',
       header: ({ column }) => (
         <div className="flex items-center gap-2 cursor-pointer select-none" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
           <span>No. SEP</span>
-          <div className="flex flex-col">
-            {column.getIsSorted() === 'asc' ? <FaSortUp className="text-blue-500" /> :
-             column.getIsSorted() === 'desc' ? <FaSortDown className="text-blue-500" /> :
-             <FaSort className="text-gray-400" />}
-          </div>
         </div>
       ),
       cell: ({ row }) => (
-        <span className="font-medium font-mono">{row.original.sep_number}</span>
+        <span className="font-mono font-medium">{row.original.sep_number}</span>
       ),
-      filterFn: 'includesString',
     },
     {
       accessorKey: 'created_at',
       header: ({ column }) => (
         <div className="flex items-center gap-2 cursor-pointer select-none" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-          <span>Tanggal</span>
-          <div className="flex flex-col">
-            {column.getIsSorted() === 'asc' ? <FaSortUp className="text-blue-500" /> :
-             column.getIsSorted() === 'desc' ? <FaSortDown className="text-blue-500" /> :
-             <FaSort className="text-gray-400" />}
-          </div>
+          <span>Tanggal SEP</span>
         </div>
       ),
       cell: ({ row }) => (
-        <span className="hidden sm:inline">{formatDateTime(row.original.created_at).date}</span>
+        <span>{new Date(row.original.created_at).toLocaleDateString('id-ID')}</span>
       ),
-      sortingFn: 'datetime',
     },
     {
-      accessorKey: 'service_type',
-      header: ({ column }) => (
-        <div className="flex items-center gap-2 cursor-pointer select-none" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-          <span>Jenis Pelayanan</span>
-          <div className="flex flex-col">
-            {column.getIsSorted() === 'asc' ? <FaSortUp className="text-blue-500" /> :
-             column.getIsSorted() === 'desc' ? <FaSortDown className="text-blue-500" /> :
-             <FaSort className="text-gray-400" />}
-          </div>
+      accessorKey: 'bpjs_number',
+      header: 'No. Kartu BPJS',
+      cell: ({ row }) => (
+        <span className="font-mono">{row.original.bpjs_number}</span>
+      ),
+    },
+    {
+      accessorKey: 'patient.name',
+      header: 'Nama Pasien',
+      cell: ({ row }) => (
+        <div>
+          <div className="font-medium">{row.original.patient?.name || 'N/A'}</div>
+          <div className="text-sm text-gray-500">{row.original.patient?.mrn || 'N/A'}</div>
         </div>
       ),
+    },
+    {
+      accessorKey: 'poli.name',
+      header: 'Poli',
       cell: ({ row }) => (
-        <span>{row.original.service_type}</span>
+        <span>{row.original.poli?.name || 'N/A'}</span>
       ),
-      filterFn: 'includesString',
     },
     {
       accessorKey: 'diagnosis',
-      header: ({ column }) => (
-        <div className="flex items-center gap-2 cursor-pointer select-none" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-          <span>Diagnosis</span>
-          <div className="flex flex-col">
-            {column.getIsSorted() === 'asc' ? <FaSortUp className="text-blue-500" /> :
-             column.getIsSorted() === 'desc' ? <FaSortDown className="text-blue-500" /> :
-             <FaSort className="text-gray-400" />}
-          </div>
-        </div>
-      ),
+      header: 'Diagnosa',
       cell: ({ row }) => (
-        <span className="hidden md:inline">{row.original.diagnosis}</span>
+        <span className="truncate max-w-32" title={row.original.diagnosis}>{row.original.diagnosis}</span>
       ),
-      filterFn: 'includesString',
+    },
+    {
+      accessorKey: 'dpjp.name',
+      header: 'DPJP',
+      cell: ({ row }) => (
+        <span>{row.original.dpjp?.name || 'N/A'}</span>
+      ),
     },
     {
       accessorKey: 'status',
-      header: ({ column }) => (
-        <div className="flex items-center gap-2 cursor-pointer select-none" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
-          <span>Status</span>
-          <div className="flex flex-col">
-            {column.getIsSorted() === 'asc' ? <FaSortUp className="text-blue-500" /> :
-             column.getIsSorted() === 'desc' ? <FaSortDown className="text-blue-500" /> :
-             <FaSort className="text-gray-400" />}
+      header: 'Status',
+      cell: ({ row }) => {
+        const status = row.original.status
+        const expiryClass = row.original.is_expired ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+        return (
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${expiryClass}`}>
+            {status === 'active' ? 'Aktif' :
+             status === 'inactive' ? 'Nonaktif' :
+             status === 'cancelled' ? 'Dibatalkan' :
+             status === 'expired' ? 'Kadaluarsa' : status}
+          </span>
+        )
+      },
+    },
+    {
+      accessorKey: 'validation_status',
+      header: 'Status Validasi',
+      cell: ({ row }) => {
+        const [text, color] = row.original.validation_badge || ['N/A', 'gray']
+        const isLoading = validationLoading.has(row.original.id)
+
+        return (
+          <div className="flex items-center gap-2">
+            <span className={`px-2 py-1 rounded-full text-xs font-medium bg-${color}-100 text-${color}-800`}>
+              {text}
+            </span>
+            {isLoading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>}
           </div>
-        </div>
-      ),
-      cell: ({ row }) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(row.original.status)}`}>
-          {getStatusText(row.original.status)}
-        </span>
-      ),
-      filterFn: 'includesString',
+        )
+      },
     },
     {
       id: 'actions',
       header: 'Aksi',
       cell: ({ row }) => (
-        <div className="flex justify-end gap-1">
+        <div className="flex items-center gap-1">
           <button
-            onClick={() => handleCetak(row.original)}
-            className="p-2 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition"
+            onClick={() => validateSEP(row.original)}
+            disabled={validationLoading.has(row.original.id)}
+            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded disabled:opacity-50"
+            title="Validasi SEP"
+          >
+            <FaCheckCircle />
+          </button>
+          <button
+            onClick={() => {
+              setSelectedSEP(row.original)
+              setShowDetailModal(true)
+            }}
+            className="p-1.5 text-gray-600 hover:bg-gray-50 rounded"
+            title="Lihat Detail"
+          >
+            <FaEye />
+          </button>
+          <button
+            onClick={() => printSEP(row.original)}
+            className="p-1.5 text-green-600 hover:bg-green-50 rounded"
             title="Cetak SEP"
           >
             <FaPrint />
           </button>
-          <button
-            onClick={() => handleEdit(row.original)}
-            className="p-2 text-gray-500 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition"
-            title="Edit SEP"
-          >
-            <FaEdit />
-          </button>
-          <button
-            onClick={() => handleDelete(row.original.id)}
-            className="p-2 text-white bg-red-500 hover:bg-red-600 border border-red-500 rounded-lg transition"
-            title="Hapus SEP"
-          >
-            <FaTrash />
-          </button>
+          {row.original.is_suspicious && (
+            <button
+              onClick={() => {
+                const reason = prompt('Masukkan alasan menandai sebagai suspicious:')
+                if (reason) flagSuspiciousSEP(row.original, reason)
+              }}
+              className="p-1.5 text-orange-600 hover:bg-orange-50 rounded"
+              title="Tandai Suspicious"
+            >
+              <FaExclamationTriangle />
+            </button>
+          )}
         </div>
       ),
     },
-  ], [])
+  ], [validationLoading])
 
-  // TanStack Table instance
+  // Table instance
   const table = useReactTable({
     data: seps,
     columns,
@@ -661,516 +497,379 @@ export default function SEPPatientPage() {
       columnVisibility,
       rowSelection,
     },
-    initialState: {
-      pagination: {
-        pageSize: perPage,
-      },
-    },
   })
 
-  if (loading) {
-    return (
-      <div className="min-h-screen p-4 md:p-8 transition-all duration-500 bg-gradient-to-br from-gray-100 via-white to-gray-50 dark:from-zinc-950 dark:via-neutral-900 dark:to-zinc-800 text-gray-900 dark:text-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <FaSpinner className="mx-auto text-4xl text-blue-500 animate-spin mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Memuat data SEP...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen p-4 md:p-8 transition-all duration-500 bg-gradient-to-br from-gray-100 via-white to-gray-50 dark:from-zinc-950 dark:via-neutral-900 dark:to-zinc-800 text-gray-900 dark:text-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <FaExclamationTriangle className="mx-auto text-4xl text-red-500 mb-4" />
-          <h2 className="text-xl font-bold mb-2">Terjadi Kesalahan</h2>
-          <p className="text-gray-600 dark:text-gray-400">{error}</p>
-        </div>
-      </div>
-    )
-  }
+  // Get selected rows for bulk actions
+  const selectedRows = table.getFilteredSelectedRowModel().rows.map(row => row.original)
 
   return (
-    <div className="min-h-screen p-4 md:p-8 transition-all duration-500 bg-gradient-to-br from-gray-100 via-white to-gray-50 dark:from-zinc-950 dark:via-neutral-900 dark:to-zinc-800 text-gray-900 dark:text-gray-100">
-      <h1 className="text-2xl md:text-3xl font-bold mb-6 tracking-wide flex items-center gap-3">
-        <FaShieldAlt className="text-blue-500" />
-        <span className="truncate">Surat Eligibilitas Peserta (SEP)</span>
-      </h1>
+    <div className="min-h-screen p-4 md:p-8 bg-gradient-to-br from-gray-100 via-white to-gray-50 dark:from-zinc-950 dark:via-neutral-900 dark:to-zinc-800 text-gray-900 dark:text-gray-100">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-wide flex items-center gap-3">
+          <FaShieldAlt className="text-blue-500" />
+          <span>SEP Validation & Monitoring</span>
+        </h1>
 
-      <div className="bg-white/70 dark:bg-zinc-900/60 border border-gray-200 dark:border-zinc-800 backdrop-blur-md shadow-xl rounded-2xl p-4 md:p-6 mb-6">
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <FaSearch className="text-gray-400" />
-            </div>
-            <input
-              type="text"
-              placeholder="Cari SEP..."
-              className="w-full pl-10 px-4 py-2 rounded-lg border border-gray-300 dark:border-zinc-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+        <div className="flex flex-wrap gap-2">
           <button
-            onClick={handleTambah}
-            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold transition flex items-center justify-center gap-2"
+            onClick={() => setShowFilters(!showFilters)}
+            className="px-4 py-2 bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-600 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800 flex items-center gap-2"
           >
-            <FaShieldAlt />
-            <span className="hidden sm:inline">Buat SEP Baru</span>
-            <span className="sm:hidden">SEP Baru</span>
+            <FaFilter className="text-sm" />
+            Filter
+          </button>
+
+          <button
+            onClick={exportToExcel}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center gap-2"
+          >
+            <FaDownload />
+            Excel
+          </button>
+
+          <button
+            onClick={exportToPDF}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center gap-2"
+          >
+            <FaDownload />
+            PDF
           </button>
         </div>
+      </div>
 
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 border border-gray-200 dark:border-zinc-700">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Total SEP</p>
+              <p className="text-2xl font-bold">{statistics.total_seps}</p>
+            </div>
+            <FaChartBar className="text-blue-500 h-6 w-6" />
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 border border-gray-200 dark:border-zinc-700">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Valid</p>
+              <p className="text-2xl font-bold text-green-600">{statistics.valid}</p>
+              <p className="text-sm text-gray-500">({Math.round(statistics.validation_rate)}%)</p>
+            </div>
+            <FaCheckCircle className="text-green-500 h-6 w-6" />
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 border border-gray-200 dark:border-zinc-700">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Belum Dicek</p>
+              <p className="text-2xl font-bold text-yellow-600">{statistics.not_checked}</p>
+            </div>
+            <FaClock className="text-yellow-500 h-6 w-6" />
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 border border-gray-200 dark:border-zinc-700">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Kadaluarsa 3 Hari</p>
+              <p className="text-2xl font-bold text-red-600">{statistics.expired_soon}</p>
+            </div>
+            <FaExclamationTriangle className="text-red-500 h-6 w-6" />
+          </div>
+        </div>
+      </div>
+
+      {/* Filters Panel */}
+      {showFilters && (
+        <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 mb-6 border border-gray-200 dark:border-zinc-700">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Tanggal Dari</label>
+              <input
+                type="date"
+                value={filters.date_from}
+                onChange={(e) => handleFilterChange('date_from', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Tanggal Sampai</label>
+              <input
+                type="date"
+                value={filters.date_to}
+                onChange={(e) => handleFilterChange('date_to', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Status SEP</label>
+              <select
+                value={filters.status}
+                onChange={(e) => handleFilterChange('status', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800"
+              >
+                <option value="">Semua Status</option>
+                <option value="active">Aktif</option>
+                <option value="inactive">Nonaktif</option>
+                <option value="cancelled">Dibatalkan</option>
+                <option value="expired">Kadaluarsa</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Status Validasi</label>
+              <select
+                value={filters.validation_status}
+                onChange={(e) => handleFilterChange('validation_status', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800"
+              >
+                <option value="">Semua</option>
+                <option value="valid">Valid</option>
+                <option value="invalid">Invalid</option>
+                <option value="not_checked">Belum Dicek</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Jenis Pelayanan</label>
+              <select
+                value={filters.service_type}
+                onChange={(e) => handleFilterChange('service_type', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800"
+              >
+                <option value="">Semua</option>
+                <option value="Rawat Jalan">Rawat Jalan</option>
+                <option value="Rawat Inap">Rawat Inap</option>
+                <option value="Rawat Darurat">Rawat Darurat</option>
+                <option value="Prosedur">Prosedur</option>
+              </select>
+            </div>
+
+            <div className="lg:col-span-2">
+              <label className="block text-sm font-medium mb-1 opacity-0">Actions</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={applyFilters}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                >
+                  Terapkan
+                </button>
+                <button
+                  onClick={resetFilters}
+                  className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Actions */}
+      {selectedRows.length > 0 && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-6">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">
+              {selectedRows.length} SEP dipilih
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => bulkValidateSEPs(selectedRows.map(s => s.id))}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm"
+              >
+                Validasi Terpilih
+              </button>
+              <button
+                onClick={() => setRowSelection({})}
+                className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-sm"
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-gray-200 dark:border-zinc-700 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
+          <table className="w-full">
+            <thead className="bg-gray-50 dark:bg-zinc-800">
               {table.getHeaderGroups().map((headerGroup) => (
-                <tr key={headerGroup.id} className="border-b border-gray-200 dark:border-zinc-700 text-left">
+                <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
-                    <th key={header.id} className="py-3 px-2">
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
+                    <th
+                      key={header.id}
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                    >
+                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                     </th>
                   ))}
                 </tr>
               ))}
             </thead>
-            <tbody>
-              {table.getRowModel().rows?.length ? (
+            <tbody className="divide-y divide-gray-200 dark:divide-zinc-700">
+              {loading ? (
+                <tr>
+                  <td colSpan={columns.length} className="px-4 py-8 text-center">
+                    <div className="flex justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                    </div>
+                  </td>
+                </tr>
+              ) : seps.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length} className="px-4 py-8 text-center text-gray-500">
+                    Tidak ada data SEP ditemukan
+                  </td>
+                </tr>
+              ) : (
                 table.getRowModel().rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="border-b border-gray-200 dark:border-zinc-800 hover:bg-indigo-500/10 dark:hover:bg-indigo-400/10 transition"
-                  >
+                  <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-zinc-800">
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="py-3 px-2">
+                      <td key={cell.id} className="px-4 py-3">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
                   </tr>
                 ))
-              ) : (
-                <tr>
-                  <td colSpan={columns.length} className="h-24 text-center">
-                    Tidak ada data SEP.
-                  </td>
-                </tr>
               )}
             </tbody>
           </table>
         </div>
 
-        {filteredSEPs.length === 0 && (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            <FaShieldAlt className="mx-auto text-4xl mb-2" />
-            <p>Tidak ada SEP yang ditemukan</p>
-          </div>
-        )}
-
-        {/* Pagination Controls */}
-        {totalPages > 1 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Menampilkan {((currentPage - 1) * perPage) + 1} - {Math.min(currentPage * perPage, totalRecords)} dari {totalRecords} SEP
+        {/* Pagination */}
+        {seps.length > 0 && (
+          <div className="px-4 py-3 border-t border-gray-200 dark:border-zinc-700 flex items-center justify-between">
+            <div className="text-sm text-gray-500">
+              Menampilkan {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} hingga{' '}
+              {Math.min((table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize, seps.length)} dari {seps.length} hasil
             </div>
-
-            <div className="flex items-center gap-2">
-              {/* Previous Button */}
+            <div className="flex gap-2">
               <button
-                onClick={() => fetchSEPs(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                onClick={() => table.previousPage()}
+                disabled={!table.getCanPreviousPage()}
+                className="px-3 py-1 border border-gray-300 dark:border-zinc-600 rounded text-sm disabled:opacity-50"
               >
-                ‹ Sebelumnya
+                Sebelumnya
               </button>
-
-              {/* Page Numbers */}
-              <div className="flex gap-1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum
-                  if (totalPages <= 5) {
-                    pageNum = i + 1
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i
-                  } else {
-                    pageNum = currentPage - 2 + i
-                  }
-
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => fetchSEPs(pageNum)}
-                      className={`px-3 py-2 border rounded-lg transition ${
-                        currentPage === pageNum
-                          ? 'bg-indigo-600 text-white border-indigo-600'
-                          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  )
-                })}
-              </div>
-
-              {/* Next Button */}
               <button
-                onClick={() => fetchSEPs(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                onClick={() => table.nextPage()}
+                disabled={!table.getCanNextPage()}
+                className="px-3 py-1 border border-gray-300 dark:border-zinc-600 rounded text-sm disabled:opacity-50"
               >
-                Selanjutnya ›
+                Selanjutnya
               </button>
-            </div>
-
-            {/* Per Page Selector */}
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-600 dark:text-gray-400">Tampilkan:</span>
-              <select
-                title="Jumlah data per halaman"
-                value={perPage}
-                onChange={(e) => {
-                  const newPerPage = Number(e.target.value)
-                  setPerPage(newPerPage)
-                  setCurrentPage(1)
-                  fetchSEPs(1, '', newPerPage)
-                }}
-                className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200"
-              >
-                <option value={5}>5</option>
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
-              <span className="text-gray-600 dark:text-gray-400">per halaman</span>
             </div>
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white/70 dark:bg-zinc-900/60 border border-gray-200 dark:border-zinc-800 backdrop-blur-md shadow-xl rounded-2xl p-4 md:p-6">
-          <h2 className="text-lg md:text-xl font-bold mb-4">Statistik SEP</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
-              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-300">Aktif</p>
-              <p className="text-lg md:text-2xl font-bold">
-                {seps.filter(s => s.status === 'active').length}
-              </p>
-            </div>
-            <div className="bg-gray-50 dark:bg-gray-900/30 p-3 rounded-lg">
-              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-300">Nonaktif</p>
-              <p className="text-lg md:text-2xl font-bold">
-                {seps.filter(s => s.status === 'inactive').length}
-              </p>
-            </div>
-            <div className="bg-red-50 dark:bg-red-900/30 p-3 rounded-lg">
-              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-300">Ditolak</p>
-              <p className="text-lg md:text-2xl font-bold">
-                {seps.filter(s => s.status === 'rejected').length}
-              </p>
-            </div>
-            <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
-              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-300">Total SEP</p>
-              <p className="text-lg md:text-2xl font-bold">{seps.length}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white/70 dark:bg-zinc-900/60 border border-gray-200 dark:border-zinc-800 backdrop-blur-md shadow-xl rounded-2xl p-4 md:p-6">
-          <h2 className="text-lg md:text-xl font-bold mb-4">Rekap Jenis Pelayanan</h2>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span>Rawat Jalan</span>
-              <span className="font-bold">15</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span>Rawat Inap</span>
-              <span className="font-bold">8</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span>Rawat Darurat</span>
-              <span className="font-bold">5</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span>Prosedur</span>
-              <span className="font-bold">3</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Modal Form */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-[9999]">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      {/* Detail Modal */}
+      {showDetailModal && selectedSEP && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-                  {editingSEP ? 'Edit SEP' : 'Buat SEP Baru'}
-                </h2>
+                <h3 className="text-xl font-bold">Detail SEP</h3>
                 <button
-                  onClick={handleCloseForm}
-                  className="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white text-2xl transition"
+                  onClick={() => setShowDetailModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
                 >
-                  &times;
+                  <FaTimes />
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit}>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Patient Search */}
-                  <div className="lg:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Cari Pasien *
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Ketik nama atau MRN pasien..."
-                        value={patientSearchTerm}
-                        onChange={(e) => {
-                          setPatientSearchTerm(e.target.value)
-                          setShowPatientDropdown(true)
-                          if (e.target.value.length > 1) {
-                            searchPatients(e.target.value)
-                          } else {
-                            setPatientSearchResults([])
-                          }
-                        }}
-                        onFocus={() => setShowPatientDropdown(true)}
-                        className="w-full px-3 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-200"
-                      />
-                      <FaSearch className="absolute left-3 top-3 text-gray-400" />
-                      {searchingPatients && (
-                        <FaSpinner className="absolute right-3 top-3 animate-spin text-gray-400" />
-                      )}
-                    </div>
-
-                    {/* Search Results Dropdown */}
-                    {showPatientDropdown && patientSearchResults.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                        {patientSearchResults.map((patient) => (
-                          <div
-                            key={patient.id}
-                            className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer border-b border-gray-200 dark:border-gray-600 last:border-b-0"
-                            onClick={() => {
-                              setSelectedPatient(patient)
-                              setFormData(prev => ({
-                                ...prev,
-                                patient_id: patient.id.toString(),
-                                bpjs_number: patient.bpjs_number || ''
-                              }))
-                              setPatientSearchTerm(`${patient.name} - ${patient.mrn}`)
-                              setShowPatientDropdown(false)
-                            }}
-                          >
-                            <div className="font-medium text-gray-800 dark:text-white">{patient.name}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              MRN: {patient.mrn} | NIK: {patient.nik || 'N/A'}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Selected Patient Display */}
-                    {selectedPatient && (
-                      <div className="mt-2 p-3 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <FaCheckCircle className="text-green-600" />
-                          <div>
-                            <div className="font-medium text-green-800 dark:text-green-200">
-                              Pasien Ditemukan: {selectedPatient.name}
-                            </div>
-                            <div className="text-sm text-green-600 dark:text-green-300">
-                              MRN: {selectedPatient.mrn} | NIK: {selectedPatient.nik || 'N/A'}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* No results message */}
-                    {patientSearchTerm.length > 1 && !searchingPatients && patientSearchResults.length === 0 && showPatientDropdown && (
-                      <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-3 text-center text-gray-500 dark:text-gray-400">
-                        Tidak ada pasien ditemukan
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Registration Search */}
-                  <div className="lg:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Cari Registrasi *
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Ketik nomor registrasi atau nama pasien..."
-                        value={registrationSearchTerm}
-                        onChange={(e) => {
-                          setRegistrationSearchTerm(e.target.value)
-                          setShowRegistrationDropdown(true)
-                          if (e.target.value.length > 1) {
-                            searchRegistrations(e.target.value)
-                          } else {
-                            setRegistrationSearchResults([])
-                          }
-                        }}
-                        onFocus={() => setShowRegistrationDropdown(true)}
-                        className="w-full px-3 py-2 pl-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-200"
-                      />
-                      <FaSearch className="absolute left-3 top-3 text-gray-400" />
-                      {searchingRegistrations && (
-                        <FaSpinner className="absolute right-3 top-3 animate-spin text-gray-400" />
-                      )}
-                    </div>
-
-                    {/* Search Results Dropdown */}
-                    {showRegistrationDropdown && registrationSearchResults.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                        {registrationSearchResults.map((registration) => (
-                          <div
-                            key={registration.id}
-                            className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer border-b border-gray-200 dark:border-gray-600 last:border-b-0"
-                            onClick={() => {
-                              setSelectedRegistration(registration)
-                              setFormData(prev => ({
-                                ...prev,
-                                registration_id: registration.id.toString()
-                              }))
-                              setRegistrationSearchTerm(`${registration.registration_no} - ${registration.patient?.name || 'N/A'}`)
-                              setShowRegistrationDropdown(false)
-                            }}
-                          >
-                            <div className="font-medium text-gray-800 dark:text-white">{registration.registration_no}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              Pasien: {registration.patient?.name || 'N/A'}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Selected Registration Display */}
-                    {selectedRegistration && (
-                      <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <FaCheckCircle className="text-blue-600" />
-                          <div>
-                            <div className="font-medium text-blue-800 dark:text-blue-200">
-                              Registrasi Ditemukan: {selectedRegistration.registration_no}
-                            </div>
-                            <div className="text-sm text-blue-600 dark:text-blue-300">
-                              Pasien: {selectedRegistration.patient?.name || 'N/A'}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* No results message */}
-                    {registrationSearchTerm.length > 1 && !searchingRegistrations && registrationSearchResults.length === 0 && showRegistrationDropdown && (
-                      <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-3 text-center text-gray-500 dark:text-gray-400">
-                        Tidak ada registrasi ditemukan
-                      </div>
-                    )}
-                  </div>
-
-                  {/* BPJS Number */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Nomor BPJS *
-                    </label>
-                    <input
-                      type="text"
-                      name="bpjs_number"
-                      value={formData.bpjs_number}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-200"
-                      placeholder="Masukkan nomor BPJS"
-                      required
-                    />
+                    <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">No. SEP</label>
+                    <p className="text-lg font-mono">{selectedSEP.sep_number}</p>
                   </div>
-
-                  {/* Service Type */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Jenis Pelayanan *
-                    </label>
-                    <select
-                      title="Pilih jenis pelayanan"
-                      name="service_type"
-                      value={formData.service_type}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-200"
-                      required
-                    >
-                      <option value="">Pilih jenis pelayanan</option>
-                      <option value="Rawat Jalan">Rawat Jalan</option>
-                      <option value="Rawat Inap">Rawat Inap</option>
-                      <option value="Rawat Darurat">Rawat Darurat</option>
-                      <option value="Prosedur">Prosedur</option>
-                    </select>
+                    <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">Tanggal SEP</label>
+                    <p>{new Date(selectedSEP.created_at).toLocaleDateString('id-ID')}</p>
                   </div>
-
-                  {/* Diagnosis */}
-                  <div className="lg:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Diagnosis *
-                    </label>
-                    <input
-                      type="text"
-                      name="diagnosis"
-                      value={formData.diagnosis}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-200"
-                      placeholder="Masukkan diagnosis"
-                      required
-                    />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">Nama Pasien</label>
+                    <p>{selectedSEP.patient?.name || 'N/A'}</p>
                   </div>
-
-                  {/* Notes */}
-                  <div className="lg:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Catatan
-                    </label>
-                    <textarea
-                      name="notes"
-                      value={formData.notes}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-200"
-                      placeholder="Catatan tambahan (opsional)"
-                      rows={3}
-                    />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">No. BPJS</label>
+                    <p className="font-mono">{selectedSEP.bpjs_number}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">Jenis Pelayanan</label>
+                    <p>{selectedSEP.service_type}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">Status</label>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      selectedSEP.status === 'active' ? 'bg-green-100 text-green-800' :
+                      selectedSEP.status === 'inactive' ? 'bg-gray-100 text-gray-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {selectedSEP.status === 'active' ? 'Aktif' :
+                       selectedSEP.status === 'inactive' ? 'Nonaktif' :
+                       selectedSEP.status === 'cancelled' ? 'Dibatalkan' :
+                       'Kadaluarsa'}
+                    </span>
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-3 mt-8">
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Diagnosa</label>
+                  <p className="p-3 bg-gray-50 dark:bg-zinc-800 rounded">{selectedSEP.diagnosis}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Status Validasi</label>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      selectedSEP.validation_status === 'valid' ? 'bg-green-100 text-green-800' :
+                      selectedSEP.validation_status === 'invalid' ? 'bg-red-100 text-red-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {selectedSEP.validation_badge[0] || 'Belum Dicek'}
+                    </span>
+                    {validationResult && (
+                      <span className="text-sm text-blue-600">Divalidasi baru saja</span>
+                    )}
+                  </div>
+                </div>
+
+                {selectedSEP.flagged_reason && (
+                  <div>
+                    <label className="block text-sm font-medium text-red-600 mb-1">Alasan Ditandai Suspicious</label>
+                    <p className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
+                      {selectedSEP.flagged_reason}
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-4">
                   <button
-                    type="button"
-                    onClick={handleCloseForm}
-                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    onClick={() => validateSEP(selectedSEP)}
+                    disabled={validationLoading.has(selectedSEP.id)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50"
                   >
-                    Batal
+                    {validationLoading.has(selectedSEP.id) ? 'Memvalidasi...' : 'Validasi Ulang'}
                   </button>
                   <button
-                    type="submit"
-                    disabled={submitting || !selectedPatient || !selectedRegistration}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg flex items-center gap-2"
+                    onClick={() => printSEP(selectedSEP)}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
                   >
-                    {submitting ? <FaSpinner className="animate-spin" /> : <FaCheckCircle />}
-                    {submitting ? 'Menyimpan...' : 'Buat SEP'}
+                    <FaPrint className="inline mr-2" />
+                    Cetak
                   </button>
                 </div>
-              </form>
+              </div>
             </div>
           </div>
         </div>

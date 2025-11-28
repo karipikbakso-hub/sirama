@@ -96,9 +96,6 @@ export default function LoginForm() {
             <p className="text-sm text-gray-400 tracking-wide px-4">
               Sistem Informasi Rumah Sakit Adaptif Modular
             </p>
-            <div className="mt-3 px-3 py-1 bg-green-900/20 border border-green-700/30 rounded-full">
-              <p className="text-xs text-green-300 font-medium">Hospital Information System</p>
-            </div>
           </div>
 
           {/* Form - Server Action */}

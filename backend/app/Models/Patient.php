@@ -12,6 +12,8 @@ class Patient extends Model implements HasMedia
 {
     use InteractsWithMedia;
 
+    protected $table = 'm_pasien';
+
     protected $fillable = [
         'mrn',
         'name',
@@ -22,7 +24,10 @@ class Patient extends Model implements HasMedia
         'address',
         'emergency_contact',
         'bpjs_number',
-        'status'
+        'status',
+        'alergi',
+        'penyakit_kronis',
+        'golongan_darah'
     ];
 
     protected $casts = [

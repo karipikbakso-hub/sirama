@@ -259,7 +259,7 @@ class BackupController extends Controller
     /**
      * Restore from backup
      */
-    public function restoreBackup(Request $request, BackupHistory $history): JsonResponse
+    public function restoreBackup(Request $request, RiwayatBackup $history): JsonResponse
     {
         $request->validate([
             'confirm_restore' => 'required|boolean|accepted',
@@ -282,20 +282,15 @@ class BackupController extends Controller
             // 5. Log the operation
 
             // For demo purposes, we'll simulate the restore process
-            $restoreHistory = BackupHistory::create([
-                'backup_name' => 'Restore from: ' . $history->backup_name,
-                'filename' => $history->filename,
-                'backup_type' => 'restore',
+            $restoreHistory = RiwayatBackup::create([
+                'jadwal_backup_id' => $history->jadwal_backup_id,
+                'nama_file' => 'restore_from_' . $history->nama_file,
                 'status' => 'completed',
-                'started_at' => now(),
-                'completed_at' => now(),
-                'backup_config' => [
-                    'source_backup_id' => $history->id,
-                    'restore_type' => 'full_restore'
-                ],
-                'storage_location' => 'database',
-                'created_by' => 1,
-                'notes' => $request->restore_notes,
+                'ukuran_file' => $history->ukuran_file,
+                'path_file' => $history->path_file,
+                'backup_type' => 'restore',
+                'durasi_detik' => rand(30, 300),
+                'created_at' => now(),
             ]);
 
             return response()->json([
@@ -318,9 +313,9 @@ class BackupController extends Controller
     /**
      * Download backup file
      */
-    public function downloadBackup(BackupHistory $history): JsonResponse
+    public function downloadBackup(RiwayatBackup $history): JsonResponse
     {
-        if ($history->status !== 'completed' || !$history->file_path) {
+        if ($history->status !== 'completed' || !$history->path_file) {
             return response()->json([
                 'success' => false,
                 'message' => 'Backup file not available for download'
@@ -333,10 +328,9 @@ class BackupController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => [
-                    'filename' => $history->filename,
-                    'file_path' => $history->file_path,
-                    'file_size' => $history->file_size_human,
-                    'checksum' => $history->checksum,
+                    'filename' => $history->nama_file,
+                    'file_path' => $history->path_file,
+                    'file_size' => $history->ukuran_file,
                     'download_url' => '/api/backups/download/' . $history->id
                 ],
                 'message' => 'Backup file ready for download'
@@ -347,6 +341,31 @@ class BackupController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to prepare backup download'
+            ], 500);
+        }
+    }
+
+    // ==================== DELETE OPERATIONS ====================
+
+    /**
+     * Delete backup history record
+     */
+    public function deleteBackup(RiwayatBackup $history): JsonResponse
+    {
+        try {
+            // In a real implementation, this would also delete the physical file
+            $history->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Backup berhasil dihapus'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to delete backup', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete backup'
             ], 500);
         }
     }

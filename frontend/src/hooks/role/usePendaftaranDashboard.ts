@@ -1,107 +1,93 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import api from '@/lib/apiData'
+import api from '@/lib/api'
+import type { SuccessResponse } from '@/lib/apiTypes'
 
 // Types for Pendaftaran Dashboard
-export interface PatientStats {
-  totalPatients: number
-  todayRegistrations: number
-  pendingAppointments: number
-  emergencyCases: number
+export interface StatsData {
+  totalKunjunganHariIni: {
+    value: number
+    breakdown: {
+      rawatJalan: number
+      igd: number
+      kontrol: number
+    }
+  }
+  pasienDalamAntrian: {
+    value: number
+    trend: number
+  }
+  pasienBaruHariIni: {
+    value: number
+    vsKemarin: number
+    trend: number
+  }
+  rataRataWaktuLayanan: {
+    value: number
+    target: number
+    status: 'good' | 'warning' | 'critical'
+  }
 }
 
-export interface QueueStats {
-  totalQueue: number
-  servedToday: number
-  averageWaitTime: number
-  longestWaitTime: number
+export interface ChartData {
+  labels: string[]
+  data: Array<{
+    date: string
+    day: string
+    rawatJalan: number
+    igd: number
+    kontrol: number
+    total: number
+  }>
 }
+
+export interface QueueRealtimeData {
+  status: {
+    waiting: number
+    called: number
+    completed: number
+    cancelled: number
+  }
+  avgWaitTime?: number
+  recentQueues: Array<{
+    id: number
+    queueNumber: number
+    patientName: string
+    doctorName: string
+    status: string
+    estimatedTime: number
+    createdAt: string
+  }>
+  lastUpdated: string
+}
+
+export interface PatientTodayDataItem {
+  id: number
+  registrationNumber: string
+  patientName: string
+  patientNik: string
+  serviceType: string
+  doctorName: string
+  status: string
+  queueNumber: string
+  registeredAt: string
+}
+
+export type PatientTodayData = PatientTodayDataItem[]
 
 export interface DashboardStats {
-  patients: PatientStats
-  queues: QueueStats
-  recentActivities: Activity[]
-  alerts: Alert[]
-}
-
-export interface Activity {
-  id: number
-  type: 'registration' | 'appointment' | 'emergency' | 'queue'
-  message: string
-  timestamp: string
-  user: string
-}
-
-export interface Alert {
-  id: number
-  type: 'warning' | 'error' | 'info'
-  message: string
-  timestamp: string
-}
-
-// Mock data for development
-const mockStats: DashboardStats = {
-  patients: {
-    totalPatients: 15420,
-    todayRegistrations: 45,
-    pendingAppointments: 23,
-    emergencyCases: 3
-  },
-  queues: {
-    totalQueue: 28,
-    servedToday: 67,
-    averageWaitTime: 24, // minutes
-    longestWaitTime: 85 // minutes
-  },
-  recentActivities: [
-    {
-      id: 1,
-      type: 'registration',
-      message: 'Pasien baru terdaftar: Ahmad Surya',
-      timestamp: '2025-11-15T10:30:00Z',
-      user: 'Staff Pendaftaran'
-    },
-    {
-      id: 2,
-      type: 'appointment',
-      message: 'Janji temu dikonfirmasi untuk Maya Sari',
-      timestamp: '2025-11-15T10:15:00Z',
-      user: 'Staff Pendaftaran'
-    },
-    {
-      id: 3,
-      type: 'emergency',
-      message: 'Kasus emergency masuk: Rudi Hartono',
-      timestamp: '2025-11-15T09:45:00Z',
-      user: 'IGD Staff'
-    },
-    {
-      id: 4,
-      type: 'queue',
-      message: 'Antrian nomor 15 dipanggil ke poli jantung',
-      timestamp: '2025-11-15T09:30:00Z',
-      user: 'System'
-    }
-  ],
-  alerts: [
-    {
-      id: 1,
-      type: 'warning',
-      message: 'Antrian poli mata melebihi batas normal (15 menit)',
-      timestamp: '2025-11-15T10:00:00Z'
-    },
-    {
-      id: 2,
-      type: 'info',
-      message: 'Backup data harian berhasil dilakukan',
-      timestamp: '2025-11-15T06:00:00Z'
-    }
-  ]
+  stats: StatsData
+  chart: ChartData
+  queueRealtime: QueueRealtimeData
+  patientsToday: PatientTodayData
 }
 
 export function usePendaftaranDashboard() {
-  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [stats, setStats] = useState<StatsData | null>(null)
+  const [chart, setChart] = useState<ChartData | null>(null)
+  const [queueRealtime, setQueueRealtime] = useState<QueueRealtimeData | null>(null)
+  const [patientsToday, setPatientsToday] = useState<PatientTodayData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -114,21 +100,160 @@ export function usePendaftaranDashboard() {
       setLoading(true)
       setError(null)
 
-      // In development, use mock data
-      // In production, uncomment the API call below
-      /*
-      const response = await api.get('/api/dashboard/pendaftaran')
-      setStats(response.data)
-      */
+      // Fetch all dashboard data in parallel with proper error handling
+      const statsPromise = api.get<SuccessResponse<StatsData>>('/api/pendaftaran/dashboard/stats')
+        .then(res => res.data)
+        .catch(err => {
+          console.error('Failed to fetch stats data:', err)
+          return null
+        })
 
-      // Mock data for development - simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500))
-      setStats(mockStats)
+      const chartPromise = api.get<SuccessResponse<ChartData>>('/api/pendaftaran/dashboard/kunjungan-chart')
+        .then(res => res.data)
+        .catch(err => {
+          console.error('Failed to fetch chart data:', err)
+          return null
+        })
+
+      const queuePromise = api.get<SuccessResponse<QueueRealtimeData>>('/api/pendaftaran/dashboard/antrian-realtime')
+        .then(res => res.data)
+        .catch(err => {
+          console.error('Failed to fetch queue data:', err)
+          return null
+        })
+
+      const patientsPromise = api.get<SuccessResponse<PatientTodayData>>('/api/pendaftaran/dashboard/pasien-hari-ini')
+        .then(res => res.data)
+        .catch(err => {
+          console.error('Failed to fetch patients data:', err)
+          return null
+        })
+
+      const [statsRes, chartRes, queueRes, patientsRes] = await Promise.all([
+        statsPromise,
+        chartPromise,
+        queuePromise,
+        patientsPromise
+      ])
+
+      if (statsRes?.success && statsRes.data) {
+        setStats(statsRes.data)
+      }
+
+      if (chartRes?.success && chartRes.data) {
+        setChart(chartRes.data)
+      } else {
+        // Fallback to mock chart data
+        console.warn('Using fallback chart data')
+        setChart({
+          labels: ['07 Des', '08 Des', '09 Des', '10 Des', '11 Des', '12 Des', '13 Des'],
+          data: [
+            { date: '2025-12-07', day: '07 Des', rawatJalan: 25, igd: 3, kontrol: 8, total: 36 },
+            { date: '2025-12-08', day: '08 Des', rawatJalan: 22, igd: 5, kontrol: 6, total: 33 },
+            { date: '2025-12-09', day: '09 Des', rawatJalan: 28, igd: 2, kontrol: 10, total: 40 },
+            { date: '2025-12-10', day: '10 Des', rawatJalan: 30, igd: 4, kontrol: 12, total: 46 },
+            { date: '2025-12-11', day: '11 Des', rawatJalan: 15, igd: 8, kontrol: 7, total: 30 },
+            { date: '2025-12-12', day: '12 Des', rawatJalan: 20, igd: 3, kontrol: 9, total: 32 },
+            { date: '2025-12-13', day: '13 Des', rawatJalan: 18, igd: 2, kontrol: 8, total: 28 }
+          ]
+        })
+      }
+
+      if (queueRes?.success && queueRes.data) {
+        setQueueRealtime(queueRes.data)
+      } else {
+        // Fallback to mock queue data
+        console.warn('Using fallback queue data')
+        setQueueRealtime({
+          status: {
+            waiting: 12,
+            called: 3,
+            completed: 58,
+            cancelled: 2
+          },
+          recentQueues: [
+            {
+              id: 1,
+              queueNumber: 12,
+              patientName: 'Ahmad Surya',
+              doctorName: 'Dr. Sarah Utami',
+              status: 'waiting',
+              estimatedTime: 15,
+              createdAt: new Date().toISOString()
+            },
+            {
+              id: 2,
+              queueNumber: 13,
+              patientName: 'Maya Sari',
+              doctorName: 'Dr. Budi Prabowo',
+              status: 'called',
+              estimatedTime: 5,
+              createdAt: new Date().toISOString()
+            }
+          ],
+          lastUpdated: new Date().toISOString()
+        })
+      }
+
+      if (patientsRes?.success && patientsRes.data) {
+        setPatientsToday(patientsRes.data)
+      } else {
+        // No fallback patients data - will show empty state
+        setPatientsToday([])
+      }
+
       setLoading(false)
 
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to fetch dashboard data')
+      console.error('Error fetching dashboard data:', err)
+      setError(err.response?.data?.message || 'Gagal memuat data dashboard')
       setLoading(false)
+
+      // Set fallback data on error
+      setChart({
+        labels: ['07 Des', '08 Des', '09 Des', '10 Des', '11 Des', '12 Des', '13 Des'],
+        data: [
+          { date: '2025-12-07', day: '07 Des', rawatJalan: 25, igd: 3, kontrol: 8, total: 36 },
+          { date: '2025-12-08', day: '08 Des', rawatJalan: 22, igd: 5, kontrol: 6, total: 33 },
+          { date: '2025-12-09', day: '09 Des', rawatJalan: 28, igd: 2, kontrol: 10, total: 40 },
+          { date: '2025-12-10', day: '10 Des', rawatJalan: 30, igd: 4, kontrol: 12, total: 46 },
+          { date: '2025-12-11', day: '11 Des', rawatJalan: 15, igd: 8, kontrol: 7, total: 30 },
+          { date: '2025-12-12', day: '12 Des', rawatJalan: 20, igd: 3, kontrol: 9, total: 32 },
+          { date: '2025-12-13', day: '13 Des', rawatJalan: 18, igd: 2, kontrol: 8, total: 28 }
+        ]
+      })
+
+      setQueueRealtime({
+        status: {
+          waiting: 12,
+          called: 3,
+          completed: 58,
+          cancelled: 2
+        },
+        recentQueues: [
+          {
+            id: 1,
+            queueNumber: 12,
+            patientName: 'Ahmad Surya',
+            doctorName: 'Dr. Sarah Utami',
+            status: 'waiting',
+            estimatedTime: 15,
+            createdAt: new Date().toISOString()
+          },
+          {
+            id: 2,
+            queueNumber: 13,
+            patientName: 'Maya Sari',
+            doctorName: 'Dr. Budi Prabowo',
+            status: 'called',
+            estimatedTime: 5,
+            createdAt: new Date().toISOString()
+          }
+        ],
+        lastUpdated: new Date().toISOString()
+      })
+
+      setPatientsToday([])
     }
   }
 
@@ -138,84 +263,11 @@ export function usePendaftaranDashboard() {
 
   return {
     stats,
+    chart,
+    queueRealtime,
+    patientsToday,
     loading,
     error,
     refreshData
-  }
-}
-
-// Additional hooks for specific functionalities
-export function usePatientSearch() {
-  const [searchResults, setSearchResults] = useState<any[]>([])
-  const [searching, setSearching] = useState(false)
-
-  const searchPatients = async (query: string) => {
-    if (!query.trim()) {
-      setSearchResults([])
-      return
-    }
-
-    try {
-      setSearching(true)
-      // Mock search results
-      const mockResults = [
-        { id: 1, name: 'Ahmad Surya', nik: '3171234567890001', phone: '+6281234567890' },
-        { id: 2, name: 'Maya Sari', nik: '3171234567890002', phone: '+6281234567891' },
-        { id: 3, name: 'Rudi Hartono', nik: '3171234567890003', phone: '+6281234567892' }
-      ].filter(patient =>
-        patient.name.toLowerCase().includes(query.toLowerCase()) ||
-        patient.nik.includes(query)
-      )
-
-      // Simulate search delay
-      await new Promise(resolve => setTimeout(resolve, 300))
-      setSearchResults(mockResults)
-      setSearching(false)
-
-    } catch (error) {
-      setSearching(false)
-    }
-  }
-
-  return {
-    searchResults,
-    searching,
-    searchPatients
-  }
-}
-
-export function useQueueManagement() {
-  const [currentQueue, setCurrentQueue] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
-
-  const callNextPatient = async (queueId: number) => {
-    try {
-      setLoading(true)
-      // Mock API call - simulate delay
-      await new Promise(resolve => setTimeout(resolve, 500))
-      setLoading(false)
-      // Update queue status
-    } catch (error) {
-      setLoading(false)
-    }
-  }
-
-  const skipPatient = async (queueId: number) => {
-    try {
-      setLoading(true)
-      // Mock API call - simulate delay
-      await new Promise(resolve => setTimeout(resolve, 500))
-      setLoading(false)
-      // Skip patient
-    } catch (error) {
-      setLoading(false)
-    }
-  }
-
-  return {
-    currentQueue,
-    loading,
-    callNextPatient,
-    skipPatient
   }
 }

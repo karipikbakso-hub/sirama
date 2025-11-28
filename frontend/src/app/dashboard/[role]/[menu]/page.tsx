@@ -19,20 +19,22 @@ const components: ComponentMap = {
     'order-rad': dynamic(() => import('../dokter/order-rad/page')),
   },
 
-  // Registration components - menggunakan file yang sudah ada di [role]/[menu]
+  // Registration components - direct menu routes and collapsible children
   pendaftaran: {
+    // Direct menu routes from menuByRole pendaftaran
     registrasi: dynamic(() => import('../pendaftaran/registrasi/page')),
     pasien: dynamic(() => import('../pendaftaran/pasien/page')),
-    antrian: dynamic(() => import('../pendaftaran/antrian/page')),
-    'antrian-management': dynamic(() => import('../pendaftaran/antrian-management/page')),
-    riwayat: dynamic(() => import('../pendaftaran/riwayat/page')),
     'registrasi-igd': dynamic(() => import('../pendaftaran/registrasi-igd/page')),
-    rujukan: dynamic(() => import('../pendaftaran/rujukan/page')),
-    appointment: dynamic(() => import('../pendaftaran/appointment/page')),
     sep: dynamic(() => import('../pendaftaran/sep/page')),
-    'bpjs-integration': dynamic(() => import('../pendaftaran/bpjs-integration/page')),
-    'master-data': dynamic(() => import('../pendaftaran/master-data/page')),
-    notifications: dynamic(() => import('../pendaftaran/notifications/page')),
+    'mobile-jkn': dynamic(() => import('../pendaftaran/mobile-jkn/page')),
+    'satu-sehat': dynamic(() => import('../pendaftaran/satu-sehat/page')),
+    antrian: dynamic(() => import('../pendaftaran/antrian/page')),
+
+    // Collapsible children - Fitur Opsional (only ones that exist)
+    'kpi-laporan': dynamic(() => import('../pendaftaran/kpi-laporan/page')),
+    'kontrol-antrian': dynamic(() => import('../pendaftaran/kontrol-antrian/page')),
+    appointment: dynamic(() => import('../pendaftaran/appointment/page')),
+    rujukan: dynamic(() => import('../pendaftaran/rujukan/page')),
   },
 
   // Admin components - menggunakan file yang sudah ada di [role]/[menu]
@@ -73,18 +75,9 @@ const components: ComponentMap = {
     tagihan: dynamic(() => import('../kasir/tagihan/page')),
     rekonsiliasi: dynamic(() => import('../kasir/rekonsiliasi/page')),
   },
-  manajemenrs: {
-    'kpi-bor': dynamic(() => import('../manajemenrs/kpi-bor/page')),
-    'kpi-los': dynamic(() => import('../manajemenrs/kpi-los/page')),
-    'analisis-bor': dynamic(() => import('../manajemenrs/analisis-bor/page')),
-    'analisis-los': dynamic(() => import('../manajemenrs/analisis-los/page')),
-    pendapatan: dynamic(() => import('../manajemenrs/pendapatan/page')),
-    kepuasan: dynamic(() => import('../manajemenrs/kepuasan/page')),
-    'indikator-kualitas': dynamic(() => import('../manajemenrs/indikator-kualitas/page')),
-    kinerja: dynamic(() => import('../manajemenrs/kinerja/page')),
-    sdm: dynamic(() => import('../manajemenrs/sdm/page')),
-    laporan: dynamic(() => import('../manajemenrs/laporan/page')),
-    'hasil-survey': dynamic(() => import('../manajemenrs/hasil-survey/page')),
+  manajemen: {
+    // Dashboard Executive - sudah ada
+    // Menu lainnya belum diimplementasikan
   },
 }
 

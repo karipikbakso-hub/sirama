@@ -72,18 +72,16 @@ class TriaseController extends Controller
             $validator = Validator::make($request->all(), [
                 'registration_id' => 'required|integer|exists:registrations,id',
                 'patient_id' => 'required|integer|exists:patients,id',
-                'chief_complaint' => 'required|string|max:1000',
-                'vital_signs' => 'required|array',
-                'vital_signs.bloodPressure' => 'nullable|string|max:20',
-                'vital_signs.heartRate' => 'nullable|integer|min:30|max:250',
-                'vital_signs.temperature' => 'nullable|numeric|min:30|max:45',
-                'vital_signs.respirationRate' => 'nullable|integer|min:5|max:60',
-                'vital_signs.oxygenSaturation' => 'nullable|integer|min:50|max:100',
-                'vital_signs.painScale' => 'nullable|integer|min:0|max:10',
-                'vital_signs.consciousness' => 'nullable|string|max:50',
-                'priority' => 'required|in:immediate,urgent,standard,non_urgent',
-                'estimated_wait_time' => 'required|string|max:50',
-                'notes' => 'nullable|string|max:1000',
+                'kategori_triase' => 'required|in:merah,kuning,hijau,hitam',
+                'keluhan_utama' => 'required|string|max:1000',
+                'mekanisme_cedera' => 'nullable|string|max:1000',
+                'airway' => 'required|in:patent,obstruksi,bebas',
+                'breathing' => 'required|in:normal,sesak,tidak_ada',
+                'circulation' => 'required|in:stabil,syok,tidak_teraba',
+                'disability' => 'required|in:composmentis,penurunan_kesadaran,koma',
+                'exposure' => 'required|in:cedera_tampak,tidak_ada',
+                'vital_signs_id' => 'nullable|integer|exists:vital_signs,id',
+                'response_time' => 'nullable|string|max:50',
                 'triage_time' => 'nullable|date'
             ]);
 
@@ -99,8 +97,11 @@ class TriaseController extends Controller
             $data['nurse_id'] = Auth::id();
             $data['created_by'] = Auth::id();
 
-            // Hitung level triase berdasarkan vital signs dan keluhan
-            $data['triage_level'] = $this->calculateTriageLevel($data['vital_signs'], $data['chief_complaint']);
+            // Map kategori_triase ke triage_level untuk kompatibilitas
+            $data['triage_level'] = $this->mapKategoriToLevel($data['kategori_triase']);
+
+            // Map keluhan_utama ke chief_complaint
+            $data['chief_complaint'] = $data['keluhan_utama'];
 
             // Set triage_time jika tidak disediakan
             if (!isset($data['triage_time'])) {
@@ -391,18 +392,18 @@ class TriaseController extends Controller
             }
 
             $totalEntries = $query->count();
-            $level1Count = (clone $query)->where('triage_level', 1)->count();
-            $level2Count = (clone $query)->where('triage_level', 2)->count();
-            $level3Count = (clone $query)->where('triage_level', 3)->count();
-            $level4Count = (clone $query)->where('triage_level', 4)->count();
-            $level5Count = (clone $query)->where('triage_level', 5)->count();
 
-            $levelStats = [
-                'level_1' => $level1Count,
-                'level_2' => $level2Count,
-                'level_3' => $level3Count,
-                'level_4' => $level4Count,
-                'level_5' => $level5Count
+            // Hitung berdasarkan kategori triase
+            $merahCount = (clone $query)->where('triage_level', 1)->count();
+            $kuningCount = (clone $query)->where('triage_level', 2)->count();
+            $hijauCount = (clone $query)->where('triage_level', 3)->count();
+            $hitamCount = (clone $query)->whereIn('triage_level', [4, 5])->count();
+
+            $kategoriStats = [
+                'merah' => $merahCount,
+                'kuning' => $kuningCount,
+                'hijau' => $hijauCount,
+                'hitam' => $hitamCount
             ];
 
             $priorityStats = [
@@ -416,7 +417,7 @@ class TriaseController extends Controller
                 'success' => true,
                 'data' => [
                     'total_entries' => $totalEntries,
-                    'level_statistics' => $levelStats,
+                    'kategori_statistics' => $kategoriStats,
                     'priority_statistics' => $priorityStats
                 ],
                 'message' => 'Statistik triase berhasil diambil'
@@ -428,6 +429,45 @@ class TriaseController extends Controller
                 'message' => 'Terjadi kesalahan saat mengambil statistik triase',
                 'error' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Map kategori triase ke triage level
+     */
+    private function mapKategoriToLevel(string $kategori): int
+    {
+        switch ($kategori) {
+            case 'merah':
+                return 1; // Resusitasi
+            case 'kuning':
+                return 2; // Emergensi
+            case 'hijau':
+                return 3; // Urgent
+            case 'hitam':
+                return 4; // Non-urgent/DOA
+            default:
+                return 5;
+        }
+    }
+
+    /**
+     * Map triage level ke kategori triase
+     */
+    private function mapLevelToKategori(int $level): string
+    {
+        switch ($level) {
+            case 1:
+                return 'merah';
+            case 2:
+                return 'kuning';
+            case 3:
+                return 'hijau';
+            case 4:
+            case 5:
+                return 'hitam';
+            default:
+                return 'hitam';
         }
     }
 

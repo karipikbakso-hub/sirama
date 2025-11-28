@@ -47,30 +47,31 @@ export default function RoleGuard({
       userRoles,
       allowedRoles,
       hasAccess,
-      pathname
+      pathname,
+      userRole: user.role
     })
 
     if (hasAccess) {
       setIsAuthorized(true)
+      setIsChecking(false)
     } else {
-      // User doesn't have access, redirect appropriately
+      // User doesn't have access, redirect to their correct dashboard
       const primaryRole = getPrimaryRole(user)
       const correctDashboard = getDashboardRoute(primaryRole)
 
       console.log('RoleGuard: Access denied, redirecting to:', correctDashboard)
 
-      if (redirectTo) {
-        router.push(redirectTo)
-      } else if (pathname !== correctDashboard) {
+      // Always redirect to correct dashboard when access is denied
+      // Don't stay on the same page even if it's their dashboard route
+      if (pathname !== correctDashboard) {
         router.push(correctDashboard)
       } else {
-        // Already on user's dashboard, just deny access
+        // If already on correct dashboard but still no access, show access denied
         setIsAuthorized(false)
+        setIsChecking(false)
       }
     }
-
-    setIsChecking(false)
-  }, [isAuthenticated, user, allowedRoles, pathname, router, redirectTo])
+  }, [isAuthenticated, user, allowedRoles, pathname, router])
 
   // Loading state
   if (isChecking) {

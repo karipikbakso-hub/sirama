@@ -1,15 +1,19 @@
+
 'use client'
 
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend } from 'chart.js'
-import { Line, Bar } from 'react-chartjs-2'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { DateRangePicker } from '@/components/ui/DateRangePicker'
+import { StatCard } from '@/components/ui/stat-card'
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Title, Tooltip, Legend } from 'chart.js'
+import { Line, Bar, Pie } from 'react-chartjs-2'
 import apiData from '@/lib/apiData'
-import { FaUsers, FaMoneyBillWave, FaBed, FaClock, FaEye } from 'react-icons/fa'
+import { Users, DollarSign, Bed, Clock, Eye, TrendingUp, AlertTriangle, Info, CheckCircle } from 'lucide-react'
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend)
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Title, Tooltip, Legend)
 
 interface KPIMetric {
   nama: string
@@ -27,6 +31,13 @@ interface ChartData {
   [key: string]: any
 }
 
+interface AlertData {
+  type: 'warning' | 'danger' | 'info' | 'success'
+  title: string
+  message: string
+  action: string
+}
+
 interface ExecutiveData {
   kpis: KPIMetric[]
   charts: {
@@ -34,7 +45,11 @@ interface ExecutiveData {
     pendapatan: ChartData[]
     bor: ChartData[]
     los: any[]
+    kunjungan_per_poli: any[]
+    top_diagnosa: any[]
+    top_obat: any[]
   }
+  alerts: AlertData[]
   period: string
   generated_at: string
 }
@@ -43,29 +58,59 @@ export default function ExecutiveDashboard() {
   const [data, setData] = useState<ExecutiveData | null>(null)
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState('30d')
+  const [filterType, setFilterType] = useState<'quick' | 'custom'>('quick')
+  const [customStartDate, setCustomStartDate] = useState('')
+  const [customEndDate, setCustomEndDate] = useState('')
 
   useEffect(() => {
     fetchData()
-  }, [period])
+  }, [period, customStartDate, customEndDate, filterType])
 
   const fetchData = async () => {
     try {
       setLoading(true)
-      const response = await apiData.get(`/backend/public/api/executive-dashboard/kpi?period=${period}`)
+      let url = `/backend/public/api/executive-dashboard/kpi?period=${period}`
+
+      if (filterType === 'custom' && customStartDate && customEndDate) {
+        url = `/backend/public/api/executive-dashboard/kpi?start_date=${customStartDate}&end_date=${customEndDate}`
+      }
+
+      const response = await apiData.get(url)
       setData(response.data)
     } catch (error) {
       console.error('Error fetching executive dashboard data:', error)
-      setData(null) // Pastikan data null jika error
+      setData(null)
     } finally {
       setLoading(false)
     }
   }
 
   const iconMap = {
-    FaUsers: FaUsers,
-    FaMoneyBillWave: FaMoneyBillWave,
-    FaBed: FaBed,
-    FaClock: FaClock,
+    FaUsers: Users,
+    FaMoneyBillWave: DollarSign,
+    FaBed: Bed,
+    FaClock: Clock,
+    FaChartLine: TrendingUp,
+  }
+
+  const getAlertIcon = (type: string) => {
+    switch (type) {
+      case 'warning': return AlertTriangle
+      case 'danger': return AlertTriangle
+      case 'info': return Info
+      case 'success': return CheckCircle
+      default: return Info
+    }
+  }
+
+  const getAlertColor = (type: string) => {
+    switch (type) {
+      case 'warning': return 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20'
+      case 'danger': return 'border-red-500 bg-red-50 dark:bg-red-900/20'
+      case 'info': return 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+      case 'success': return 'border-green-500 bg-green-50 dark:bg-green-900/20'
+      default: return 'border-gray-500 bg-gray-50 dark:bg-gray-900/20'
+    }
   }
 
   if (loading) {
@@ -141,126 +186,115 @@ export default function ExecutiveDashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Dashboard Executive
+            Dashboard Manajemen RS
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Monitoring KPI rumah sakit — kunjungan, pendapatan, BOR & LOS
+            Monitoring KPI utama rumah sakit untuk pengambilan keputusan strategis
           </p>
         </div>
 
-        {/* Period Filter */}
-        <div className="mt-4 sm:mt-0 flex gap-2">
-          {periodOptions.map((option) => (
+        {/* Filter Controls */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          {/* Quick Filters */}
+          <div className="flex gap-2">
             <Button
-              key={option.value}
-              variant={period === option.value ? 'default' : 'outline'}
+              variant={filterType === 'quick' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setPeriod(option.value)}
+              onClick={() => setFilterType('quick')}
             >
-              {option.label}
+              Quick Filter
             </Button>
-          ))}
+            <Button
+              variant={filterType === 'custom' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setFilterType('custom')}
+            >
+              Custom Range
+            </Button>
+          </div>
+
+          {/* Period Filter */}
+          {filterType === 'quick' && (
+            <div className="flex gap-2">
+              {periodOptions.map((option) => (
+                <Button
+                  key={option.value}
+                  variant={period === option.value ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setPeriod(option.value)}
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+          )}
+
+          {/* Custom Date Range */}
+          {filterType === 'custom' && (
+            <DateRangePicker
+              startDate={customStartDate}
+              endDate={customEndDate}
+              onStartDateChange={(date) => setCustomStartDate(date)}
+              onEndDateChange={(date) => setCustomEndDate(date)}
+            />
+          )}
         </div>
       </div>
 
+      {/* Alerts */}
+      {data.alerts && data.alerts.length > 0 && (
+        <div className="space-y-3">
+          {data.alerts.map((alert, index) => {
+            const AlertIcon = getAlertIcon(alert.type)
+            return (
+              <Alert key={index} className={`border-l-4 ${getAlertColor(alert.type)}`}>
+                <AlertIcon className="h-4 w-4" />
+                <AlertTitle className="font-semibold">{alert.title}</AlertTitle>
+                <AlertDescription className="mt-1">
+                  {alert.message}
+                  <br />
+                  <span className="font-medium text-sm">{alert.action}</span>
+                </AlertDescription>
+              </Alert>
+            )
+          })}
+        </div>
+      )}
+
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
         {data.kpis.map((kpi, index) => {
-          const IconComponent = iconMap[kpi.ikon as keyof typeof iconMap] || FaUsers
-          const trendColor = kpi.trend === 'naik' ? 'text-green-600' : kpi.trend === 'turun' ? 'text-red-600' : 'text-gray-600'
-          const bgColor = `${kpi.warna}15` // Add transparency
+          const IconComponent = iconMap[kpi.ikon as keyof typeof iconMap] || Users
+          const trend = kpi.trend === 'naik' ? 'up' : kpi.trend === 'turun' ? 'down' : 'neutral'
 
           return (
-            <Card key={index} className="relative overflow-hidden hover:shadow-lg transition-shadow">
-              <div
-                className="absolute top-0 right-0 w-16 h-16 rounded-bl-3xl opacity-10"
-                style={{ backgroundColor: kpi.warna }}
-              />
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <IconComponent className="h-5 w-5" style={{ color: kpi.warna }} />
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                    <FaEye className="h-3 w-3" />
-                  </Button>
-                </div>
-                <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {kpi.nilai}
-                </CardTitle>
-                <CardDescription className="text-sm font-medium">
-                  {kpi.nama}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">
-                    Hari ini: {kpi.hari_ini}
-                  </span>
-                  <span className={`font-medium ${trendColor}`}>
-                    {kpi.persentase > 0 ? '+' : ''}{kpi.persentase}%
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
+            <StatCard
+              key={index}
+              title={kpi.nama}
+              value={kpi.nilai}
+              description={`Hari ini: ${kpi.hari_ini}`}
+              change={kpi.persentase}
+              trend={trend}
+              icon={IconComponent}
+            />
           )
         })}
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Kunjungan Trends */}
+      {/* Charts Grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/* Revenue 30 Hari */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <FaUsers className="h-5 w-5 text-blue-600" />
-              Tren Kunjungan Pasien
+              <DollarSign className="h-5 w-5 text-green-600" />
+              Tren Pendapatan 30 Hari Terakhir
             </CardTitle>
             <CardDescription>
-              Perkembangan jumlah kunjungan hari ini vs hari sebelumnya
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Line
-              data={{
-                labels: data.charts.kunjungan.map(item => item.tanggal),
-                datasets: [{
-                  label: 'Kunjungan',
-                  data: data.charts.kunjungan.map(item => item.kunjungan),
-                  borderColor: '#3B82F6',
-                  backgroundColor: '#3B82F615',
-                  tension: 0.4,
-                }]
-              }}
-              options={{
-                responsive: true,
-                plugins: {
-                  legend: { display: false },
-                  tooltip: {
-                    callbacks: {
-                      label: (context) => `${context.parsed?.y || 0} pasien`
-                    }
-                  }
-                },
-                scales: {
-                  y: { beginAtZero: true }
-                }
-              }}
-              height={200}
-            />
-          </CardContent>
-        </Card>
-
-        {/* Pendapatan Trends */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <FaMoneyBillWave className="h-5 w-5 text-green-600" />
-              Tren Pendapatan
-            </CardTitle>
-            <CardDescription>
-              Perkembangan pendapatan harian (status: lunas)
+              Perkembangan pendapatan harian rumah sakit
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -294,79 +328,31 @@ export default function ExecutiveDashboard() {
                   }
                 }
               }}
-              height={200}
+              height={300}
             />
           </CardContent>
         </Card>
 
-        {/* BOR Trends */}
+        {/* Kunjungan per Poli */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <FaBed className="h-5 w-5 text-purple-600" />
-              Tren Bed Occupancy Rate (BOR)
+              <Users className="h-5 w-5 text-blue-600" />
+              Kunjungan Pasien per Poli
             </CardTitle>
             <CardDescription>
-              Tingkat hunian tempat tidur rawat inap
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Line
-              data={{
-                labels: data.charts.bor.map(item => item.tanggal),
-                datasets: [{
-                  label: 'BOR (%)',
-                  data: data.charts.bor.map(item => item.bor),
-                  borderColor: '#8B5CF6',
-                  backgroundColor: '#8B5CF615',
-                  tension: 0.4,
-                }]
-              }}
-              options={{
-                responsive: true,
-                plugins: {
-                  legend: { display: false },
-                  tooltip: {
-                    callbacks: {
-                      label: (context) => `${(context.parsed?.y as number)?.toFixed(1) || 0}%`
-                    }
-                  }
-                },
-                scales: {
-                  y: {
-                    beginAtZero: true,
-                    max: 100,
-                    ticks: {
-                      callback: (value) => `${value}%`
-                    }
-                  }
-                }
-              }}
-              height={200}
-            />
-          </CardContent>
-        </Card>
-
-        {/* LOS Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <FaClock className="h-5 w-5 text-orange-600" />
-              Distribusi Length of Stay (LOS)
-            </CardTitle>
-            <CardDescription>
-              Durasi rata-rata rawat inap berdasarkan kategori
+              Distribusi kunjungan pasien berdasarkan poli klinik
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Bar
               data={{
-                labels: data.charts.los.map(item => item.range),
+                labels: data.charts.kunjungan_per_poli.map(item => item.poli),
                 datasets: [{
-                  label: 'Jumlah Pasien',
-                  data: data.charts.los.map(item => item.pasien),
-                  backgroundColor: '#F59E0B',
-                  borderColor: '#D97706',
+                  label: 'Kunjungan',
+                  data: data.charts.kunjungan_per_poli.map(item => item.jumlah),
+                  backgroundColor: '#3B82F6',
+                  borderColor: '#2563EB',
                   borderWidth: 1,
                 }]
               }}
@@ -384,7 +370,98 @@ export default function ExecutiveDashboard() {
                   y: { beginAtZero: true }
                 }
               }}
-              height={200}
+              height={300}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Top 10 Diagnosa */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-purple-600" />
+              Top 10 Diagnosa Terbanyak
+            </CardTitle>
+            <CardDescription>
+              Diagnosa paling sering ditemukan pada pasien
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Pie
+              data={{
+                labels: data.charts.top_diagnosa.slice(0, 10).map(item => `${item.kode} - ${item.nama}`),
+                datasets: [{
+                  data: data.charts.top_diagnosa.slice(0, 10).map(item => item.jumlah),
+                  backgroundColor: [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                    '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#FF6384'
+                  ],
+                  borderWidth: 1,
+                }]
+              }}
+              options={{
+                responsive: true,
+                plugins: {
+                  legend: {
+                    position: 'right' as const,
+                    labels: { boxWidth: 12, font: { size: 11 } }
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label: (context) => `${context.label}: ${context.parsed} kasus`
+                    }
+                  }
+                }
+              }}
+              height={300}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Top 10 Obat Terlaris */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-orange-600" />
+              Top 10 Obat Terlaris
+            </CardTitle>
+            <CardDescription>
+              Obat-obatan yang paling sering diresepkan
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Bar
+              data={{
+                labels: data.charts.top_obat.slice(0, 10).map(item => item.nama_obat.length > 20 ? item.nama_obat.substring(0, 20) + '...' : item.nama_obat),
+                datasets: [{
+                  label: 'Total Terjual',
+                  data: data.charts.top_obat.slice(0, 10).map(item => item.total_terjual),
+                  backgroundColor: '#F59E0B',
+                  borderColor: '#D97706',
+                  borderWidth: 1,
+                }]
+              }}
+              options={{
+                responsive: true,
+                plugins: {
+                  legend: { display: false },
+                  tooltip: {
+                    callbacks: {
+                      label: (context) => `${context.parsed?.y || 0} unit terjual`
+                    }
+                  }
+                },
+                scales: {
+                  y: { beginAtZero: true },
+                  x: {
+                    ticks: {
+                      maxRotation: 45,
+                      minRotation: 45
+                    }
+                  }
+                }
+              }}
+              height={300}
             />
           </CardContent>
         </Card>

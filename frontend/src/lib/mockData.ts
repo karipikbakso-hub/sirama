@@ -82,6 +82,93 @@ export const mockRoles: Role[] = [
   { id: '9', name: 'Manajemen', slug: 'manajemen' }
 ]
 
+// Mock SATUSEHAT sync data
+interface SatusehatStats {
+  total: number;
+  synced: number;
+  pending: number;
+  failed: number;
+  todaySync: number;
+}
+
+interface SatusehatSyncLog {
+  id: string;
+  resourceType: 'Patient' | 'Encounter' | 'Observation';
+  localId: string;
+  patientName: string;
+  satusehatId: string | null;
+  syncStatus: 'pending' | 'success' | 'failed';
+  lastAttempt: string;
+  errorMessage: string | null;
+  actions: string[];
+}
+
+export const mockSatusehatStats: SatusehatStats = {
+  total: 1247,
+  synced: 1189,
+  pending: 45,
+  failed: 13,
+  todaySync: 23
+};
+
+export const mockSyncLogs: SatusehatSyncLog[] = [
+  {
+    id: '1',
+    resourceType: 'Patient',
+    localId: 'MR-20250101-0001',
+    patientName: 'Ahmad Fauzi',
+    satusehatId: 'IHS123456789',
+    syncStatus: 'success',
+    lastAttempt: '5 menit lalu',
+    errorMessage: null,
+    actions: ['view', 'copy']
+  },
+  {
+    id: '2',
+    resourceType: 'Patient',
+    localId: 'MR-20250115-0052',
+    patientName: 'Siti Aminah',
+    satusehatId: null,
+    syncStatus: 'pending',
+    lastAttempt: 'Belum pernah',
+    errorMessage: null,
+    actions: ['sync']
+  },
+  {
+    id: '3',
+    resourceType: 'Encounter',
+    localId: 'REG-20250118-0001',
+    patientName: 'Budi Santoso',
+    satusehatId: null,
+    syncStatus: 'failed',
+    lastAttempt: '1 jam lalu',
+    errorMessage: 'NIK tidak valid format FHIR',
+    actions: ['retry', 'view']
+  },
+  {
+    id: '4',
+    resourceType: 'Patient',
+    localId: 'MR-20241201-0098',
+    patientName: 'Dewi Sari',
+    satusehatId: 'IHS987654321',
+    syncStatus: 'success',
+    lastAttempt: '2 hari lalu',
+    errorMessage: null,
+    actions: ['view', 'copy']
+  },
+  {
+    id: '5',
+    resourceType: 'Observation',
+    localId: 'VR-20250118-0003',
+    patientName: 'Ahmad Fauzi',
+    satusehatId: null,
+    syncStatus: 'failed',
+    lastAttempt: '30 menit lalu',
+    errorMessage: 'Network timeout',
+    actions: ['retry', 'view']
+  }
+];
+
 // Mock API handlers - commented out for now, will be enabled after implementing components
 /*
 export const mockUserAPI = {

@@ -71,16 +71,42 @@ export interface TodayPatient {
   chief_complaint: string
   status: 'waiting' | 'in_progress' | 'completed'
   priority: 'normal' | 'urgent' | 'emergency'
+  registration_no?: string
+  created_at?: string
+  queue_number?: string
 }
 
 // Hook for today's patients
-export function useTodayPatients() {
+export function useTodayPatients(options?: { per_page?: number }) {
   return useQuery({
-    queryKey: ['today-patients'],
+    queryKey: ['today-patients', options?.per_page],
     queryFn: async (): Promise<TodayPatient[]> => {
       try {
-        const response = await api.get('/api/doctor/today-patients')
-        return response.data.success ? response.data.data : []
+        // Use the correct endpoint from DokterDashboardController
+        const response = await api.get('/api/dokter/dashboard/antrean')
+        if (response.data.success) {
+          // Transform the queue data to match TodayPatient interface
+          const transformedData = response.data.data.map((queue: any) => ({
+            id: queue.id,
+            patient_id: queue.patient_id,
+            patient_name: queue.patient_name || 'Unknown',
+            mrn: queue.patient?.mrn || '',
+            appointment_time: queue.created_at,
+            chief_complaint: queue.complaint || 'Tidak ada keluhan',
+            status: queue.status === 'called' ? 'in_progress' :
+                   queue.status === 'active' ? 'waiting' :
+                   queue.status === 'completed' ? 'completed' : 'waiting',
+            priority: 'normal', // Default priority
+            registration_no: `REG-${queue.registration_id || queue.id}`,
+            created_at: queue.created_at,
+            queue_number: queue.queue_number || `Q${queue.id}`
+          }))
+
+          // Limit results if per_page is specified
+          const limit = options?.per_page || 20
+          return transformedData.slice(0, limit)
+        }
+        return []
       } catch (error) {
         console.error('Error fetching today patients:', error)
         return []

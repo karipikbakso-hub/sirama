@@ -67,28 +67,30 @@ class DatabaseSeeder extends Seeder
 
         // Seed master data first
         $this->call([
-            // Master Data (Indonesian tables)
-            MasterTablesSeeder::class,
+            // Comprehensive Master Data
+            ComprehensiveMasterDataSeeder::class,
+
+            // Patient and Transaction Data
+            ComprehensivePatientSeeder::class,
+
+            // Additional Data (Survey, Backup, Audit, etc.)
+            AdditionalDataSeeder::class,
 
             // Legacy seeders (now empty, kept for compatibility)
+            MasterTablesSeeder::class,
+            NursingMasterDataSeeder::class,
             DoctorSeeder::class,
             MedicineSeeder::class,
             Icd10DiagnosisSeeder::class,
             BpjsConfigurationSeeder::class,
-
-            // Patient and basic registration data
             PatientSeeder::class,
             RegistrationSeeder::class,
             SepSeeder::class,
-
-            // Transaction data (some seeders disabled due to field mismatches)
+            LabOrderSeeder::class,
             PatientHistorySeeder::class,
             EmergencyRegistrationSeeder::class,
             QueueManagementSeeder::class,
-            // AppointmentSeeder::class, // Disabled - field mismatch
-            // ReferralSeeder::class, // Disabled - field mismatch
-            // PatientCommunicationSeeder::class, // Disabled - data truncation
-            // BpjsIntegrationSeeder::class, // Disabled - field mismatch
+            PrescriptionTestSeeder::class,
         ]);
     }
 }

@@ -6,23 +6,36 @@ import {
   MdGroup, MdCall, MdChat, MdComputer, MdAccountBalance, MdMedication, MdHealing, MdBiotech, MdMedicalServices
 } from 'react-icons/md';
 
+// Additional icons from lucide-react for new menu structure
+import {
+  LayoutDashboard, UserPlus, FolderOpen, Ambulance, Edit, Monitor,
+  Link, CheckCircle, Smartphone, Cloud, Star, Settings,
+  Calendar, ArrowUp, ArrowRightLeft, ChevronDown, AlertTriangle
+} from 'lucide-react';
+
 // 🎯 SIRAMA Menu System - Master Context (9 Main Roles)
 export type Role =
-  | 'admin'           // 👨‍💼 Administrator/IT
-  | 'pendaftaran'    // 📋 Registration
-  | 'dokter'         // 👨‍⚕️ Doctor
-  | 'perawat'        // 👩‍⚕️ Nurse
-  | 'apoteker'       // 💊 Pharmacist
-  | 'kasir'          // 💰 Cashier
-  | 'laboratorium'   // 🔬 Lab Technician
-  | 'radiologi'      // 📷 Radiology Technician
-  | 'manajemen'      // 🏢 Management (manajemenrs -> manajemen)
+    | 'admin'           // 👨‍💼 Administrator/IT
+    | 'pendaftaran'    // 📋 Registration
+    | 'dokter'         // 👨‍⚕️ Doctor
+    | 'perawat'        // 👩‍⚕️ Nurse
+    | 'apoteker'       // 💊 Pharmacist
+    | 'kasir'          // 💰 Cashier
+    | 'laboratorium'   // 🔬 Lab Technician
+    | 'radiologi'      // 📷 Radiology Technician
+    | 'manajemen'      // 🏢 Management
 
+
+export type Badge = {
+  text: string;
+  variant: 'default' | 'secondary' | 'destructive' | 'outline';
+};
 
 export type MenuItem = {
   label: string;
   href: string;
   icon: React.ElementType;
+  badge?: Badge;
 };
 
 export type MenuCategory = {
@@ -30,7 +43,32 @@ export type MenuCategory = {
   items: MenuItem[];
 };
 
-export const menuByRole: Record<string, (MenuItem | MenuCategory)[]> = {
+// New types for collapsible structure
+export type CollapsibleMenuItem = {
+  label: string;
+  href?: string;
+  icon: React.ElementType;
+  badge?: Badge;
+};
+
+export type CollapsibleMenu = {
+  title: string;
+  icon: React.ElementType;
+  badge?: Badge;
+  collapsible: boolean;
+  defaultOpen?: boolean;
+  children: CollapsibleMenuItem[];
+};
+
+export type Separator = {
+  type: 'separator';
+  title: string;
+};
+
+// Union type for all menu item types
+export type MenuItemType = MenuItem | MenuCategory | CollapsibleMenu | Separator;
+
+export const menuByRole: Record<string, MenuItemType[]> = {
   // 🎯 7 MAIN ROLES - KEMENKES STANDARDS
 
   admin: [
@@ -46,22 +84,56 @@ export const menuByRole: Record<string, (MenuItem | MenuCategory)[]> = {
   ],
 
   pendaftaran: [
-    // 📋 Registration - Patient Registration & Queue Management - Direct path routing
-    { label: 'Beranda', href: '/dashboard/pendaftaran', icon: MdDashboard },
-    { label: 'Dashboard KPI', href: '/dashboard/pendaftaran/kpi', icon: MdBarChart },
-    { label: 'Pendaftaran Baru', href: '/dashboard/pendaftaran/registrasi', icon: MdPerson },
-    { label: 'Data Pasien', href: '/dashboard/pendaftaran/pasien', icon: MdPeople },
-    { label: 'Riwayat Medis', href: '/dashboard/pendaftaran/riwayat', icon: MdAssignment },
-    { label: 'Pendaftaran IGD', href: '/dashboard/pendaftaran/registrasi-igd', icon: MdLocalHospital },
-    { label: 'Monitor Antrian', href: '/dashboard/pendaftaran/antrian', icon: MdListAlt },
-    { label: 'Kontrol Antrian', href: '/dashboard/pendaftaran/antrian-management', icon: MdListAlt },
-    { label: 'SEP BPJS', href: '/dashboard/pendaftaran/sep', icon: MdShield },
-    { label: 'Mobile JKN', href: '/dashboard/pendaftaran/mobile-jkn', icon: MdCall },
-    { label: 'Janji Temu', href: '/dashboard/pendaftaran/appointment', icon: MdCalendarToday },
-    { label: 'Integrasi BPJS', href: '/dashboard/pendaftaran/bpjs-integration', icon: MdCloudUpload },
-    { label: 'Sistem Rujukan', href: '/dashboard/pendaftaran/rujukan', icon: MdLocalHospital },
-    { label: 'Data Master', href: '/dashboard/pendaftaran/master-data', icon: MdStorage },
-    { label: 'Komunikasi Pasien', href: '/dashboard/pendaftaran/notifications', icon: MdChat },
+    // CORE FEATURES - KEMENKES STANDARDS
+    { label: 'Dashboard', href: '/dashboard/pendaftaran', icon: LayoutDashboard },
+    { label: 'Pasien Baru', href: '/dashboard/pendaftaran/registrasi', icon: UserPlus },
+    { label: 'Data Pasien', href: '/dashboard/pendaftaran/pasien', icon: FolderOpen },
+    { label: 'Registrasi IGD', href: '/dashboard/pendaftaran/registrasi-igd', icon: Ambulance, badge: { text: '', variant: 'destructive' } },
+    { label: 'Update Data Pasien', href: '/dashboard/pendaftaran/riwayat', icon: Edit },
+    { label: 'Monitor Antrian', href: '/dashboard/pendaftaran/antrian', icon: Monitor },
+    { label: 'Bridging BPJS', href: '/dashboard/pendaftaran/sep', icon: Link, badge: { text: '⚠️', variant: 'secondary' } },
+    { label: 'Verifikasi SEP', href: '/dashboard/pendaftaran/verifikasi-sep', icon: CheckCircle },
+    { label: 'Mobile JKN', href: '/dashboard/pendaftaran/mobile-jkn', icon: Smartphone },
+    { label: 'SATUSEHAT Sync', href: '/dashboard/pendaftaran/satu-sehat', icon: Cloud, badge: { text: '⚠️', variant: 'secondary' } },
+
+    // SEPARATOR
+    { type: 'separator', title: 'FITUR OPSIONAL' },
+
+    // COLLAPSIBLE MENU - 5 Optional Features
+    {
+      title: 'Fitur Opsional',
+      icon: Star,
+      badge: { text: 'Beta', variant: 'secondary' },
+      collapsible: true,
+      defaultOpen: false,
+      children: [
+        {
+          label: 'Kontrol Antrian New',
+          href: '/dashboard/pendaftaran/kontrol-antrian',
+          icon: Settings
+        },
+        {
+          label: 'Janji Temu',
+          href: '/dashboard/pendaftaran/appointment',
+          icon: Calendar
+        },
+        {
+          label: 'Antrian Prioritas',
+          href: '/dashboard/pendaftaran/antrian-prioritas',
+          icon: ArrowUp
+        },
+        {
+          label: 'Sistem Rujukan',
+          href: '/dashboard/pendaftaran/rujukan',
+          icon: ArrowRightLeft
+        },
+        {
+          label: 'KPI & Laporan',
+          href: '/dashboard/pendaftaran/kpi-laporan',
+          icon: MdBarChart
+        }
+      ]
+    }
   ],
 
   dokter: [
@@ -94,7 +166,7 @@ export const menuByRole: Record<string, (MenuItem | MenuCategory)[]> = {
     { label: 'Dispensing', href: '/dashboard/apoteker/dispensing', icon: MdMedication },
     { label: 'Manajemen Stok', href: '/dashboard/apoteker/stok', icon: MdStorage },
     { label: 'Mutasi Stok', href: '/dashboard/apoteker/mutasi-stok', icon: MdAssignment },
-    { label: 'Penyerahan Obat', href: '/dashboard/apoteker/penyerahan', icon: MdLocalPharmacy },
+    { label: 'Serah Terima Obat', href: '/dashboard/apoteker/penyerahan', icon: MdLocalPharmacy },
     { label: 'Permintaan Obat', href: '/dashboard/apoteker/permintaan', icon: MdListAlt },
     { label: 'Riwayat Resep', href: '/dashboard/apoteker/riwayat-resep', icon: MdFileCopy },
     { label: 'Obat Terpopuler', href: '/dashboard/apoteker/obat-terpopuler', icon: MdBarChart },
@@ -141,7 +213,7 @@ export const menuByRole: Record<string, (MenuItem | MenuCategory)[]> = {
 
   manajemen: [
     // 🏢 Management - Hospital Management - Direct path routing for SPA navigation
-    { label: 'Dashboard', href: '/dashboard/manajemen', icon: MdDashboard },
+    { label: 'Dashboard Executive', href: '/dashboard/manajemen', icon: MdDashboard },
     { label: 'KPI BOR', href: '/dashboard/manajemen/kpi-bor', icon: MdBarChart },
     { label: 'KPI LOS', href: '/dashboard/manajemen/kpi-los', icon: MdBarChart },
     { label: 'Analisis BOR', href: '/dashboard/manajemen/analisis-bor', icon: MdBarChart },

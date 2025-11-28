@@ -13,54 +13,50 @@ class ObatKeluar extends Model
     protected $table = 't_obat_keluar';
 
     protected $fillable = [
-        'resep_detail_id',
-        'user_id',
-        'tanggal_keluar',
-        'jumlah_keluar',
-        'harga_satuan',
-        'subtotal',
-        'status',
-        'catatan',
+        'registration_id',
+        'prescription_item_id',
+        'medicine_id',
+        'quantity_given',
+        'given_at',
+        'nurse_id',
+        'notes',
     ];
 
     protected $casts = [
-        'tanggal_keluar' => 'datetime',
-        'jumlah_keluar' => 'integer',
-        'harga_satuan' => 'decimal:2',
-        'subtotal' => 'decimal:2',
-        'status' => 'string',
+        'given_at' => 'datetime',
+        'quantity_given' => 'integer',
     ];
 
     /**
-     * Get the resep detail that owns the obat keluar.
+     * Get the registration that owns the obat keluar.
      */
-    public function resepDetail(): BelongsTo
+    public function registration(): BelongsTo
     {
-        return $this->belongsTo(ResepDetail::class, 'resep_detail_id');
+        return $this->belongsTo(Registration::class, 'registration_id');
     }
 
     /**
-     * Get the user that created the obat keluar record.
+     * Get the prescription item that owns the obat keluar.
      */
-    public function user(): BelongsTo
+    public function prescriptionItem(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(PrescriptionItem::class, 'prescription_item_id');
     }
 
     /**
-     * Get the medicine through resep detail.
+     * Get the medicine that owns the obat keluar.
      */
-    public function obat()
+    public function medicine(): BelongsTo
     {
-        return $this->resepDetail->obat();
+        return $this->belongsTo(Medicine::class, 'medicine_id');
     }
 
     /**
-     * Get the registration through resep detail.
+     * Get the nurse that created the obat keluar record.
      */
-    public function registrasi()
+    public function nurse(): BelongsTo
     {
-        return $this->resepDetail->resep->registrasi();
+        return $this->belongsTo(User::class, 'nurse_id');
     }
 
     /**

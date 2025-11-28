@@ -259,8 +259,8 @@ class LaboratoriumController extends Controller
             }
 
             $labTests = $query->orderBy('nama_pemeriksaan')
-                             ->limit(50)
-                             ->get(['id', 'nama_pemeriksaan', 'kode_pemeriksaan', 'kategori', 'satuan', 'nilai_normal', 'harga']);
+                              ->limit(50)
+                              ->get(['id', 'nama_pemeriksaan', 'kode_lab', 'kategori', 'satuan', 'nilai_normal', 'tarif']);
 
             return response()->json([
                 'success' => true,

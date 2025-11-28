@@ -3,6 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\MedicineBatch;
+use App\Models\StockAdjustment;
+use App\Models\StockMovement;
 
 class Medicine extends Model
 {
@@ -33,6 +36,8 @@ class Medicine extends Model
         'updated_at' => 'datetime',
     ];
 
+    protected $appends = ['current_stock'];
+
     // Scopes
     public function scopeActive($query)
     {
@@ -54,5 +59,41 @@ class Medicine extends Model
               ->orWhere('nama_generik', 'like', "%{$search}%")
               ->orWhere('kode_obat', 'like', "%{$search}%");
         });
+    }
+
+    /**
+     * Relationship with medicine batches
+     */
+    public function batches()
+    {
+        return $this->hasMany(MedicineBatch::class, 'medicine_id');
+    }
+
+    /**
+     * Relationship with stock adjustments
+     */
+    public function stockAdjustments()
+    {
+        return $this->hasMany(StockAdjustment::class, 'medicine_id');
+    }
+
+    /**
+     * Relationship with stock movements
+     */
+    public function stockMovements()
+    {
+        return $this->hasMany(StockMovement::class, 'medicine_id');
+    }
+
+    /**
+     * Get current stock accessor
+     * Calculate current stock from medicine batches
+     */
+    public function getCurrentStockAttribute()
+    {
+        // Calculate current stock from active medicine batches
+        return $this->batches()
+            ->where('expired_date', '>', now())
+            ->sum('stock');
     }
 }

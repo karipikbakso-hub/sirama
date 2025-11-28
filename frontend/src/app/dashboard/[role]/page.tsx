@@ -33,9 +33,9 @@ function RoleHomePage({ role }: { role: string }) {
     case 'kasir':
       const KasirHome = require('./kasir/page').default
       return <KasirHome />
-    case 'manajemenrs':
-      const ManajemenRsHome = require('./manajemenrs/page').default
-      return <ManajemenRsHome />
+    case 'manajemen':
+      const ManajemenHome = require('./manajemen/page').default
+      return <ManajemenHome />
     default:
       return <GenericHomePage role={role} />
   }

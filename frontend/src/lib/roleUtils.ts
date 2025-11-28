@@ -22,8 +22,9 @@ export function getDashboardRoute(role: string): string {
     'laboratory': '/dashboard/laboratorium',
     'radiologi': '/dashboard/radiologi',
     'radiology': '/dashboard/radiologi',
-    'manajemenrs': '/dashboard/manajemenrs',
-    'management': '/dashboard/manajemenrs',
+    'manajemenrs': '/dashboard/manajemen',
+    'management': '/dashboard/manajemen',
+    'manajemen': '/dashboard/manajemen',
 
     // Fallback
     'user': '/dashboard',

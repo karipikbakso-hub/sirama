@@ -66,11 +66,11 @@ interface CPPTEntry {
 
 interface Patient {
   id: string
-  name: string
-  medicalRecordNumber: string
-  room: string
-  bed: string
-  lastCPPT?: CPPTEntry
+  nama_lengkap: string
+  no_rm: string
+  room?: string
+  bed?: string
+  last_cppt?: CPPTEntry
 }
 
 export default function CPPTPage() {
@@ -143,22 +143,22 @@ export default function CPPTPage() {
         setPatients([
           {
             id: '1',
-            name: 'Budi Santoso',
-            medicalRecordNumber: 'MR-2025-001',
+            nama_lengkap: 'Budi Santoso',
+            no_rm: 'MR-2025-001',
             room: 'Ward-01',
             bed: 'A1'
           },
           {
             id: '2',
-            name: 'Maya Sari',
-            medicalRecordNumber: 'MR-2025-002',
+            nama_lengkap: 'Maya Sari',
+            no_rm: 'MR-2025-002',
             room: 'ICU-01',
             bed: 'B1'
           },
           {
             id: '3',
-            name: 'Ahmad Surya',
-            medicalRecordNumber: 'MR-2025-003',
+            nama_lengkap: 'Ahmad Surya',
+            no_rm: 'MR-2025-003',
             room: 'Ward-02',
             bed: 'C2'
           }
@@ -170,22 +170,22 @@ export default function CPPTPage() {
       setPatients([
         {
           id: '1',
-          name: 'Budi Santoso',
-          medicalRecordNumber: 'MR-2025-001',
+          nama_lengkap: 'Budi Santoso',
+          no_rm: 'MR-2025-001',
           room: 'Ward-01',
           bed: 'A1'
         },
         {
           id: '2',
-          name: 'Maya Sari',
-          medicalRecordNumber: 'MR-2025-002',
+          nama_lengkap: 'Maya Sari',
+          no_rm: 'MR-2025-002',
           room: 'ICU-01',
           bed: 'B1'
         },
         {
           id: '3',
-          name: 'Ahmad Surya',
-          medicalRecordNumber: 'MR-2025-003',
+          nama_lengkap: 'Ahmad Surya',
+          no_rm: 'MR-2025-003',
           room: 'Ward-02',
           bed: 'C2'
         }
@@ -213,8 +213,8 @@ export default function CPPTPage() {
       console.error('Error fetching CPPT entries:', error)
       // Fallback to mock data
       const mockEntries: CPPTEntry[] = safePatients
-        .filter(p => p.lastCPPT)
-        .map(p => p.lastCPPT!)
+        .filter(p => p.last_cppt)
+        .map(p => p.last_cppt!)
         .sort((a, b) => new Date(`${b.date} ${b.time}`).getTime() - new Date(`${a.date} ${a.time}`).getTime())
       setCpptEntries(mockEntries)
     } finally {
@@ -223,9 +223,9 @@ export default function CPPTPage() {
   }
 
   const filteredPatients = safePatients.filter(patient =>
-    patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.medicalRecordNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.room.toLowerCase().includes(searchTerm.toLowerCase())
+    patient.nama_lengkap.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    patient.no_rm.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (patient.room && patient.room.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
   const getStatusColor = (status: string) => {
@@ -346,8 +346,8 @@ export default function CPPTPage() {
         const newEntry: CPPTEntry = {
           id: Date.now().toString(),
           patientId: selectedPatient.id,
-          patientName: selectedPatient.name,
-          medicalRecordNumber: selectedPatient.medicalRecordNumber,
+          patientName: selectedPatient.nama_lengkap,
+          medicalRecordNumber: selectedPatient.no_rm,
           date: new Date().toISOString().split('T')[0],
           time: new Date().toTimeString().slice(0, 5),
           nurseId: 'current-nurse-id',
@@ -410,8 +410,8 @@ export default function CPPTPage() {
       const newEntry: CPPTEntry = {
         id: Date.now().toString(),
         patientId: selectedPatient.id,
-        patientName: selectedPatient.name,
-        medicalRecordNumber: selectedPatient.medicalRecordNumber,
+        patientName: selectedPatient.nama_lengkap,
+        medicalRecordNumber: selectedPatient.no_rm,
         date: new Date().toISOString().split('T')[0],
         time: new Date().toTimeString().slice(0, 5),
         nurseId: 'current-nurse-id',
@@ -560,25 +560,25 @@ export default function CPPTPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {patient.name}
+                    {patient.nama_lengkap}
                   </h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     {patient.room} - {patient.bed}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-500">
-                    {patient.medicalRecordNumber}
+                    {patient.no_rm}
                   </p>
                 </div>
               </div>
               {patient.lastCPPT && (
-                <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(patient.lastCPPT.status)}`}>
-                  {getStatusIcon(patient.lastCPPT.status)}
-                  {getStatusText(patient.lastCPPT.status)}
+                <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(patient.last_cppt.status)}`}>
+                  {getStatusIcon(patient.last_cppt.status)}
+                  {getStatusText(patient.last_cppt.status)}
                 </span>
               )}
             </div>
 
-            {patient.lastCPPT && (
+            {patient.last_cppt && (
               <div className="space-y-3 mb-4">
                 <div className="flex items-center gap-2 text-sm">
                   <MdAccessTime className="text-gray-400 text-lg" />
@@ -608,9 +608,9 @@ export default function CPPTPage() {
                 <MdNoteAlt className="text-lg" />
                 Buat CPPT
               </button>
-              {patient.lastCPPT && (
+              {patient.last_cppt && (
                 <button
-                  onClick={() => setSelectedEntry(patient.lastCPPT!)}
+                  onClick={() => setSelectedEntry(patient.last_cppt!)}
                   className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                 >
                   <MdAssessment className="text-lg" />
