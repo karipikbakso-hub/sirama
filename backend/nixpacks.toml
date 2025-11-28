@@ -3,7 +3,7 @@ nixPkgs = ["...", "php82", "php82Packages.composer", "nodejs", "yarn"]
 
 [phases.install]
 cmds = [
-  "composer install --no-dev --optimize-autoloader",
+  "composer install --no-dev --optimize-autoloader --ignore-platform-req=ext-exif --ignore-platform-req=ext-zip",
   "npm ci",
   "npm run build"
 ]
