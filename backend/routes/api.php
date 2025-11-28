@@ -74,10 +74,12 @@ use App\Http\Controllers\Api\IntegrationController;
 use App\Http\Controllers\Api\ResepController;
 use App\Http\Controllers\Api\RolePermissionController;
 use App\Http\Controllers\Api\PoliController;
+use App\Http\Controllers\Api\HealthController;
 
 Route::get('/sanctum/csrf-cookie', [CsrfCookieController::class, 'show']);
 
 // Public routes (no authentication required)
+Route::get('health', [HealthController::class, 'index']);
 Route::get('appointments/statistics', [AppointmentController::class, 'statistics']);
 Route::get('patients-search', [PatientController::class, 'search']); // Make patient search public for autocomplete
 
