@@ -1,4 +1,4 @@
-f'use client'
+'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from './card'
 import { Badge } from './badge'
